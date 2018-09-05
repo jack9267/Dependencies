@@ -62,8 +62,12 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG=1")
 
 # Add directx sdk to include/linker path
 if(WIN32)
-	include_directories($ENV{DXSDK_DIR}/Include)
-	link_directories("$ENV{DXSDK_DIR}/Lib/${ENGINE_PLATFORM}")
+	if(DEFINED $ENV{DXSDK_DIR})
+		include_directories($ENV{DXSDK_DIR}/Include)
+		link_directories("$ENV{DXSDK_DIR}/Lib/${ENGINE_PLATFORM}")
+	else()
+		message(FATAL_ERROR "The DirectX SDK needs to be installed.\n\nhttps://www.microsoft.com/en-gb/download/details.aspx?id=6812")
+	endif()
 endif()
 
 macro(add_compiler_flags FLAGS)
@@ -103,6 +107,9 @@ if(MSVC)
 		# Prevent static variables from being thread local storage
 		add_compiler_flags("/Zc:threadSafeInit-")
 	endif()
+
+	# disable manifest on dlls
+	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /MANIFEST:NO")
 
 	# Warnings should be errors
 	#add_compiler_flags("/WX")
