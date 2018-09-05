@@ -8,7 +8,7 @@ if %ERRORLEVEL% neq 0 pause && goto eof
 cmake --build . --config Debug --target install
 if %ERRORLEVEL% neq 0 pause && goto eof
 cmake --build . --config Release --target install
-pause
+if %ERRORLEVEL% neq 0 pause && goto eof
 
 cd ..
 mkdir CMake.%2_static.tmp
@@ -19,6 +19,7 @@ if %ERRORLEVEL% neq 0 pause && goto eof
 cmake --build . --config Debug --target install
 if %ERRORLEVEL% neq 0 pause && goto eof
 cmake --build . --config Release --target install
+if %ERRORLEVEL% neq 0 pause && goto eof
 pause
 
 :eof
