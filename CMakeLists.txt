@@ -62,7 +62,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG=1")
 
 # Add directx sdk to include/linker path
 if(WIN32)
-	if(DEFINED $ENV{DXSDK_DIR})
+	if(DEFINED ENV{DXSDK_DIR})
 		include_directories($ENV{DXSDK_DIR}/Include)
 		link_directories("$ENV{DXSDK_DIR}/Lib/${ENGINE_PLATFORM}")
 	else()
