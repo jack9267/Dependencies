@@ -1,10 +1,3 @@
-//
-// stdbool.h
-//
-//      Copyright (c) Microsoft Corporation. All rights reserved.
-//
-// The C Standard Library <stdbool.h> header.
-//
 #ifndef _STDBOOL
 #define _STDBOOL
 
@@ -12,15 +5,10 @@
 
 #ifndef __cplusplus
 
-#define bool	_Bool
+#define bool	int
 #define false	0
 #define true	1
 
-#endif /* __cplusplus */
+#endif
 
-#endif /* _STDBOOL */
-
-/*
- * Copyright (c) 1992-2010 by P.J. Plauger.  ALL RIGHTS RESERVED.
- * Consult your license regarding permissions and restrictions.
-V5.30:0009 */
+#endif
