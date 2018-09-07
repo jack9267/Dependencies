@@ -1,4 +1,11 @@
 
+if(MSVC)
+	if(MSVC_VERSION LESS 1900)
+		# Visual studio 2015 adds support for stdbool.h, add it for older versions
+		include_directories("${CMAKE_CURRENT_SOURCE_DIR}/stdbool")
+	endif()
+endif()
+
 set(PROJECTS "")
 
 list(APPEND PROJECTS "zlib-1.2.11")
