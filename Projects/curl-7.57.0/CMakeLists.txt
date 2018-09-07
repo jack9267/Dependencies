@@ -3,6 +3,10 @@ file(GLOB_RECURSE SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/lib/vauth/*.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/lib/vtls/*.c)
 
+if(WIN32)
+	file(GLOB_RECURSE VERSION_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/*.rc)
+end()
+
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/lib")
 
 add_definitions(-DBUILDING_LIBCURL)
@@ -40,9 +44,9 @@ add_definitions(-DUSE_IPV6)
 
 new_library_static(curl "${SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/src/include" "CURL_STATICLIB;USE_SSLEAY;USE_OPENSSL")
 if(WIN32)
-new_library_static(curl_sspi "${SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/src/include" "CURL_STATICLIB;USE_WINDOWS_SSPI;USE_SCHANNEL")
+	new_library_static(curl_sspi "${SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/src/include" "CURL_STATICLIB;USE_WINDOWS_SSPI;USE_SCHANNEL")
 endif()
-new_library_shared(curl "${SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/src/include" "USE_SSLEAY;USE_OPENSSL")
+new_library_shared(curl "${SOURCES};${VERSION_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/src/include" "USE_SSLEAY;USE_OPENSSL")
 
 if(WIN32)
 	target_link_libraries(curl wldap32 ws2_32)
