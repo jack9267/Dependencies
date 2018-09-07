@@ -111,6 +111,9 @@ if(MSVC)
 	# disable manifest on dlls
 	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /MANIFEST:NO")
 
+	# This object file does not define any previously undefined public symbols, so it will not be used by any link operation that consumes this library
+	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /ignore:4221")
+
 	# Warnings should be errors
 	#add_compiler_flags("/WX")
 
