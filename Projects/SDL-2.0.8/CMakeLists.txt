@@ -2,7 +2,6 @@ set(SDL2_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(EXTRA_LIBS "")
 
 include_directories("${SDL2_SOURCE_DIR}/include")
-include_directories("${SDL2_SOURCE_DIR}/include/SDL2")
 
 file(GLOB SOURCE_FILES
   ${SDL2_SOURCE_DIR}/src/*.c
