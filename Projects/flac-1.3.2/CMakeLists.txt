@@ -2,9 +2,6 @@ cmake_policy(SET CMP0005 NEW) # do not escape preprocessor defines
 
 enable_language(ASM_NASM)
 
-file(GLOB LIBFLAC_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/src/libFLAC/*.c)
-list(APPEND LIBFLAC_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/src/share/win_utf8_io/win_utf8_io.c)
-
 if(MSVC)
 	# var' : conversion from 'size_t' to 'type', possible loss of data
 	disable_warning(4267)
@@ -12,6 +9,20 @@ if(MSVC)
 	# The compiler encountered a deprecated declaration.
 	disable_warning(4996)
 endif()
+
+file(GLOB LIBFLAC_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/src/libFLAC/*.c)
+
+if(WIN32)
+	list(APPEND LIBFLAC_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/src/share/win_utf8_io/win_utf8_io.c)
+else()
+	list(FILTER LIBFLAC_SOURCES EXCLUDE REGEX "windows[^/]*$")
+
+	file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/config.h "#include <inttypes.h>")
+	include_directories(${CMAKE_CURRENT_BINARY_DIR})
+	add_definitions(-DHAVE_CONFIG_H)
+endif()
+
+file(GLOB LIBFLACXX_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/src/libFLAC++/*.cpp)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/src/libFLAC/include")
@@ -46,8 +57,6 @@ if(CMAKE_BUILD_TYPE MATCHES Debug)
     add_definitions(-DFLAC__OVERFLOW_DETECT)
 endif()
 
-add_definitions(-DFLAC_API_EXPORTS)
-
 add_definitions(-DPACKAGE_VERSION="1.3.2")
 add_definitions(-DFLAC__HAS_OGG)
 add_definitions(-DFLAC__ALIGN_MALLOC_DATA) # 32 byte boundary
@@ -56,9 +65,13 @@ add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 add_definitions(-D_CRT_NONSTDC_NO_WARNINGS)
 
 new_library_static(FLAC "${LIBFLAC_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/include" "FLAC__NO_DLL")
-new_library_shared(FLAC "${LIBFLAC_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/include" "")
+new_library_shared(FLAC "${LIBFLAC_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/include" "FLAC_API_EXPORTS")
+
+new_library_static(FLAC++ "${LIBFLACXX_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/include" "FLAC__NO_DLL")
+new_library_shared(FLAC++ "${LIBFLACXX_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/include" "FLACPP_API_EXPORTS")
 
 target_link_libraries(FLAC ogg)
+target_link_libraries(FLAC++ FLAC)
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/include/FLAC/ DESTINATION include/FLAC FILES_MATCHING PATTERN "*.h*")
 
