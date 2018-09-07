@@ -60,5 +60,5 @@ new_library_shared(FLAC "${LIBFLAC_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/includ
 
 target_link_libraries(FLAC ogg)
 
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/include/FLAC/ DESTINATION include/FLAC)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/include/FLAC/ DESTINATION include/FLAC FILES_MATCHING PATTERN "*.h*")
 
