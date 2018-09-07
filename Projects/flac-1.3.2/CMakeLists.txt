@@ -75,3 +75,5 @@ target_link_libraries(FLAC++ FLAC)
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/include/FLAC/ DESTINATION include/FLAC FILES_MATCHING PATTERN "*.h*")
 
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/include/FLAC++/ DESTINATION include/FLAC++ FILES_MATCHING PATTERN "*.h*")
+
