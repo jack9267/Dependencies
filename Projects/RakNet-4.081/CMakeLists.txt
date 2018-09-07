@@ -9,7 +9,7 @@ file(GLOB ALL_HEADER_SRCS ${RakNet_SOURCE_DIR}/Source/*.h)
 file(GLOB ALL_CPP_SRCS ${RakNet_SOURCE_DIR}/Source/*.cpp)
 
 if(WIN32)
-	set(DEFINES "_WINSOCK_DEPRECATED_NO_WARNINGS;_RAKNET_LIB")
+	set(DEFINES "_RAKNET_LIB")
 else()
 	set(DEFINES "")
 endif()

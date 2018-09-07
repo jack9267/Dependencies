@@ -103,6 +103,9 @@ if(MSVC)
 	# common defines
 	add_definitions(-DWIN32 -D_WINDOWS -D_CRT_SECURE_NO_DEPRECATE -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_WARNINGS -D_USE_MATH_DEFINES=1 -DNOMINMAX)
 
+	# no deprecated warnings for winsock
+	add_definitions(-D_WINSOCK_DEPRECATED_NO_WARNINGS)
+
 	if(MSVC_VERSION GREATER_EQUAL 1900)
 		# Prevent static variables from being thread local storage
 		add_compiler_flags("/Zc:threadSafeInit-")
