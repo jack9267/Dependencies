@@ -14,11 +14,7 @@ if(WIN32)
 	add_definitions(-DCPPFLAGS -DOPENSSL_NO_SPEED -DNO_SYSLOG -DNO_CRYPT)
 endif()
 
-if(MSVC)
-	if(MSVC_VERSION GREATER_EQUAL 1900)
-		add_definitions(-Dinline=__inline)
-	endif()
-endif()
+add_definitions(-Dinline=__inline)
 
 if(WIN32)
 	add_definitions(-DHAVE_STRNLEN)
