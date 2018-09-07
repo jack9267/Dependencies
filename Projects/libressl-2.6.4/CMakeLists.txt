@@ -15,7 +15,9 @@ if(WIN32)
 endif()
 
 if(MSVC)
-	add_definitions(-Dinline=__inline)
+	if(MSVC_VERSION GREATER_EQUAL 1900)
+		add_definitions(-Dinline=__inline)
+	endif()
 endif()
 
 if(WIN32)
