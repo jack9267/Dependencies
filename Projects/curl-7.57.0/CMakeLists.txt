@@ -5,7 +5,7 @@ file(GLOB_RECURSE SOURCES
 
 if(WIN32)
 	file(GLOB_RECURSE VERSION_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/*.rc)
-end()
+endif()
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/lib")
 
