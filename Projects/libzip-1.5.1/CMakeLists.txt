@@ -9,6 +9,9 @@ list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/zip_random_uwp.c")
 list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/zip_winzip_aes.c")
 
 if(MSVC)
+	# function' undefined; assuming extern returning int
+	disable_warning(4013)
+
 	# operator' : result of 32-bit shift implicitly converted to 64 bits (was 64-bit shift intended?)
 	disable_warning(4334)
 endif()
