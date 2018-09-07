@@ -1,0 +1,3 @@
+set(SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/glew.c)
+
+new_library_static(glew "${SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/include" "GLEW_EXPORTS;GLEW_STATIC;GLEW_BUILD")
