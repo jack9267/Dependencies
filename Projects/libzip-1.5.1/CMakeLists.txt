@@ -20,6 +20,7 @@ add_definitions(-DZIP_STATIC)
 add_definitions(-DHAVE_CONFIG_H)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/include")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 
-new_library_static(zip "${SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/include" "")
-#new_library_shared(zip "${SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/include" "")
+new_library_static(zip "${SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/src/include" "")
+#new_library_shared(zip "${SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/src/include" "")
