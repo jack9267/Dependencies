@@ -1,0 +1,7 @@
+C:/Users/Jack/Downloads/pcre2-10.31/build/CMakeFiles/INSTALL.dir
+C:/Users/Jack/Downloads/pcre2-10.31/build/CMakeFiles/RUN_TESTS.dir
+C:/Users/Jack/Downloads/pcre2-10.31/build/CMakeFiles/pcre2-8.dir
+C:/Users/Jack/Downloads/pcre2-10.31/build/CMakeFiles/pcre2-posix.dir
+C:/Users/Jack/Downloads/pcre2-10.31/build/CMakeFiles/pcre2test.dir
+C:/Users/Jack/Downloads/pcre2-10.31/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/Jack/Downloads/pcre2-10.31/build/CMakeFiles/ZERO_CHECK.dir

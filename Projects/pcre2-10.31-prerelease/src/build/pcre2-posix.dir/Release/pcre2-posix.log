@@ -1,0 +1,5 @@
+﻿  Building Custom Rule C:/Users/Jack/Downloads/pcre2-10.31/CMakeLists.txt
+  CMake does not need to re-run because C:/Users/Jack/Downloads/pcre2-10.31/build/CMakeFiles/generate.stamp is up-to-date.
+  pcre2posix.c
+     Creating library C:/Users/Jack/Downloads/pcre2-10.31/build/Release/pcre2-posix.lib and object C:/Users/Jack/Downloads/pcre2-10.31/build/Release/pcre2-posix.exp
+  pcre2-posix.vcxproj -> C:\Users\Jack\Downloads\pcre2-10.31\build\Release\pcre2-posix.dll
