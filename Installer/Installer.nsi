@@ -2,6 +2,7 @@
 !include "MUI2.nsh"
 ;!include "WriteEnvStr.nsh"
 
+SetCompressor lzma
 Unicode true
 
 Name "Dependencies"
