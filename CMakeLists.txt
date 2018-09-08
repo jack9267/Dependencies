@@ -11,6 +11,8 @@ set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
 set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO}")
 
+set(ENGINE_CXX_11 false)
+
 # C++11 minimum
 if(NOT MSVC)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
@@ -27,6 +29,12 @@ if(NOT MSVC)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
 	else()
 		message(FATAL_ERROR "Your C++ compiler does not support C++11.")
+	endif()
+
+	set(ENGINE_CXX_11 true)
+else()
+	if(MSVC_VERSION GREATER_EQUAL 1900)
+		set(ENGINE_CXX_11 true)
 	endif()
 endif()
 
