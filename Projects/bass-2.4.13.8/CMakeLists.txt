@@ -17,5 +17,4 @@ if(WIN32)
 	install(FILES ${BASS_FILES} DESTINATION "${LIB_DIRECTORY}/Debug")
 
 	install(FILES ${BASS_FILES} DESTINATION "${LIB_DIRECTORY}/Release")
-
 endif()

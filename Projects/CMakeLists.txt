@@ -1,5 +1,41 @@
 
 if(MSVC)
+	# no deprecated warnings for winsock
+	add_definitions(-D_WINSOCK_DEPRECATED_NO_WARNINGS)
+
+	# macro redefinition
+	disable_warning(4005)
+
+	# signed/unsigned mismatch
+	disable_warning(4018)
+
+	# different 'modifier' qualifiers
+	disable_warning(4090)
+
+	# ignored on left of 'type' when no variable is declared
+	disable_warning(4091)
+
+	# unary minus operator applied to unsigned type, result still unsigned
+	disable_warning(4146)
+
+	# conversion from 'type1' to 'type2', possible loss of data
+	disable_warning(4242)
+
+	# conversion from 'type1' to 'type2', possible loss of data
+	disable_warning(4244)
+
+	# conversion from 'type1' to 'type2', signed/unsigned mismatch
+	disable_warning(4245)
+
+	# conversion from 'size_t' to 'type', possible loss of data
+	disable_warning(4267)
+
+	# signed/unsigned mismatch
+	disable_warning(4389)
+
+	# conversion from 'type_1' to 'type_2' requires a narrowing conversion
+	disable_warning(4838)
+
 	if(MSVC_VERSION LESS 1900)
 		# Visual studio 2015 adds support for stdbool.h, add it for older versions
 		include_directories("${CMAKE_CURRENT_SOURCE_DIR}/stdbool")
@@ -14,7 +50,7 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/freetype-2.8.1/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/squirrel-3.1/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/sqstdlib-3.1/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/tinyxml-2.6.2/include")
-if(MSVC_VERSION GREATER_EQUAL 1900)
+if(COMPILER_SUPPORTS_CXX11 AND MSVC)
 	include_directories("${CMAKE_CURRENT_SOURCE_DIR}/libressl-2.6.4/src/include")
 endif()
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/libzip-1.5.1/src/include")
@@ -24,7 +60,7 @@ add_subdirectory(zlib-1.2.11)
 add_subdirectory(png-1.6.24)
 add_subdirectory(ogg-1.3.3)
 add_subdirectory(vorbis-1.3.6)
-if(ENGINE_CXX_11)
+if(COMPILER_SUPPORTS_CXX11)
 	add_subdirectory(flac-1.3.2)
 	add_subdirectory(theora-1.1.1)
 endif()
@@ -35,13 +71,13 @@ add_subdirectory(squirrel-3.1)
 add_subdirectory(sqstdlib-3.1)
 add_subdirectory(tinyxml-2.6.2)
 add_subdirectory(asmjit-1.0.0)
-if(ENGINE_CXX_11)
+if(COMPILER_SUPPORTS_CXX11 AND MSVC)
 	add_subdirectory(discord-rpc-3.3.0)
 	add_subdirectory(libressl-2.6.4)
 endif()
 add_subdirectory(libzip-1.5.1)
 add_subdirectory(rapidjson-1.1.0)
-if(ENGINE_CXX_11)
+if(COMPILER_SUPPORTS_CXX11)
 	add_subdirectory(curl-7.57.0)
 	add_subdirectory(SDL-2.0.8)
 	add_subdirectory(mongoose-6.10)
@@ -49,13 +85,13 @@ if(ENGINE_CXX_11)
 endif()
 add_subdirectory(enet-1.3.3)
 add_subdirectory(lzma-18.01)
-if(ENGINE_CXX_11)
+if(COMPILER_SUPPORTS_CXX11)
 	add_subdirectory(md5)
 endif()
 add_subdirectory(bass-2.4.13.8)
 add_subdirectory(fmod-1.8.3)
 add_subdirectory(jpeg-6b)
-if(ENGINE_CXX_11)
+if(COMPILER_SUPPORTS_CXX11)
 	add_subdirectory(pcre2-10.31-prerelease)
 endif()
 add_subdirectory(glew-1.2.3.4)

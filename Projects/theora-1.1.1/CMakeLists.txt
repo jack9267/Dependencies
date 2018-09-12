@@ -47,14 +47,17 @@ if(MSVC)
 	disable_warning(4700)
 endif()
 
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/lib")
 
-new_library_static(theora "${THEORA_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/src/include" "")
+install_include("${CMAKE_CURRENT_SOURCE_DIR}/src/include")
+
+new_library_static(theora "${THEORA_SOURCES}" "")
 
 if(WIN32)
 	list(APPEND THEORA_SOURCES "libtheora.def")
 endif()
 
-new_library_shared(theora "${THEORA_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/src/include" "LIBTHEORA_EXPORTS")
+new_library_shared(theora "${THEORA_SOURCES}" "LIBTHEORA_EXPORTS")
 
 target_link_libraries(theora ogg)

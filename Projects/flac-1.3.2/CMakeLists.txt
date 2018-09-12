@@ -67,11 +67,11 @@ add_definitions(-DHAVE_LROUND)
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 add_definitions(-D_CRT_NONSTDC_NO_WARNINGS)
 
-new_library_static(FLAC "${LIBFLAC_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/include" "FLAC__NO_DLL")
-new_library_shared(FLAC "${LIBFLAC_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/include" "FLAC_API_EXPORTS")
+new_library_static(FLAC "${LIBFLAC_SOURCES}" "FLAC__NO_DLL")
+new_library_shared(FLAC "${LIBFLAC_SOURCES}" "FLAC_API_EXPORTS")
 
-new_library_static(FLAC++ "${LIBFLACXX_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/include" "FLAC__NO_DLL")
-new_library_shared(FLAC++ "${LIBFLACXX_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/include" "FLACPP_API_EXPORTS")
+new_library_static(FLAC++ "${LIBFLACXX_SOURCES}" "FLAC__NO_DLL")
+new_library_shared(FLAC++ "${LIBFLACXX_SOURCES}" "FLACPP_API_EXPORTS")
 
 target_link_libraries(FLAC ogg)
 target_link_libraries(FLAC++ FLAC)

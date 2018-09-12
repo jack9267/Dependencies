@@ -604,16 +604,18 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/ssl")
 
 file(GLOB_RECURSE SSL_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/ssl/*.c)
 
-new_library_static(crypto "${CRYPTO_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/src/include" "")
-new_library_shared(crypto "${CRYPTO_SOURCES};crypto_p.def" "${CMAKE_CURRENT_SOURCE_DIR}/src/include" "")
+install_include("${CMAKE_CURRENT_SOURCE_DIR}/src/include")
+
+new_library_static(crypto "${CRYPTO_SOURCES}" "")
+new_library_shared(crypto "${CRYPTO_SOURCES};crypto_p.def" "")
 
 set_target_properties(crypto PROPERTIES RUNTIME_OUTPUT_NAME_DEBUG "crypto-42${RUNTIME_DEBUG_POSTFIX}")
 set_target_properties(crypto PROPERTIES RUNTIME_OUTPUT_NAME_RELEASE "crypto-42${RUNTIME_RELEASE_POSTFIX}")
 
 target_link_libraries(crypto shell32 comdlg32 ws2_32)
 
-new_library_static(ssl "${SSL_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/src/include" "")
-new_library_shared(ssl "${SSL_SOURCES};ssl.def" "${CMAKE_CURRENT_SOURCE_DIR}/src/include" "")
+new_library_static(ssl "${SSL_SOURCES}" "")
+new_library_shared(ssl "${SSL_SOURCES};ssl.def" "")
 
 set_target_properties(ssl PROPERTIES RUNTIME_OUTPUT_NAME_DEBUG "ssl-44${RUNTIME_DEBUG_POSTFIX}")
 set_target_properties(ssl PROPERTIES RUNTIME_OUTPUT_NAME_RELEASE "ssl-44${RUNTIME_RELEASE_POSTFIX}")

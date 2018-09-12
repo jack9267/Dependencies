@@ -27,14 +27,14 @@ endif()
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/C")
 
-new_library_static(7z "${LIB7Z_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/include" "")
+new_library_static(7z "${LIB7Z_SOURCES}" "")
 
 if(WIN32)
 	list(APPEND LIB7Z_SOURCES "7z.def")
 	list(APPEND LIB7Z_SOURCES "resource.rc")
 endif()
 
-new_library_shared(7z "${LIB7Z_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/include" "")
+new_library_shared(7z "${LIB7Z_SOURCES}" "")
 
 file(GLOB LIB7Z_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/src/C/7z*.h")
 

@@ -14,4 +14,8 @@ else()
 	set(DEFINES "")
 endif()
 
-new_library_static(RakNet "${ALL_CPP_SRCS};${ALL_HEADER_SRCS}" "${CMAKE_CURRENT_SOURCE_DIR}/include" "${DEFINES}")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
+
+install_include("${CMAKE_CURRENT_SOURCE_DIR}/include")
+
+new_library_static(RakNet "${ALL_CPP_SRCS};${ALL_HEADER_SRCS}" "${DEFINES}")

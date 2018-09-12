@@ -23,5 +23,4 @@ if(WIN32)
 	install(FILES ${FMOD_FILES} DESTINATION "${LIB_DIRECTORY}/Debug")
 
 	install(FILES ${FMOD_FILES} DESTINATION "${LIB_DIRECTORY}/Release")
-
 endif()

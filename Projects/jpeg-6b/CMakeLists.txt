@@ -61,9 +61,12 @@ set(JPEG_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/wrtarga.c
 )
 
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-new_library_static(jpeg "${JPEG_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/include" "")
+install_include("${CMAKE_CURRENT_SOURCE_DIR}/include")
+
+new_library_static(jpeg "${JPEG_SOURCES}" "")
 
 set(JPEG_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/src/jmorecfg.h
@@ -72,4 +75,3 @@ set(JPEG_HEADERS
 )
 
 install(FILES ${JPEG_HEADERS} DESTINATION include)
-

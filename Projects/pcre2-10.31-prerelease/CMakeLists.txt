@@ -31,6 +31,9 @@ set(PCRE2_SOURCES
 
 include_directories("${PCRE2_SOURCE_DIR}/src")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 
-new_library_static(pcre2-8 "${PCRE2_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/include" "PCRE2_CODE_UNIT_WIDTH=8;HAVE_CONFIG_H;PCRE2_STATIC")
-new_library_shared(pcre2-8 "${PCRE2_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/include" "PCRE2_CODE_UNIT_WIDTH=8;HAVE_CONFIG_H;pcre2_8_EXPORTS")
+install_include("${CMAKE_CURRENT_SOURCE_DIR}/include")
+
+new_library_static(pcre2-8 "${PCRE2_SOURCES}" "PCRE2_CODE_UNIT_WIDTH=8;HAVE_CONFIG_H;PCRE2_STATIC")
+new_library_shared(pcre2-8 "${PCRE2_SOURCES}" "PCRE2_CODE_UNIT_WIDTH=8;HAVE_CONFIG_H;pcre2_8_EXPORTS")

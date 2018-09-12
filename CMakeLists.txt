@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 3.12)
 
-#set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/modules")
-#set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
-
 project(Dependencies C CXX)
+
+if(WIN32)
+	# Find NASM
+	enable_language(ASM_NASM)
+endif()
 
 # We only want Debug and Release
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "Configuration types" FORCE)
@@ -11,31 +13,28 @@ set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
 set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO}")
 
-set(ENGINE_CXX_11 false)
+# C++ standard
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED OFF)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-# C++11 minimum
 if(NOT MSVC)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+	# Use pthreads on other systems
 	set(CMAKE_THREAD_PREFER_PTHREAD true)
-	set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+endif()
 
-	# Compiler-specific C++11 activation.
-	if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-		execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
-		if(NOT (GCC_VERSION VERSION_GREATER 4.7 OR GCC_VERSION VERSION_EQUAL 4.7))
-			message(FATAL_ERROR "${PROJECT_NAME} requires g++ 4.7 or greater.")
-		endif()
-	elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
-	else()
-		message(FATAL_ERROR "Your C++ compiler does not support C++11.")
-	endif()
-
-	set(ENGINE_CXX_11 true)
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+if(COMPILER_SUPPORTS_CXX11)
+	message("C++11 is supported by the compiler")
 else()
-	if(MSVC_VERSION GREATER_EQUAL 1900)
-		set(ENGINE_CXX_11 true)
-	endif()
+	message(WARNING "C++11 is NOT supported by the compiler")
+endif()
+CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX14)
+if(COMPILER_SUPPORTS_CXX14)
+	message("C++14 is supported by the compiler")
+else()
+	message(WARNING "C++14 is NOT supported by the compiler")
 endif()
 
 # determine bits
@@ -58,15 +57,14 @@ else()
 	set(LIB_DIRECTORY "Lib")
 endif()
 
+# hide symbols
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+
 # hide symbols on unix
-if(UNIX)
-	set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -fno-rtti -fvisibility=hidden")
+if(UNIX AND CMAKE_COMPILER_IS_GNUCC)
+	set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -fvisibility=hidden")
 	set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -fvisibility=hidden")
 endif()
-
-# Enable DEBUG=1 for debug builds as some projects check that
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG=1")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG=1")
 
 # Add directx sdk to include/linker path
 if(WIN32)
@@ -92,6 +90,9 @@ macro(define_debug DEFINES)
 	endforeach()
 endmacro()
 
+# Enable DEBUG=1 for debug builds as some projects check that
+define_debug(DEBUG=1)
+
 # Visual Studio specifics
 if(MSVC)
 	# Force /MT for static VC runtimes if Release...
@@ -113,9 +114,6 @@ if(MSVC)
 	# common defines
 	add_definitions(-DWIN32 -D_WINDOWS -D_CRT_SECURE_NO_DEPRECATE -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_WARNINGS -D_USE_MATH_DEFINES=1 -DNOMINMAX)
 
-	# no deprecated warnings for winsock
-	add_definitions(-D_WINSOCK_DEPRECATED_NO_WARNINGS)
-
 	if(MSVC_VERSION GREATER_EQUAL 1900)
 		# Prevent static variables from being thread local storage
 		add_compiler_flags("/Zc:threadSafeInit-")
@@ -124,55 +122,31 @@ if(MSVC)
 	# disable manifest on dlls
 	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /MANIFEST:NO")
 
-	# This object file does not define any previously undefined public symbols, so it will not be used by any link operation that consumes this library
-	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /ignore:4221")
-	set(CMAKE_STATIC_LINKER_FLAGS "${CMAKE_STATIC_LINKER_FLAGS} /ignore:4221")
-	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /ignore:4221")
-
-	# Warnings should be errors
-	#add_compiler_flags("/WX")
-
 	# macro to disable VS warning
 	macro(disable_warning ID)
 		add_compiler_flags(/wd${ID})
 	endmacro()
 
-	# macro redefinition
-	disable_warning(4005)
+	# macro to disable VS linker warnings
+	macro(disable_linker_warning ID)
+		set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /ignore:${ID}")
+		set(CMAKE_STATIC_LINKER_FLAGS "${CMAKE_STATIC_LINKER_FLAGS} /ignore:${ID}")
+		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /ignore:${ID}")
+	endmacro()
 
-	# signed/unsigned mismatch
-	disable_warning(4018)
+	# This object file does not define any previously undefined public symbols, so it will not be used by any link operation that consumes this library
+	disable_linker_warning(4221)
 
-	# different 'modifier' qualifiers
-	disable_warning(4090)
-
-	# ignored on left of 'type' when no variable is declared
-	disable_warning(4091)
-
-	# unary minus operator applied to unsigned type, result still unsigned
-	disable_warning(4146)
-
-	# conversion from 'type1' to 'type2', possible loss of data
-	disable_warning(4242)
-
-	# conversion from 'type1' to 'type2', possible loss of data
-	disable_warning(4244)
-
-	# conversion from 'type1' to 'type2', signed/unsigned mismatch
-	disable_warning(4245)
-
-	# conversion from 'size_t' to 'type', possible loss of data
-	disable_warning(4267)
-
-	# signed/unsigned mismatch
-	disable_warning(4389)
-
-	# conversion from 'type_1' to 'type_2' requires a narrowing conversion
-	disable_warning(4838)
+	# Warnings should be errors
+	#add_compiler_flags("/WX")
 endif()
 
 # to avoid repeating stuff
-function(new_library_static NAME SOURCES INCLUDE DEFINES)
+function(install_include INCLUDE)
+	install(DIRECTORY "${INCLUDE}/" DESTINATION include FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp")
+endfunction()
+
+function(new_library_static NAME SOURCES DEFINES)
 	set(LIBRARY_SOURCES "")
 	foreach(SOURCE ${SOURCES})
 		list(APPEND LIBRARY_SOURCES ${SOURCE})
@@ -189,8 +163,6 @@ function(new_library_static NAME SOURCES INCLUDE DEFINES)
 		target_compile_definitions("${NAME}_static" PRIVATE ${DEFINE})
 	endforeach()
 
-	target_include_directories("${NAME}_static" PRIVATE "${INCLUDE}")
-
 	install(TARGETS "${NAME}_static"
 		RUNTIME DESTINATION "${LIB_DIRECTORY}/Debug" CONFIGURATIONS Debug
 		LIBRARY DESTINATION "${LIB_DIRECTORY}/Debug" CONFIGURATIONS Debug
@@ -199,10 +171,9 @@ function(new_library_static NAME SOURCES INCLUDE DEFINES)
 		RUNTIME DESTINATION "${LIB_DIRECTORY}/Release" CONFIGURATIONS Release
 		LIBRARY DESTINATION "${LIB_DIRECTORY}/Release" CONFIGURATIONS Release
 		ARCHIVE DESTINATION "${LIB_DIRECTORY}/Release" CONFIGURATIONS Release)
-	install(DIRECTORY "${INCLUDE}/" DESTINATION include FILES_MATCHING PATTERN "*.h*")
 endfunction()
 
-function(new_library_shared NAME SOURCES INCLUDE DEFINES)
+function(new_library_shared NAME SOURCES DEFINES)
 	set(LIBRARY_SOURCES "")
 	foreach(SOURCE ${SOURCES})
 		list(APPEND LIBRARY_SOURCES ${SOURCE})
@@ -217,8 +188,6 @@ function(new_library_shared NAME SOURCES INCLUDE DEFINES)
 		target_compile_definitions("${NAME}" PRIVATE ${DEFINE})
 	endforeach()
 
-	target_include_directories("${NAME}" PRIVATE "${INCLUDE}")
-
 	install(TARGETS "${NAME}"
 		RUNTIME DESTINATION "${LIB_DIRECTORY}/Debug" CONFIGURATIONS Debug
 		LIBRARY DESTINATION "${LIB_DIRECTORY}/Debug" CONFIGURATIONS Debug
@@ -227,7 +196,6 @@ function(new_library_shared NAME SOURCES INCLUDE DEFINES)
 		RUNTIME DESTINATION "${LIB_DIRECTORY}/Release" CONFIGURATIONS Release
 		LIBRARY DESTINATION "${LIB_DIRECTORY}/Release" CONFIGURATIONS Release
 		ARCHIVE DESTINATION "${LIB_DIRECTORY}/Release" CONFIGURATIONS Release)
-	install(DIRECTORY "${INCLUDE}/" DESTINATION include FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp")
 
 	if(MSVC)
 		install(FILES $<TARGET_PDB_FILE:${NAME}> DESTINATION "${LIB_DIRECTORY}/Debug" CONFIGURATIONS Debug OPTIONAL)

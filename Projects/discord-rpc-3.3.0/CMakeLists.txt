@@ -16,4 +16,8 @@ FOREACH(item ${SOURCES})
 ENDFOREACH(item)
 endif()
 
-new_library_static(discord-rpc "${SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/src/include" "DISCORD_BUILDING_SDK;DISCORD_DISABLE_IO_THREAD=1")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/include")
+
+install_include("${CMAKE_CURRENT_SOURCE_DIR}/src/include")
+
+new_library_static(discord-rpc "${SOURCES}" "DISCORD_BUILDING_SDK;DISCORD_DISABLE_IO_THREAD=1")

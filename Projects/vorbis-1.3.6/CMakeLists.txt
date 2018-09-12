@@ -38,24 +38,27 @@ if(MSVC)
 	disable_warning(4305)
 endif()
 
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/lib")
 
-new_library_static(vorbis "${VORBIS_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/src/include" "")
+install_include("${CMAKE_CURRENT_SOURCE_DIR}/src/include")
+
+new_library_static(vorbis "${VORBIS_SOURCES}" "")
 
 if(WIN32)
 	list(APPEND VORBIS_SOURCES "src/win32/vorbis.def")
 endif()
 
-new_library_shared(vorbis "${VORBIS_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/src/include" "LIBVORBIS_EXPORTS")
+new_library_shared(vorbis "${VORBIS_SOURCES}" "LIBVORBIS_EXPORTS")
 
 target_link_libraries(vorbis ogg)
 
-new_library_static(vorbisfile "${VORBISFILE_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/src/include" "")
+new_library_static(vorbisfile "${VORBISFILE_SOURCES}" "")
 
 if(WIN32)
 	list(APPEND VORBISFILE_SOURCES "src/win32/vorbisfile.def")
 endif()
 
-new_library_shared(vorbisfile "${VORBISFILE_SOURCES}" "${CMAKE_CURRENT_SOURCE_DIR}/src/include" "LIBVORBISFILE_EXPORTS")
+new_library_shared(vorbisfile "${VORBISFILE_SOURCES}" "LIBVORBISFILE_EXPORTS")
 
 target_link_libraries(vorbisfile ogg vorbis)
