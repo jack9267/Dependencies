@@ -138,6 +138,12 @@ if(MSVC)
 		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /ignore:${ID}")
 	endmacro()
 
+	# precompiled header macro
+	macro(precompiled_header HEADER)
+		add_compiler_flags(/Yu${HEADER}.h)
+		set_source_files_properties(${HEADER}.cpp PROPERTIES COMPILE_FLAGS "/Yc${HEADER}.h")
+	endmacro()
+
 	# This object file does not define any previously undefined public symbols, so it will not be used by any link operation that consumes this library
 	disable_linker_warning(4221)
 
