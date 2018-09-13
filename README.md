@@ -2,6 +2,7 @@
 Dependencies
 
 Ensure cmake is added to the path variable, this is asked during the setup.
+
 If you encounter any issues installing the DirectX Software Development Kit, uninstall the Visual C++ 2010 Runtime (both x86 and x64) first.
 
 Prerequests:
