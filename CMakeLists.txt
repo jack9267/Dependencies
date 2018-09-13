@@ -83,11 +83,15 @@ macro(add_compiler_flags FLAGS)
 	endforeach()
 endmacro()
 
-macro(define_debug DEFINES)
+macro(define CONFIGURATION DEFINES)
 	foreach(DEFINE ${DEFINES})
-		set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -D${DEFINE}")
-		set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -D${DEFINE}")
+		set(CMAKE_C_FLAGS_${CONFIGURATION} "${CMAKE_C_FLAGS_${CONFIGURATION}} -D${DEFINE}")
+		set(CMAKE_CXX_FLAGS_${CONFIGURATION} "${CMAKE_CXX_FLAGS_${CONFIGURATION}} -D${DEFINE}")
 	endforeach()
+endmacro()
+
+macro(define_debug DEFINES)
+	define(DEBUG ${DEFINES})
 endmacro()
 
 # Enable DEBUG=1 for debug builds as some projects check that
