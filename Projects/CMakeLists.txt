@@ -30,6 +30,9 @@ if(MSVC)
 	# conversion from 'size_t' to 'type', possible loss of data
 	disable_warning(4267)
 
+	# operator' : result of 32-bit shift implicitly converted to 64 bits (was 64-bit shift intended?)
+	disable_warning(4334)
+
 	# signed/unsigned mismatch
 	disable_warning(4389)
 
