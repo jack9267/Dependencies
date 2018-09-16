@@ -8,14 +8,13 @@ set(RakNet_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 file(GLOB ALL_HEADER_SRCS ${RakNet_SOURCE_DIR}/Source/*.h)
 file(GLOB ALL_CPP_SRCS ${RakNet_SOURCE_DIR}/Source/*.cpp)
 
-if(WIN32)
-	set(DEFINES "_RAKNET_LIB")
-else()
-	set(DEFINES "")
-endif()
-
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 install_include("${CMAKE_CURRENT_SOURCE_DIR}/include")
 
-new_library_static(RakNet "${ALL_CPP_SRCS};${ALL_HEADER_SRCS}" "${DEFINES}")
+new_library_static(RakNet "${ALL_CPP_SRCS};${ALL_HEADER_SRCS}" "_RAKNET_LIB")
+new_library_shared(RakNet "${ALL_CPP_SRCS};${ALL_HEADER_SRCS}" "_RAKNET_DLL")
+
+if(WIN32)
+	target_link_libraries(RakNet ws2_32)
+endif()
