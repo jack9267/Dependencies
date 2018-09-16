@@ -47,3 +47,6 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 install_include("${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 new_library_static(freetype "${SOURCES}" "FT2_BUILD_LIBRARY")
+new_library_shared(freetype "${SOURCES}" "FT2_BUILD_LIBRARY;FREETYPE_EXPORTS")
+
+target_link_libraries(freetype png zlib)
