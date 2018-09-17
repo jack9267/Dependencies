@@ -106,6 +106,6 @@ endif()
 install_include("${SDL2_SOURCE_DIR}/include")
 
 new_library_static(SDL2 "${SOURCE_FILES}" "SDL2_BUILDING;HAVE_LIBC")
-new_library_shared(SDL2 "${SOURCE_FILES};${VERSION_SOURCES}" "SDL2_BUILDING;HAVE_LIBC")
+new_library_shared(SDL2 "${SOURCE_FILES};${VERSION_SOURCES}" "SDL2_BUILDING;HAVE_LIBC;SDL2_STATIC")
 
 target_link_libraries(SDL2 ${EXTRA_LIBS})
