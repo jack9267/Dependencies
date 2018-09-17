@@ -16,3 +16,4 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/src")
 install_include("${CMAKE_CURRENT_SOURCE_DIR}/src/src")
 
 new_library_static(asmjit "${SOURCES}" "ASMJIT_STATIC")
+new_library_shared(asmjit "${SOURCES}" "ASMJIT_EXPORTS")
