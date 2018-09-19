@@ -115,8 +115,8 @@ if(MSVC)
 		endif()
 	endforeach()
 
-	linker_flags(RELEASE "/LTCG")
-	linker_flags(RELWITHDEBINFO "/LTCG")
+	linker_flags(RELEASE "/LTCG /OPT:REF")
+	linker_flags(RELWITHDEBINFO "/LTCG /OPT:REF")
 
 	# disable manifest on dlls
 	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /MANIFEST:NO")
