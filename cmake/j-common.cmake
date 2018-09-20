@@ -160,8 +160,11 @@ if(MSVC)
 	# multi-processor core
 	add_compiler_flags("/MP")
 
+	# smaller binary in release
+	compiler_flags("RELEASE" "/O1 /Ob2")
+
 	# whole program optimisation
-	compiler_flags("RELEASE;RELWITHDEBINFO;MINSIZEREL" "/GL")
+	compiler_flags("RELEASE;RELWITHDEBINFO;MINSIZEREL" "/GL /Oi")
 
 	foreach(flag_var
 		CMAKE_SHARED_LINKER_FLAGS_RELEASE
