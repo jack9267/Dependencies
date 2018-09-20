@@ -1,100 +1,10 @@
 cmake_minimum_required(VERSION 3.12)
 
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
+
 project(Dependencies C CXX)
 
-if(WIN32)
-	# Find NASM
-	enable_language(ASM_NASM)
-endif()
-
-# We only want Debug and Release
-set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "Configuration types" FORCE)
-set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
-set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO}")
-
-# C++ standard
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED OFF)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-if(NOT MSVC)
-	# Use pthreads on other systems
-	set(CMAKE_THREAD_PREFER_PTHREAD true)
-endif()
-
-include(CheckCXXCompilerFlag)
-CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
-if(COMPILER_SUPPORTS_CXX11)
-	message("C++11 is supported by the compiler")
-else()
-	message(WARNING "C++11 is NOT supported by the compiler")
-endif()
-CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX14)
-if(COMPILER_SUPPORTS_CXX14)
-	message("C++14 is supported by the compiler")
-else()
-	message(WARNING "C++14 is NOT supported by the compiler")
-endif()
-
-include(Common.cmake)
-
-# to avoid repeating stuff
-function(new_library_static NAME SOURCES DEFINES)
-	set(LIBRARY_SOURCES "")
-	foreach(SOURCE ${SOURCES})
-		list(APPEND LIBRARY_SOURCES ${SOURCE})
-	endforeach()
-
-	add_library("${NAME}_static" STATIC ${LIBRARY_SOURCES})
-
-	if(MSVC)
-		# embedd pdb
-		set_target_properties("${NAME}_static" PROPERTIES COMPILE_OPTIONS "/Z7")
-	endif()
-
-	foreach(DEFINE ${DEFINES})
-		target_compile_definitions("${NAME}_static" PRIVATE ${DEFINE})
-	endforeach()
-
-	install(TARGETS "${NAME}_static"
-		RUNTIME DESTINATION "${LIB_DIRECTORY}/Debug" CONFIGURATIONS Debug
-		LIBRARY DESTINATION "${LIB_DIRECTORY}/Debug" CONFIGURATIONS Debug
-		ARCHIVE DESTINATION "${LIB_DIRECTORY}/Debug" CONFIGURATIONS Debug)
-	install(TARGETS "${NAME}_static"
-		RUNTIME DESTINATION "${LIB_DIRECTORY}/Release" CONFIGURATIONS Release
-		LIBRARY DESTINATION "${LIB_DIRECTORY}/Release" CONFIGURATIONS Release
-		ARCHIVE DESTINATION "${LIB_DIRECTORY}/Release" CONFIGURATIONS Release)
-endfunction()
-
-function(new_library_shared NAME SOURCES DEFINES)
-	set(LIBRARY_SOURCES "")
-	foreach(SOURCE ${SOURCES})
-		list(APPEND LIBRARY_SOURCES ${SOURCE})
-	endforeach()
-
-	add_library("${NAME}" SHARED ${LIBRARY_SOURCES})
-
-	set_target_properties("${NAME}" PROPERTIES RUNTIME_OUTPUT_NAME_DEBUG "${NAME}${RUNTIME_DEBUG_POSTFIX}")
-	set_target_properties("${NAME}" PROPERTIES RUNTIME_OUTPUT_NAME_RELEASE "${NAME}${RUNTIME_RELEASE_POSTFIX}")
-
-	foreach(DEFINE ${DEFINES})
-		target_compile_definitions("${NAME}" PRIVATE ${DEFINE})
-	endforeach()
-
-	install(TARGETS "${NAME}"
-		RUNTIME DESTINATION "${LIB_DIRECTORY}/Debug" CONFIGURATIONS Debug
-		LIBRARY DESTINATION "${LIB_DIRECTORY}/Debug" CONFIGURATIONS Debug
-		ARCHIVE DESTINATION "${LIB_DIRECTORY}/Debug" CONFIGURATIONS Debug)
-	install(TARGETS "${NAME}"
-		RUNTIME DESTINATION "${LIB_DIRECTORY}/Release" CONFIGURATIONS Release
-		LIBRARY DESTINATION "${LIB_DIRECTORY}/Release" CONFIGURATIONS Release
-		ARCHIVE DESTINATION "${LIB_DIRECTORY}/Release" CONFIGURATIONS Release)
-
-	if(MSVC)
-		install(FILES $<TARGET_PDB_FILE:${NAME}> DESTINATION "${LIB_DIRECTORY}/Debug" CONFIGURATIONS Debug OPTIONAL)
-		install(FILES $<TARGET_PDB_FILE:${NAME}> DESTINATION "${LIB_DIRECTORY}/Release" CONFIGURATIONS Release OPTIONAL)
-	endif()
-endfunction()
+include(j-common)
+include(j-macros)
 
 add_subdirectory(Projects)
