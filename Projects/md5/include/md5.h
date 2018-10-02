@@ -5,6 +5,10 @@
 
 #include <inttypes.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct MD5Context {
 	uint32_t buf[4];
 	uint32_t bits[2];
@@ -20,5 +24,9 @@ void MD5Transform(uint32_t buf[4], uint32_t const in[16]);
  * This is needed to make RSAREF happy on some MS-DOS compilers.
  */
 typedef struct MD5Context MD5_CTX;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !MD5_H */
