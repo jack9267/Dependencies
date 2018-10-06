@@ -8,7 +8,7 @@ function(new_library_static NAME SOURCES DEFINES)
 
 	add_library("${NAME}_static" STATIC ${LIBRARY_SOURCES})
 
-	if(MSVC)
+	if(MSVC AND EMBEDDED_PDB)
 		# embedd pdb
 		set_target_properties("${NAME}_static" PROPERTIES COMPILE_OPTIONS "/Z7")
 	endif()
