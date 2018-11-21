@@ -2,7 +2,8 @@
 !include "MUI2.nsh"
 ;!include "WriteEnvStr.nsh"
 
-SetCompressor lzma
+;SetCompressor lzma
+SetCompress off
 Unicode true
 
 Name "Dependencies"
@@ -25,7 +26,7 @@ ManifestDPIAware true
 !define MUI_ABORTWARNING
 
 ;!insertmacro MUI_PAGE_LICENSE "../LICENSE"
-!insertmacro MUI_PAGE_COMPONENTS
+;!insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
   
@@ -57,84 +58,18 @@ Section "" ;"Remove Old Versions"
 	RMDir /r "$INSTDIR\Lib"
 SectionEnd
 
-Section "Visual Studio 2010"
-	SetOutPath "$INSTDIR\Lib\x64\v100"
-	File /r "..\Build\Lib\x64\v100\"
-
-	SetOutPath "$INSTDIR\Lib\x64\v100_static"
-	File /r "..\Build\Lib\x64\v100_static\"
-
-	SetOutPath "$INSTDIR\Lib\x86\v100"
-	File /r "..\Build\Lib\x86\v100\"
-
-	SetOutPath "$INSTDIR\Lib\x86\v100_static"
-	File /r "..\Build\Lib\x86\v100_static\"
-SectionEnd
-
-Section "Visual Studio 2015"
-	SetOutPath "$INSTDIR\Lib\x64\v140"
-	File /r "..\Build\Lib\x64\v140\"
-
-	SetOutPath "$INSTDIR\Lib\x64\v140_static"
-	File /r "..\Build\Lib\x64\v140_static\"
-
-	SetOutPath "$INSTDIR\Lib\x64\v140_xp"
-	File /r "..\Build\Lib\x64\v140_xp\"
-
-	SetOutPath "$INSTDIR\Lib\x64\v140_xp_static"
-	File /r "..\Build\Lib\x64\v140_xp_static\"
-
-	SetOutPath "$INSTDIR\Lib\x86\v140"
-	File /r "..\Build\Lib\x86\v140\"
-
-	SetOutPath "$INSTDIR\Lib\x86\v140_static"
-	File /r "..\Build\Lib\x86\v140_static\"
-
-	SetOutPath "$INSTDIR\Lib\x86\v140_xp"
-	File /r "..\Build\Lib\x86\v140_xp\"
-
-	SetOutPath "$INSTDIR\Lib\x86\v140_xp_static"
-	File /r "..\Build\Lib\x86\v140_xp_static\"
-SectionEnd
-
-Section "Visual Studio 2017"
-	SetOutPath "$INSTDIR\Lib\x64\v141"
-	File /r "..\Build\Lib\x64\v141\"
-
-	SetOutPath "$INSTDIR\Lib\x64\v141_static"
-	File /r "..\Build\Lib\x64\v141_static\"
-
-	SetOutPath "$INSTDIR\Lib\x64\v141_xp"
-	File /r "..\Build\Lib\x64\v141_xp\"
-
-	SetOutPath "$INSTDIR\Lib\x64\v141_xp_static"
-	File /r "..\Build\Lib\x64\v141_xp_static\"
-
-	SetOutPath "$INSTDIR\Lib\x86\v141"
-	File /r "..\Build\Lib\x86\v141\"
-
-	SetOutPath "$INSTDIR\Lib\x86\v141_static"
-	File /r "..\Build\Lib\x86\v141_static\"
-
-	SetOutPath "$INSTDIR\Lib\x86\v141_xp"
-	File /r "..\Build\Lib\x86\v141_xp\"
-
-	SetOutPath "$INSTDIR\Lib\x86\v141_xp_static"
-	File /r "..\Build\Lib\x86\v141_xp_static\"
-SectionEnd
-
 Section "" ;"Standard Libraries"
 	SectionIn RO
 
 	SetOutPath "$INSTDIR"
 
-	SetOutPath "$INSTDIR\include"
-	File /r "..\Build\include\"
-
-	;SetOutPath "$INSTDIR\Lib"
-	;File /r "..\Lib\"
-
-	SetOutPath "$INSTDIR"
+	File "..\7za.exe"
+	File "..\Dependencies.7z"
+	;ExecWait '"$OUTDIR\7za.exe" x Dependencies.7z -y'
+	nsExec::Exec '"$OUTDIR\7za.exe" x Dependencies.7z -y'
+	Pop $0
+	Delete "$OUTDIR\Dependencies.7z"
+	Delete "$OUTDIR\7za.exe"
 
 	WriteUninstaller "$INSTDIR\Uninstall.exe"
 
