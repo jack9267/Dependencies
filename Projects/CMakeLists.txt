@@ -39,6 +39,12 @@ if(MSVC)
 	# conversion from 'type_1' to 'type_2' requires a narrowing conversion
 	disable_warning(4838)
 
+	# 64-bit specific warnings
+	if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+		# operation' : conversion from 'type1' to 'type2' of greater size
+		disable_warning(4312)
+	endif()
+
 	if(MSVC_VERSION LESS 1900)
 		# Visual studio 2015 adds support for stdbool.h, add it for older versions
 		include_directories("${CMAKE_CURRENT_SOURCE_DIR}/stdbool")
