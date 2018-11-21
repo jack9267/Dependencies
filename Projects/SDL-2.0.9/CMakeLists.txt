@@ -3,6 +3,16 @@ set(EXTRA_LIBS "")
 
 include_directories("${SDL2_SOURCE_DIR}/include")
 
+# Check for 64 or 32 bit
+set(SIZEOF_VOIDP ${CMAKE_SIZEOF_VOID_P})
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+  set(ARCH_64 TRUE)
+  set(PROCESSOR_ARCH "x64")
+else()
+  set(ARCH_64 FALSE)
+  set(PROCESSOR_ARCH "x86")
+endif()
+
 file(GLOB SOURCE_FILES
   ${SDL2_SOURCE_DIR}/src/*.c
   ${SDL2_SOURCE_DIR}/src/atomic/*.c
