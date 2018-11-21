@@ -39,8 +39,8 @@ function(new_library_shared NAME SOURCES DEFINES)
 
 	add_library("${NAME}" SHARED ${LIBRARY_SOURCES})
 
+	set_target_properties("${NAME}" PROPERTIES RUNTIME_OUTPUT_NAME "${NAME}${RUNTIME_RELEASE_POSTFIX}")
 	set_target_properties("${NAME}" PROPERTIES RUNTIME_OUTPUT_NAME_DEBUG "${NAME}${RUNTIME_DEBUG_POSTFIX}")
-	set_target_properties("${NAME}" PROPERTIES RUNTIME_OUTPUT_NAME_RELEASE "${NAME}${RUNTIME_RELEASE_POSTFIX}")
 
 	foreach(DEFINE ${DEFINES})
 		target_compile_definitions("${NAME}" PRIVATE ${DEFINE})
@@ -74,8 +74,8 @@ function(new_library_executable NAME SOURCES DEFINES)
 
 	add_executable("${NAME}" WIN32 ${LIBRARY_SOURCES})
 
+	set_target_properties("${NAME}" PROPERTIES RUNTIME_OUTPUT_NAME "${NAME}${RUNTIME_RELEASE_POSTFIX}")
 	set_target_properties("${NAME}" PROPERTIES RUNTIME_OUTPUT_NAME_DEBUG "${NAME}${RUNTIME_DEBUG_POSTFIX}")
-	set_target_properties("${NAME}" PROPERTIES RUNTIME_OUTPUT_NAME_RELEASE "${NAME}${RUNTIME_RELEASE_POSTFIX}")
 
 	foreach(DEFINE ${DEFINES})
 		target_compile_definitions("${NAME}" PRIVATE ${DEFINE})
