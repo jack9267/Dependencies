@@ -58,11 +58,11 @@ Section "" ;"Remove Old Versions"
 SectionEnd
 
 Section "Visual Studio 2010"
-	;SetOutPath "$INSTDIR\Lib\x64\v100"
-	;File /r "..\Build\Lib\x64\v100\"
+	SetOutPath "$INSTDIR\Lib\x64\v100"
+	File /r "..\Build\Lib\x64\v100\"
 
-	;SetOutPath "$INSTDIR\Lib\x64\v100_static"
-	;File /r "..\Build\Lib\x64\v100_static\"
+	SetOutPath "$INSTDIR\Lib\x64\v100_static"
+	File /r "..\Build\Lib\x64\v100_static\"
 
 	SetOutPath "$INSTDIR\Lib\x86\v100"
 	File /r "..\Build\Lib\x86\v100\"
@@ -72,17 +72,17 @@ Section "Visual Studio 2010"
 SectionEnd
 
 Section "Visual Studio 2015"
-	;SetOutPath "$INSTDIR\Lib\x64\v140"
-	;File /r "..\Build\Lib\x64\v140\"
+	SetOutPath "$INSTDIR\Lib\x64\v140"
+	File /r "..\Build\Lib\x64\v140\"
 
-	;SetOutPath "$INSTDIR\Lib\x64\v140_static"
-	;File /r "..\Build\Lib\x64\v140_static\"
+	SetOutPath "$INSTDIR\Lib\x64\v140_static"
+	File /r "..\Build\Lib\x64\v140_static\"
 
-	;SetOutPath "$INSTDIR\Lib\x64\v140_xp"
-	;File /r "..\Build\Lib\x64\v140_xp\"
+	SetOutPath "$INSTDIR\Lib\x64\v140_xp"
+	File /r "..\Build\Lib\x64\v140_xp\"
 
-	;SetOutPath "$INSTDIR\Lib\x64\v140_xp_static"
-	;File /r "..\Build\Lib\x64\v140_xp_static\"
+	SetOutPath "$INSTDIR\Lib\x64\v140_xp_static"
+	File /r "..\Build\Lib\x64\v140_xp_static\"
 
 	SetOutPath "$INSTDIR\Lib\x86\v140"
 	File /r "..\Build\Lib\x86\v140\"
@@ -98,17 +98,17 @@ Section "Visual Studio 2015"
 SectionEnd
 
 Section "Visual Studio 2017"
-	;SetOutPath "$INSTDIR\Lib\x64\v141"
-	;File /r "..\Build\Lib\x64\v141\"
+	SetOutPath "$INSTDIR\Lib\x64\v141"
+	File /r "..\Build\Lib\x64\v141\"
 
-	;SetOutPath "$INSTDIR\Lib\x64\v141_static"
-	;File /r "..\Build\Lib\x64\v141_static\"
+	SetOutPath "$INSTDIR\Lib\x64\v141_static"
+	File /r "..\Build\Lib\x64\v141_static\"
 
-	;SetOutPath "$INSTDIR\Lib\x64\v141_xp"
-	;File /r "..\Build\Lib\x64\v141_xp\"
+	SetOutPath "$INSTDIR\Lib\x64\v141_xp"
+	File /r "..\Build\Lib\x64\v141_xp\"
 
-	;SetOutPath "$INSTDIR\Lib\x64\v141_xp_static"
-	;File /r "..\Build\Lib\x64\v141_xp_static\"
+	SetOutPath "$INSTDIR\Lib\x64\v141_xp_static"
+	File /r "..\Build\Lib\x64\v141_xp_static\"
 
 	SetOutPath "$INSTDIR\Lib\x86\v141"
 	File /r "..\Build\Lib\x86\v141\"
