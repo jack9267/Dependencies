@@ -2695,7 +2695,7 @@ size_t mg_match_prefix_n(const struct mg_str pattern, const struct mg_str str);
  * $FreeBSD$
  */
 
-#ifndef _SYS_QUEUE_H_
+#if !defined(_SYS_QUEUE_H_) && !defined(_WIN32)
 #define	_SYS_QUEUE_H_
 
 /*
