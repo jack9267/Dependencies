@@ -149,6 +149,12 @@ if(MSVC)
 		set(LIB_DIRECTORY "${LIB_DIRECTORY}_static")
 	endif()
 
+	option(NO_ENHANCED_INSTRUCTIONS "No Enhanced Instructions" OFF)
+	if(NO_ENHANCED_INSTRUCTIONS)
+		# No Enhanced Instructions
+		add_compiler_flags(/arch:IA32)
+	endif()
+
 	# common defines
 	add_definitions(-DWIN32 -D_WINDOWS -D_CRT_SECURE_NO_DEPRECATE -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_WARNINGS -D_USE_MATH_DEFINES=1 -DNOMINMAX)
 

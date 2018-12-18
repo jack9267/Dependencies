@@ -64,7 +64,7 @@ if(WIN32)
 	if(MSVC)
 		# Prevent codegen that would use the VC runtime libraries.
 		set_property(DIRECTORY . APPEND PROPERTY COMPILE_OPTIONS "/GS-")
-		if(NOT ARCH_64)
+		if(NOT ARCH_64 AND NOT NO_ENHANCED_INSTRUCTIONS)
 			set_property(DIRECTORY . APPEND PROPERTY COMPILE_OPTIONS "/arch:SSE")
 		endif()
 	endif()
