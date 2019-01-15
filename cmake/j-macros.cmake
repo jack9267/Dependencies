@@ -108,3 +108,10 @@ macro(copy_dependency PATH NAME EXTENSION)
 	install(DIRECTORY "${PATH}/Release/" DESTINATION "${LIB_DIRECTORY}/Release" CONFIGURATIONS Release FILES_MATCHING PATTERN "${NAME}${RUNTIME_RELEASE_POSTFIX}.${EXTENSION}")
 	install(DIRECTORY "${PATH}/Release/" DESTINATION "${LIB_DIRECTORY}/RelWithDebInfo" CONFIGURATIONS RelWithDebInfo FILES_MATCHING PATTERN "${NAME}${RUNTIME_RELEASE_POSTFIX}.${EXTENSION}")
 endmacro()
+
+macro(disable_rtti)
+	if(MSVC)
+		# disable RTTI
+		add_compiler_flags(/GR-)
+	endif()
+endmacro()
