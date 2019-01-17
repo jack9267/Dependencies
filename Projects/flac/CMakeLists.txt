@@ -9,7 +9,7 @@ if(MSVC)
 	# The compiler encountered a deprecated declaration.
 	disable_warning(4996)
 
-	if(NOT NO_ENHANCED_INSTRUCTIONS)
+	if(CMAKE_SIZEOF_VOID_P EQUAL 4)
 		# Enables the use of Intel Advanced Vector Extensions instructions
 		add_compiler_flags(/arch:AVX)
 	endif()
@@ -39,9 +39,7 @@ else()
 endif()
 
 if(NOT LIBFLAC_ARCHITECTURE MATCHES arm)
-    if(NOT NO_ENHANCED_INSTRUCTIONS)
-        add_definitions(-DFLAC__SSE_OS)
-    endif()
+    add_definitions(-DFLAC__SSE_OS)
     add_definitions(-DFLAC__HAS_X86INTRIN)
 endif()
 
