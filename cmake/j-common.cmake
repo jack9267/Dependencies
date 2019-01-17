@@ -151,8 +151,10 @@ if(MSVC)
 
 	option(NO_ENHANCED_INSTRUCTIONS "No Enhanced Instructions" OFF)
 	if(NO_ENHANCED_INSTRUCTIONS)
-		# No Enhanced Instructions
-		add_compiler_flags(/arch:IA32)
+		if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+			# No Enhanced Instructions
+			add_compiler_flags(/arch:IA32)
+		endif()
 	endif()
 
 	# common defines
