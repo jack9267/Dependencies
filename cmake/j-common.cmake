@@ -149,9 +149,9 @@ if(MSVC)
 		set(LIB_DIRECTORY "${LIB_DIRECTORY}_static")
 	endif()
 
-	option(NO_ENHANCED_INSTRUCTIONS "No Enhanced Instructions" OFF)
-	if(NO_ENHANCED_INSTRUCTIONS)
-		if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+	if(MSVC_VERSION GREATER_EQUAL 1900 AND CMAKE_SIZEOF_VOID_P EQUAL 4)
+		option(NO_ENHANCED_INSTRUCTIONS "No Enhanced Instructions" OFF)
+		if(NO_ENHANCED_INSTRUCTIONS)
 			# No Enhanced Instructions
 			add_compiler_flags(/arch:IA32)
 		endif()
