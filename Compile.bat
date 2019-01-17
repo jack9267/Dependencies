@@ -7,7 +7,7 @@ cd %1
 mkdir %2
 cd %2
 
-cmake ../../.. -G %1 -T %2 -DCMAKE_INSTALL_PREFIX="../../../Build"
+cmake ../../.. -G %1 -T %2 -DCMAKE_INSTALL_PREFIX="../../../Build" %3
 if %ERRORLEVEL% neq 0 pause && goto eof
 cmake --build . --config Debug --target install
 if %ERRORLEVEL% neq 0 pause && goto eof
@@ -18,7 +18,7 @@ cd ..
 mkdir %2_static
 cd %2_static
 
-cmake ../../.. -G %1 -T %2 -DCMAKE_INSTALL_PREFIX="../../../Build" -DFORCE_STATIC_VCRT=ON
+cmake ../../.. -G %1 -T %2 -DCMAKE_INSTALL_PREFIX="../../../Build" -DFORCE_STATIC_VCRT=ON %3
 if %ERRORLEVEL% neq 0 pause && goto eof
 cmake --build . --config Debug --target install
 if %ERRORLEVEL% neq 0 pause && goto eof
