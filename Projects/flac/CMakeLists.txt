@@ -1,5 +1,3 @@
-disable_rtti()
-
 cmake_policy(SET CMP0005 NEW) # do not escape preprocessor defines
 
 enable_language(ASM_NASM)
