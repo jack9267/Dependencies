@@ -1,3 +1,4 @@
+disable_rtti()
 
 set(THEORA_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/lib/cpu.c

@@ -1,3 +1,4 @@
+disable_rtti()
 
 file(GLOB_RECURSE TINYXML_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 

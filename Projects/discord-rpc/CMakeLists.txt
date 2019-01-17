@@ -1,3 +1,5 @@
+disable_rtti()
+
 file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/src/*.cpp)
 list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/src/dllmain.cpp")
 if(NOT WIN32)

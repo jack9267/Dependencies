@@ -1,3 +1,5 @@
+disable_rtti()
+
 file(GLOB_RECURSE SOURCES src/*.c include/*.h)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")

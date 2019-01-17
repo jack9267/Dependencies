@@ -1,3 +1,4 @@
+disable_rtti()
 
 # set definitions and sources for arm
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^arm" OR

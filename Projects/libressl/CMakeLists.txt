@@ -1,3 +1,5 @@
+disable_rtti()
+
 include(CheckTypeSize)
 
 add_definitions(-DLIBRESSL_INTERNAL)

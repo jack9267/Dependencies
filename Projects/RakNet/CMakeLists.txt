@@ -1,3 +1,5 @@
+disable_rtti()
+
 if(MSVC)
 	# 'function' : format string 'string' requires an argument of type 'type', but variadic argument number has type 'type'
 	disable_warning(4477)

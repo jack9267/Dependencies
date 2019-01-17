@@ -1,3 +1,5 @@
+disable_rtti()
+
 set(PCRE2_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 set(PCRE2_SOURCES

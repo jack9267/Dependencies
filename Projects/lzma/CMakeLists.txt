@@ -1,3 +1,4 @@
+disable_rtti()
 
 set(LIB7Z_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/C/7zAlloc.c

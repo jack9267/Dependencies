@@ -1,3 +1,5 @@
+disable_rtti()
+
 set(BSDIFF_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/bsdiff.c)
 set(BSPATCH_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/bspatch.c)
 
