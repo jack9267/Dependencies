@@ -22,4 +22,6 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/include")
 
 install_include("${CMAKE_CURRENT_SOURCE_DIR}/src/include")
 
-new_library_static(discord-rpc "${SOURCES}" "DISCORD_BUILDING_SDK;DISCORD_DISABLE_IO_THREAD=1")
+#add_definitions(-DDISCORD_DISABLE_IO_THREAD=1)
+
+new_library_static(discord-rpc "${SOURCES}" "DISCORD_BUILDING_SDK")
