@@ -9,8 +9,8 @@ if(MSVC)
 	# The compiler encountered a deprecated declaration.
 	disable_warning(4996)
 
-	# Enables the use of Intel Advanced Vector Extensions instructions
-	#add_compiler_flags(/arch:AVX)
+	# found Intel(R) Advanced Vector Extensions; consider using the appropriate /arch AVX flag
+	disable_warning(4752)
 endif()
 
 file(GLOB LIBFLAC_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/src/libFLAC/*.c)
