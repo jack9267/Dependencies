@@ -5,7 +5,7 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 1998 - 2017, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) 1998 - 2018, Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
@@ -23,13 +23,15 @@
 #include "curl_setup.h"
 
 #if defined(USE_OPENSSL)                                \
-  || defined(USE_AXTLS)                                 \
   || defined(USE_GSKIT)                                 \
-  || (defined(USE_SCHANNEL) && defined(_WIN32_WCE))
+  || defined(USE_SCHANNEL)
 /* these backends use functions from this file */
 
 #ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>
+#endif
+#ifdef HAVE_NETINET_IN6_H
+#include <netinet/in6.h>
 #endif
 
 #include "hostcheck.h"
@@ -147,4 +149,4 @@ int Curl_cert_hostcheck(const char *match_pattern, const char *hostname)
   return res;
 }
 
-#endif /* OPENSSL, AXTLS, GSKIT or schannel+wince */
+#endif /* OPENSSL, GSKIT or schannel+wince */

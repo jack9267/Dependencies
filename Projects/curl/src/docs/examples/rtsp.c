@@ -63,13 +63,13 @@ static int _getch(void)
 /* error handling macros */
 #define my_curl_easy_setopt(A, B, C)                             \
   res = curl_easy_setopt((A), (B), (C));                         \
-  if(!res)                                                       \
+  if(res != CURLE_OK)                                            \
     fprintf(stderr, "curl_easy_setopt(%s, %s, %s) failed: %d\n", \
             #A, #B, #C, res);
 
 #define my_curl_easy_perform(A)                                     \
   res = curl_easy_perform(A);                                       \
-  if(!res)                                                          \
+  if(res != CURLE_OK)                                               \
     fprintf(stderr, "curl_easy_perform(%s) failed: %d\n", #A, res);
 
 
@@ -192,7 +192,8 @@ int main(int argc, char * const argv[])
   char *base_name = NULL;
 
   printf("\nRTSP request %s\n", VERSION_STR);
-  printf("    Project web site: http://code.google.com/p/rtsprequest/\n");
+  printf("    Project web site: "
+    "https://github.com/BackupGGCode/rtsprequest\n");
   printf("    Requires curl V7.20 or greater\n\n");
 
   /* check command line */
