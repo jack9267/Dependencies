@@ -54,7 +54,7 @@ HSQUIRRELVM sq_open(SQInteger initialstacksize)
         sq_delete(v, SQVM);
         return NULL;
     }
-    return v;
+    //return v;
 }
 
 HSQUIRRELVM sq_newthread(HSQUIRRELVM friendvm, SQInteger initialstacksize)
