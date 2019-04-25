@@ -12037,24 +12037,6 @@ static int mg_get_ip_address_of_nameserver(char *name, size_t name_len) {
         }
         /* %S will convert wchar_t -> char */
         snprintf(name, name_len, "%S", value);
-
-		// Fix by Mex for invalid string
-		size_t DotCount = 0;
-		for (size_t i = 0; i < name_len; i++)
-		{
-			if (DotCount == 3)
-			{
-				if (!(name[i] >= '0' && name[i] <= '9'))
-				{
-					name[i] = 0x00;
-					break;
-				}
-			}
-
-			if (name[i] == '.')
-				DotCount++;
-		}
-
         ret = 0;
         RegCloseKey(hSub);
         break;
