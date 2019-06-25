@@ -15,6 +15,9 @@ if(WIN32)
 else()
 	set(DEFINES "")
 endif()
-new_library_shared(lua "${SOURCES}" "${DEFINES}")
+
+if(DEPENDENCIES_SHARED)
+	new_library_shared(lua "${SOURCES}" "${DEFINES}")
+endif()
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/ DESTINATION include/lua)

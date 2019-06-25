@@ -15,8 +15,11 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 install_include("${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 new_library_static(RakNet "${ALL_CPP_SRCS};${ALL_HEADER_SRCS}" "_RAKNET_LIB")
-new_library_shared(RakNet "${ALL_CPP_SRCS};${ALL_HEADER_SRCS}" "_RAKNET_DLL")
 
-if(WIN32)
+if(DEPENDENCIES_SHARED)
+	new_library_shared(RakNet "${ALL_CPP_SRCS};${ALL_HEADER_SRCS}" "_RAKNET_DLL")
+endif()
+
+if(WIN32 AND DEPENDENCIES_SHARED)
 	target_link_libraries(RakNet ws2_32)
 endif()
