@@ -44,7 +44,7 @@ Section "" ;"Environment Variables"
 	SectionIn RO
 
 	SetOutPath "$INSTDIR"
-	ExecWait '"setx.exe" /M "dependencies" "$INSTDIR"'
+	ExecWait '"setx.exe" /M "jdependencies_home" "$INSTDIR"'
 SectionEnd
 
 Section "" ;"Remove Old Versions"
