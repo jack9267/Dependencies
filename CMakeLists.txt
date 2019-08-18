@@ -5,7 +5,12 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/../CMake-Modules
 project(Dependencies C CXX)
 
 # Embedded pdb in static libraries
-set(EMBEDDED_PDB ON)
+set(EMBEDDED_PDB OFF)
+
+if(WIN32)
+	# Find NASM
+	enable_language(ASM_NASM)
+endif()
 
 include(j-common)
 include(j-macros)
