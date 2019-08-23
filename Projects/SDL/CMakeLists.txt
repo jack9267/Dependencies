@@ -3,8 +3,6 @@ disable_rtti()
 set(SDL2_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(EXTRA_LIBS "")
 
-include_directories("${SDL2_SOURCE_DIR}/include")
-
 # Check for 64 or 32 bit
 set(SIZEOF_VOIDP ${CMAKE_SIZEOF_VOID_P})
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
