@@ -274,7 +274,7 @@ void NatPunchthroughClient::Update(void)
 			{
 				if (natPunchthroughDebugInterface)
 				{
-					char ipAddressString[32];
+					char ipAddressString[128];
 					sp.targetAddress.ToString(true, ipAddressString);
 					char guidString[128];
 					sp.targetGuid.ToString(guidString);
@@ -299,7 +299,7 @@ void NatPunchthroughClient::Update(void)
 			{
 				if (natPunchthroughDebugInterface)
 				{
-					char ipAddressString[32];
+					char ipAddressString[128];
 					sp.targetAddress.ToString(true, ipAddressString);
 					char guidString[128];
 					sp.targetGuid.ToString(guidString);
@@ -352,7 +352,7 @@ void NatPunchthroughClient::OnPunchthroughFailure(void)
 	{
 		if (natPunchthroughDebugInterface)
 		{
-			char ipAddressString[32];
+			char ipAddressString[128];
 			sp.targetAddress.ToString(true, ipAddressString);
 			char guidString[128];
 			sp.targetGuid.ToString(guidString);
@@ -371,7 +371,7 @@ void NatPunchthroughClient::OnPunchthroughFailure(void)
 		{
 			if (natPunchthroughDebugInterface)
 			{
-				char ipAddressString[32];
+				char ipAddressString[128];
 				sp.targetAddress.ToString(true, ipAddressString);
 				char guidString[128];
 				sp.targetGuid.ToString(guidString);
@@ -392,7 +392,7 @@ void NatPunchthroughClient::OnPunchthroughFailure(void)
 	{
 		if (natPunchthroughDebugInterface)
 		{
-			char ipAddressString[32];
+			char ipAddressString[128];
 			sp.targetAddress.ToString(true, ipAddressString);
 			char guidString[128];
 			sp.targetGuid.ToString(guidString);
@@ -406,7 +406,7 @@ void NatPunchthroughClient::OnPunchthroughFailure(void)
 
 	if (natPunchthroughDebugInterface)
 	{
-		char ipAddressString[32];
+		char ipAddressString[128];
 		sp.targetAddress.ToString(true, ipAddressString);
 		char guidString[128];
 		sp.targetGuid.ToString(guidString);
@@ -501,7 +501,7 @@ PluginReceiveResult NatPunchthroughClient::OnReceive(Packet *packet)
 			if (sessionId!=sp.sessionId)
 				break;
 
-			char ipAddressString[32];
+			char ipAddressString[128];
 			packet->systemAddress.ToString(true,ipAddressString);
 			// sp.targetGuid==packet->guid is because the internal IP addresses reported may include loopbacks not reported by RakPeer::IsLocalIP()
 			if (packet->data[1]==ID_NAT_ESTABLISH_UNIDIRECTIONAL && sp.targetGuid==packet->guid)
@@ -786,7 +786,7 @@ void NatPunchthroughClient::SendTTL(const SystemAddress &sa)
 	if (sa.GetPort()==0)
 		return;
 
-	char ipAddressString[32];
+	char ipAddressString[128];
 	sa.ToString(false, ipAddressString);
 	// TTL of 1 doesn't get past the router, 2 might hit the other system on a LAN
 	rakPeerInterface->SendTTL(ipAddressString,sa.GetPort(), 2);
@@ -839,7 +839,7 @@ void NatPunchthroughClient::SendOutOfBand(SystemAddress sa, MessageID oobId)
 //	RakAssert(sp.sessionId<100);
 	if (oobId==ID_NAT_ESTABLISH_BIDIRECTIONAL)
 		oob.Write(sa.GetPort());
-	char ipAddressString[32];
+	char ipAddressString[128];
 	sa.ToString(false, ipAddressString);
 	rakPeerInterface->SendOutOfBand((const char*) ipAddressString,sa.GetPort(),(const char*) oob.GetData(),oob.GetNumberOfBytesUsed());
 

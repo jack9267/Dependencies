@@ -269,7 +269,7 @@ void MessageFilter::OnInvalidMessage(FilterSet *filterSet, AddressOrGUID systemA
 		filterSet->invalidMessageCallback(rakPeerInterface, systemAddress, filterSet->filterSetID, filterSet->disallowedCallbackUserData, messageID);
 	if (filterSet->banOnDisallowedMessage && rakPeerInterface)
 	{
-		char str1[64];
+		char str1[128];
 		systemAddress.systemAddress.ToString(false, str1);
 		rakPeerInterface->AddToBanList(str1, filterSet->disallowedMessageBanTimeMS);
 	}

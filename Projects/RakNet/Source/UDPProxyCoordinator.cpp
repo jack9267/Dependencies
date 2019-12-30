@@ -366,7 +366,7 @@ void UDPProxyCoordinator::OnForwardingReplyFromServerToCoordinator(Packet *packe
 
 	if (serverPublicIp.IsEmpty())
 	{
-		char serverIP[64];
+		char serverIP[128];
 		packet->systemAddress.ToString(false,serverIP);
 		serverPublicIp=serverIP;
 	}

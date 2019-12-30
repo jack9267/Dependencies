@@ -762,7 +762,7 @@ void FullyConnectedMesh2::ConnectToRemoteNewIncomingConnections(Packet *packet)
 	bsIn.Read(count);
 	SystemAddress remoteAddress;
 	RakNetGUID remoteGuid;
-	char str[64];
+	char str[128];
 	for (unsigned int i=0; i < count; i++)
 	{
 		bsIn.Read(remoteAddress);

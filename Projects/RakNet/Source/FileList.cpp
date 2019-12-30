@@ -94,13 +94,13 @@ void FLP_Printf::OnFilePushesComplete( SystemAddress systemAddress, unsigned sho
 {
 	(void) setID;
 
-	char str[32];
+	char str[128];
 	systemAddress.ToString(true, (char*) str);
 	RAKNET_DEBUG_PRINTF("File pushes complete to %s\n", str);	
 }
 void FLP_Printf::OnSendAborted( SystemAddress systemAddress )
 {
-	char str[32];
+	char str[128];
 	systemAddress.ToString(true, (char*) str);
 	RAKNET_DEBUG_PRINTF("Send aborted to %s\n", str);
 }

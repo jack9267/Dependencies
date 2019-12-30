@@ -47,7 +47,7 @@ void NatTypeDetectionClient::DetectNATType(SystemAddress _serverAddress)
 		rakPeerInterface->GetSockets(sockets);
 		//SystemAddress sockAddr;
 		//SocketLayer::GetSystemAddress(sockets[0], &sockAddr);
-		char str[64];
+		char str[128];
 		//sockAddr.ToString(false,str);
 		sockets[0]->GetBoundAddress().ToString(false,str);
 		c2=CreateNonblockingBoundSocket(str

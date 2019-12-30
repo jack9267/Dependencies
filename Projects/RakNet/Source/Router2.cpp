@@ -262,7 +262,7 @@ PluginReceiveResult Router2::OnReceive(Packet *packet)
                 if (debugInterface)
                 {
                     char buff[512];
-                    char buff2[32];
+                    char buff2[128];
                     packet->systemAddress.ToString(true,buff2);
                     debugInterface->ShowDiagnostic(FormatStringTS(buff,"Got ID_ROUTER_2_REQUEST_FORWARDING on ip %s from %I64d, ",
                         buff2,packet->guid.g));
@@ -292,7 +292,7 @@ PluginReceiveResult Router2::OnReceive(Packet *packet)
 					if (debugInterface)
 					{
 						char buff[512];
-						char buff2[32];
+						char buff2[128];
 						sa.ToString(false,buff2);
 						debugInterface->ShowDiagnostic(FormatStringTS(buff,"Got ID_ROUTER_2_REPLY_TO_SENDER_PORT %i on address %s, replying with ID_ROUTER_2_MINI_PUNCH_REPLY at %s:%i\n", sa.GetPort(), buff2, _FILE_AND_LINE_));
 
@@ -318,7 +318,7 @@ PluginReceiveResult Router2::OnReceive(Packet *packet)
 					if (debugInterface)
 					{
 						char buff[512];
-						char buff2[32];
+						char buff2[128];
 						sa.ToString(false,buff2);
 						debugInterface->ShowDiagnostic(FormatStringTS(buff,"Got ID_ROUTER_2_REPLY_TO_SPECIFIED_PORT %i on address %s, "
                                         "replying with ID_ROUTER_2_MINI_PUNCH_REPLY at %s:%i\n", sa.GetPort(), buff2, __FILE__, __LINE__));
@@ -915,7 +915,7 @@ void Router2::SendOOBFromRakNetPort(OutOfBandIdentifiers oob, BitStream *extraDa
 		extraData->ResetReadPointer();
 		oobBs.Write(*extraData);
 	}
-	char ipAddressString[32];
+	char ipAddressString[128];
 	sa.ToString(false, ipAddressString);
 	rakPeerInterface->SendOutOfBand((const char*) ipAddressString,sa.GetPort(),(const char*) oobBs.GetData(),oobBs.GetNumberOfBytesUsed());
 }
@@ -1024,8 +1024,8 @@ void Router2::OnRequestForwarding(Packet *packet)
 	else if (result==UDPFORWARDER_NO_SOCKETS)
 	{
 		char buff[512];
-		char buff2[64];
-		char buff3[64];
+		char buff2[128];
+		char buff3[128];
 		packet->systemAddress.ToString(true,buff2);
 		endpointSystemAddress.ToString(true,buff3);
 		if (debugInterface)
@@ -1036,8 +1036,8 @@ void Router2::OnRequestForwarding(Packet *packet)
 	else if (result==UDPFORWARDER_INVALID_PARAMETERS)
 	{
 		char buff[512];
-		char buff2[64];
-		char buff3[64];
+		char buff2[128];
+		char buff3[128];
 		packet->systemAddress.ToString(true,buff2);
 		endpointSystemAddress.ToString(true,buff3);
 		if (debugInterface)
@@ -1048,8 +1048,8 @@ void Router2::OnRequestForwarding(Packet *packet)
 	else if (result==UDPFORWARDER_BIND_FAILED)
 	{
 		char buff[512];
-		char buff2[64];
-		char buff3[64];
+		char buff2[128];
+		char buff3[128];
 		packet->systemAddress.ToString(true,buff2);
 		endpointSystemAddress.ToString(true,buff3);
 		if (debugInterface)
@@ -1061,8 +1061,8 @@ void Router2::OnRequestForwarding(Packet *packet)
 	{
 		if (debugInterface)
 		{
-			char buff2[32];
-			char buff3[32];
+			char buff2[128];
+			char buff3[128];
 			endpointSystemAddress.ToString(true,buff2);
 			packet->systemAddress.ToString(true,buff3);
 			char buff[512];

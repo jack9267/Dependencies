@@ -4545,7 +4545,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char *data,
 	unsigned i;
 
 
-	char str1[64];
+	char str1[128];
 	systemAddress.ToString(false, str1);
 	if (rakPeer->IsBanned( str1 ))
 	{
@@ -5966,7 +5966,7 @@ bool RakPeer::RunUpdateCycle(BitStream &updateBitStream )
 						RAKNET_DEBUG_PRINTF("Temporarily banning %i:%i for sending nonsense data\n", systemAddress);
 #endif
 
-						char str1[64];
+						char str1[128];
 						systemAddress.ToString(false, str1);
 						AddToBanList(str1, remoteSystem->reliabilityLayer.GetTimeoutTime());
 

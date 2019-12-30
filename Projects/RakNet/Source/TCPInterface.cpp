@@ -901,7 +901,7 @@ RAK_THREAD_DECLARATION(RakNet::ConnectionAttemptLoop)
 	unsigned short socketFamily = s->socketFamily;
 	RakNet::OP_DELETE(s, _FILE_AND_LINE_);
 
-	char str1[64];
+	char str1[128];
 	systemAddress.ToString(false, str1);
 	__TCPSOCKET__ sockfd = tcpInterface->SocketConnect(str1, systemAddress.GetPort(), socketFamily, s->bindAddress);
 	if (sockfd==0)

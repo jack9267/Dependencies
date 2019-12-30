@@ -77,7 +77,7 @@ char* into, const char* dir, const char* type, unsigned int reliableMessageNumbe
 , const BitSize_t bitLen, unsigned long long time, const SystemAddress& local, const SystemAddress& remote,
 unsigned int splitPacketId, unsigned int splitPacketIndex, unsigned int splitPacketCount, unsigned int orderingIndex)
 {
-	char str1[64], str2[62];
+	char str1[128], str2[128];
 	local.ToString(true, str1);
 	remote.ToString(true, str2);
 	char localtime[128];
@@ -153,7 +153,7 @@ void PacketLogger::OnReliabilityLayerNotification(const char *errorMessage, cons
 void PacketLogger::OnAck(unsigned int messageNumber, SystemAddress remoteSystemAddress, RakNet::TimeMS time)
 {
 	char str[256];
-	char str1[64], str2[62];
+	char str1[128], str2[128];
 	SystemAddress localSystemAddress = rakPeerInterface->GetExternalID(remoteSystemAddress);
 	localSystemAddress.ToString(true, str1);
 	remoteSystemAddress.ToString(true, str2);
@@ -172,7 +172,7 @@ void PacketLogger::OnAck(unsigned int messageNumber, SystemAddress remoteSystemA
 void PacketLogger::OnPushBackPacket(const char *data, const BitSize_t bitsUsed, SystemAddress remoteSystemAddress)
 {
 	char str[256];
-	char str1[64], str2[62];
+	char str1[128], str2[128];
 	SystemAddress localSystemAddress = rakPeerInterface->GetExternalID(remoteSystemAddress);
 	localSystemAddress.ToString(true, str1);
 	remoteSystemAddress.ToString(true, str2);
@@ -235,7 +235,7 @@ void PacketLogger::WriteLog(const char *str)
 void PacketLogger::WriteMiscellaneous(const char *type, const char *msg)
 {
 	char str[1024];
-	char str1[64];
+	char str1[128];
 	SystemAddress localSystemAddress = rakPeerInterface->GetInternalID();
 	localSystemAddress.ToString(true, str1);
 	RakNet::TimeMS time = RakNet::GetTimeMS();

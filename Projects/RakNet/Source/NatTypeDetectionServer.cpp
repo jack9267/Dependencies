@@ -46,7 +46,7 @@ void NatTypeDetectionServer::Startup(
 {
 	DataStructures::List<RakNetSocket2* > sockets;
 	rakPeerInterface->GetSockets(sockets);
-	char str[64];
+	char str[128];
 	sockets[0]->GetBoundAddress().ToString(false,str);
 	s1p2=
 		CreateNonblockingBoundSocket(str,

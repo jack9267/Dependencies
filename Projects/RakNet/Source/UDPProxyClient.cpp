@@ -261,7 +261,7 @@ void UDPProxyClient::OnPingServers(Packet *packet)
 	incomingBs.Read(serverListSize);
 	SystemAddress serverAddress;
 	unsigned short serverListIndex;
-	char ipStr[64];
+	char ipStr[128];
 	for (serverListIndex=0; serverListIndex<serverListSize; serverListIndex++)
 	{
 		incomingBs.Read(swp.serverAddress);

@@ -151,7 +151,7 @@ bool RakNetCommandParser::OnCommand(const char *command, unsigned numParameters,
 				transport->Send(systemAddress, "GetConnectionList() returned:\r\n");
 				for (i=0; i < count; i++)
 				{
-					char str1[64];
+					char str1[128];
 					remoteSystems[i].ToString(true, str1);
 					transport->Send(systemAddress, "%i %s\r\n", i, str1);
 				}

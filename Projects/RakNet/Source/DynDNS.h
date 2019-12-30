@@ -100,7 +100,7 @@ protected:
 	SystemAddress checkIpAddress;
 	const char *resultDescription;
 	RakNet::DynDnsResultCode result;
-	char myIPStr[32];
+	char myIPStr[128];
 };
 
 } // namespace RakNet
