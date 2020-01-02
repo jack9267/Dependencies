@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2018 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2019 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -85,7 +85,6 @@ typedef unsigned int uintptr_t;
 #define HAVE_MMDEVICEAPI_H 1
 #define HAVE_AUDIOCLIENT_H 1
 #define HAVE_ENDPOINTVOLUME_H 1
-#define HAVE_LIBC 1
 
 /* This is disabled by default to avoid C runtime dependencies and manifest requirements */
 #ifdef HAVE_LIBC
@@ -194,7 +193,7 @@ typedef unsigned int uintptr_t;
 /* Enable various input drivers */
 #define SDL_JOYSTICK_DINPUT 1
 #define SDL_JOYSTICK_XINPUT 1
-//#define SDL_JOYSTICK_HIDAPI 1
+#define SDL_JOYSTICK_HIDAPI 1
 #define SDL_HAPTIC_DINPUT   1
 #define SDL_HAPTIC_XINPUT   1
 
@@ -215,7 +214,7 @@ typedef unsigned int uintptr_t;
 #define SDL_VIDEO_DRIVER_WINDOWS    1
 
 #ifndef SDL_VIDEO_RENDER_D3D
-#define SDL_VIDEO_RENDER_D3D    0
+#define SDL_VIDEO_RENDER_D3D    1
 #endif
 #ifndef SDL_VIDEO_RENDER_D3D11
 #define SDL_VIDEO_RENDER_D3D11  0
@@ -229,10 +228,10 @@ typedef unsigned int uintptr_t;
 #define SDL_VIDEO_OPENGL_WGL    1
 #endif
 #ifndef SDL_VIDEO_RENDER_OGL
-#define SDL_VIDEO_RENDER_OGL    0
+#define SDL_VIDEO_RENDER_OGL    1
 #endif
 #ifndef SDL_VIDEO_RENDER_OGL_ES2
-#define SDL_VIDEO_RENDER_OGL_ES2    0
+#define SDL_VIDEO_RENDER_OGL_ES2    1
 #endif
 #ifndef SDL_VIDEO_OPENGL_ES2
 #define SDL_VIDEO_OPENGL_ES2    1

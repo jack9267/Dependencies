@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2018 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2019 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -330,9 +330,6 @@ extern DECLSPEC void * SDLCALL SDL_TLSGet(SDL_TLSID id);
  *  \sa SDL_TLSGet()
  */
 extern DECLSPEC int SDLCALL SDL_TLSSet(SDL_TLSID id, const void *value, void (SDLCALL *destructor)(void*));
-
-// JP - Allows me to cleanup the main thread
-extern DECLSPEC void SDLCALL SDL_TLSCleanup();
 
 
 /* Ends C function definitions when using C++ */
