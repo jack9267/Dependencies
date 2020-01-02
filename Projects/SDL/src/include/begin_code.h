@@ -49,6 +49,18 @@
 #  endif
 #endif
 
+#if !defined(DECLSPEC) && defined(__WIN32__)
+#ifdef SDL2_STATIC
+#define DECLSPEC
+#else
+#ifdef SDL2_BUILDING
+#define DECLSPEC __declspec(dllexport)
+#else
+#define DECLSPEC
+#endif
+#endif
+#endif
+
 /* Some compilers use a special export keyword */
 #ifndef DECLSPEC
 # if defined(__WIN32__) || defined(__WINRT__)
