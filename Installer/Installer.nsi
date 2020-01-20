@@ -6,6 +6,10 @@
 SetCompress off
 Unicode true
 
+ManifestDPIAware true
+ManifestLongPathAware true
+ManifestSupportedOS all
+
 Name "Dependencies"
 OutFile "Dependencies.exe"
 
