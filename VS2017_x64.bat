@@ -1,2 +1,9 @@
 @echo off
-call Compile.bat "Visual Studio 15 2017 Win64" "v141"
+set CMAKE_GENERATOR="Visual Studio 15 2017"
+set CMAKE_GENERATOR_PLATFORM=x64
+set CMAKE_GENERATOR_TOOLSET=v141
+call Compile.bat
+set CMAKE_EXTRA_PATH=_static
+set CMAKE_EXTRA_ARGS=-DFORCE_STATIC_VCRT=ON
+call Compile.bat
+pause
