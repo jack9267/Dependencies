@@ -140,7 +140,7 @@ if(WIN32)
 
 	list(APPEND EXTRA_LIBS user32 gdi32 winmm imm32 ole32 oleaut32 version uuid advapi32 setupapi shell32)
 	list(APPEND EXTRA_LIBS dinput8)
-	list(APPEND EXTRA_LIBS dxerr)
+	#list(APPEND EXTRA_LIBS dxerr)
 endif()
 
 install_include("${SDL2_SOURCE_DIR}/include")
