@@ -819,6 +819,10 @@ SOURCE=..\..\..\..\src\tool_parsecfg.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\..\..\src\tool_progress.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\..\..\src\tool_setopt.c
 # End Source File
 # Begin Source File
@@ -844,6 +848,10 @@ SOURCE=..\..\..\..\src\tool_vms.c
 # Begin Source File
 
 SOURCE=..\..\..\..\src\tool_writeout.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\..\src\tool_writeout_json.c
 # End Source File
 # Begin Source File
 
@@ -1003,6 +1011,10 @@ SOURCE=..\..\..\..\src\tool_parsecfg.h
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\..\..\src\tool_progress.h
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\..\..\src\tool_sdecls.h
 # End Source File
 # Begin Source File
@@ -1040,6 +1052,10 @@ SOURCE=..\..\..\..\src\tool_vms.h
 # Begin Source File
 
 SOURCE=..\..\..\..\src\tool_writeout.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\..\src\tool_writeout_json.h
 # End Source File
 # Begin Source File
 

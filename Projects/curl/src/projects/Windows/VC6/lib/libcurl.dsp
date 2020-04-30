@@ -790,6 +790,10 @@ SOURCE=..\..\..\..\lib\curl_gethostname.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\..\..\lib\curl_get_line.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\..\..\lib\curl_gssapi.c
 # End Source File
 # Begin Source File
@@ -998,6 +1002,10 @@ SOURCE=..\..\..\..\lib\mprintf.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\..\..\lib\mqtt.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\..\..\lib\multi.c
 # End Source File
 # Begin Source File
@@ -1026,10 +1034,6 @@ SOURCE=..\..\..\..\lib\pingpong.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\..\..\lib\pipeline.c
-# End Source File
-# Begin Source File
-
 SOURCE=..\..\..\..\lib\pop3.c
 # End Source File
 # Begin Source File
@@ -1043,6 +1047,10 @@ SOURCE=..\..\..\..\lib\psl.c
 # Begin Source File
 
 SOURCE=..\..\..\..\lib\rand.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\..\lib\rename.c
 # End Source File
 # Begin Source File
 
@@ -1086,6 +1094,10 @@ SOURCE=..\..\..\..\lib\smtp.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\..\..\lib\socketpair.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\..\..\lib\socks.c
 # End Source File
 # Begin Source File
@@ -1103,14 +1115,6 @@ SOURCE=..\..\..\..\lib\speedcheck.c
 # Begin Source File
 
 SOURCE=..\..\..\..\lib\splay.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\..\..\lib\ssh.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\..\..\lib\ssh-libssh.c
 # End Source File
 # Begin Source File
 
@@ -1226,7 +1230,27 @@ SOURCE=..\..\..\..\lib\vauth\vauth.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\..\..\lib\vtls\cyassl.c
+SOURCE=..\..\..\..\lib\vquic\ngtcp2.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\..\lib\vquic\quiche.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\..\lib\vssh\libssh2.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\..\lib\vssh\libssh.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\..\lib\vssh\wolfssh.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\..\lib\vtls\bearssl.c
 # End Source File
 # Begin Source File
 
@@ -1242,6 +1266,10 @@ SOURCE=..\..\..\..\lib\vtls\mbedtls.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\..\..\lib\vtls\mbedtls_threadlock.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\..\..\lib\vtls\mesalink.c
 # End Source File
 # Begin Source File
@@ -1251,14 +1279,6 @@ SOURCE=..\..\..\..\lib\vtls\nss.c
 # Begin Source File
 
 SOURCE=..\..\..\..\lib\vtls\openssl.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\..\..\lib\vtls\polarssl.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\..\..\lib\vtls\polarssl_threadlock.c
 # End Source File
 # Begin Source File
 
@@ -1275,6 +1295,10 @@ SOURCE=..\..\..\..\lib\vtls\sectransp.c
 # Begin Source File
 
 SOURCE=..\..\..\..\lib\vtls\vtls.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\..\lib\vtls\wolfssl.c
 # End Source File
 # End Group
 # Begin Group "Header Files"
@@ -1343,6 +1367,10 @@ SOURCE=..\..\..\..\lib\curl_fnmatch.h
 # Begin Source File
 
 SOURCE=..\..\..\..\lib\curl_gethostname.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\..\lib\curl_get_line.h
 # End Source File
 # Begin Source File
 
@@ -1550,6 +1578,10 @@ SOURCE=..\..\..\..\lib\mime.h
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\..\..\lib\mqtt.h
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\..\..\lib\multihandle.h
 # End Source File
 # Begin Source File
@@ -1578,10 +1610,6 @@ SOURCE=..\..\..\..\lib\pingpong.h
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\..\..\lib\pipeline.h
-# End Source File
-# Begin Source File
-
 SOURCE=..\..\..\..\lib\pop3.h
 # End Source File
 # Begin Source File
@@ -1594,7 +1622,15 @@ SOURCE=..\..\..\..\lib\psl.h
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\..\..\lib\quic.h
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\..\..\lib\rand.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\..\lib\rename.h
 # End Source File
 # Begin Source File
 
@@ -1642,6 +1678,10 @@ SOURCE=..\..\..\..\lib\sockaddr.h
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\..\..\lib\socketpair.h
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\..\..\lib\socks.h
 # End Source File
 # Begin Source File
@@ -1651,10 +1691,6 @@ SOURCE=..\..\..\..\lib\speedcheck.h
 # Begin Source File
 
 SOURCE=..\..\..\..\lib\splay.h
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\..\..\lib\ssh.h
 # End Source File
 # Begin Source File
 
@@ -1734,7 +1770,19 @@ SOURCE=..\..\..\..\lib\vauth\vauth.h
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\..\..\lib\vtls\cyassl.h
+SOURCE=..\..\..\..\lib\vquic\ngtcp2.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\..\lib\vquic\quiche.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\..\lib\vssh\ssh.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\..\lib\vtls\bearssl.h
 # End Source File
 # Begin Source File
 
@@ -1750,6 +1798,10 @@ SOURCE=..\..\..\..\lib\vtls\mbedtls.h
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\..\..\lib\vtls\mbedtls_threadlock.h
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\..\..\lib\vtls\mesalink.h
 # End Source File
 # Begin Source File
@@ -1762,14 +1814,6 @@ SOURCE=..\..\..\..\lib\vtls\openssl.h
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\..\..\lib\vtls\polarssl.h
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\..\..\lib\vtls\polarssl_threadlock.h
-# End Source File
-# Begin Source File
-
 SOURCE=..\..\..\..\lib\vtls\schannel.h
 # End Source File
 # Begin Source File
@@ -1779,6 +1823,10 @@ SOURCE=..\..\..\..\lib\vtls\sectransp.h
 # Begin Source File
 
 SOURCE=..\..\..\..\lib\vtls\vtls.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\..\lib\vtls\wolfssl.h
 # End Source File
 # End Group
 # Begin Group "Resource Files"

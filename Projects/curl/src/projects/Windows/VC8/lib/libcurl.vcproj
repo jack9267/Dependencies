@@ -3677,6 +3677,10 @@
 			>
 			</File>
 			<File
+				RelativePath="..\..\..\..\lib\curl_get_line.c"
+			>
+			</File>
+			<File
 				RelativePath="..\..\..\..\lib\curl_gssapi.c"
 			>
 			</File>
@@ -3885,6 +3889,10 @@
 			>
 			</File>
 			<File
+				RelativePath="..\..\..\..\lib\mqtt.c"
+			>
+			</File>
+			<File
 				RelativePath="..\..\..\..\lib\multi.c"
 			>
 			</File>
@@ -3913,10 +3921,6 @@
 			>
 			</File>
 			<File
-				RelativePath="..\..\..\..\lib\pipeline.c"
-			>
-			</File>
-			<File
 				RelativePath="..\..\..\..\lib\pop3.c"
 			>
 			</File>
@@ -3930,6 +3934,10 @@
 			</File>
 			<File
 				RelativePath="..\..\..\..\lib\rand.c"
+			>
+			</File>
+			<File
+				RelativePath="..\..\..\..\lib\rename.c"
 			>
 			</File>
 			<File
@@ -3973,6 +3981,10 @@
 			>
 			</File>
 			<File
+				RelativePath="..\..\..\..\lib\socketpair.c"
+			>
+			</File>
+			<File
 				RelativePath="..\..\..\..\lib\socks.c"
 			>
 			</File>
@@ -3990,14 +4002,6 @@
 			</File>
 			<File
 				RelativePath="..\..\..\..\lib\splay.c"
-			>
-			</File>
-			<File
-				RelativePath="..\..\..\..\lib\ssh.c"
-			>
-			</File>
-			<File
-				RelativePath="..\..\..\..\lib\ssh-libssh.c"
 			>
 			</File>
 			<File
@@ -4130,6 +4134,10 @@
 			</File>
 			<File
 				RelativePath="..\..\..\..\lib\curl_gethostname.h"
+			>
+			</File>
+			<File
+				RelativePath="..\..\..\..\lib\curl_get_line.h"
 			>
 			</File>
 			<File
@@ -4337,6 +4345,10 @@
 			>
 			</File>
 			<File
+				RelativePath="..\..\..\..\lib\mqtt.h"
+			>
+			</File>
+			<File
 				RelativePath="..\..\..\..\lib\multihandle.h"
 			>
 			</File>
@@ -4365,10 +4377,6 @@
 			>
 			</File>
 			<File
-				RelativePath="..\..\..\..\lib\pipeline.h"
-			>
-			</File>
-			<File
 				RelativePath="..\..\..\..\lib\pop3.h"
 			>
 			</File>
@@ -4381,7 +4389,15 @@
 			>
 			</File>
 			<File
+				RelativePath="..\..\..\..\lib\quic.h"
+			>
+			</File>
+			<File
 				RelativePath="..\..\..\..\lib\rand.h"
+			>
+			</File>
+			<File
+				RelativePath="..\..\..\..\lib\rename.h"
 			>
 			</File>
 			<File
@@ -4429,6 +4445,10 @@
 			>
 			</File>
 			<File
+				RelativePath="..\..\..\..\lib\socketpair.h"
+			>
+			</File>
+			<File
 				RelativePath="..\..\..\..\lib\socks.h"
 			>
 			</File>
@@ -4438,10 +4458,6 @@
 			</File>
 			<File
 				RelativePath="..\..\..\..\lib\splay.h"
-			>
-			</File>
-			<File
-				RelativePath="..\..\..\..\lib\ssh.h"
 			>
 			</File>
 			<File
@@ -4590,13 +4606,69 @@
 			</Filter>
 		</Filter>
 		<Filter
+			Name="vquic"
+			>
+			<Filter
+				Name="Source Files"
+				>
+				<File
+					RelativePath="..\..\..\..\lib\vquic\ngtcp2.c"
+				>
+				</File>
+				<File
+					RelativePath="..\..\..\..\lib\vquic\quiche.c"
+				>
+				</File>
+			</Filter>
+			<Filter
+				Name="Header Files"
+				>
+				<File
+					RelativePath="..\..\..\..\lib\vquic\ngtcp2.h"
+				>
+				</File>
+				<File
+					RelativePath="..\..\..\..\lib\vquic\quiche.h"
+				>
+				</File>
+			</Filter>
+		</Filter>
+		<Filter
+			Name="vssh"
+			>
+			<Filter
+				Name="Source Files"
+				>
+				<File
+					RelativePath="..\..\..\..\lib\vssh\libssh2.c"
+				>
+				</File>
+				<File
+					RelativePath="..\..\..\..\lib\vssh\libssh.c"
+				>
+				</File>
+				<File
+					RelativePath="..\..\..\..\lib\vssh\wolfssh.c"
+				>
+				</File>
+			</Filter>
+			<Filter
+				Name="Header Files"
+				>
+				<File
+					RelativePath="..\..\..\..\lib\vssh\ssh.h"
+				>
+				</File>
+			</Filter>
+		</Filter>
+		<Filter
 			Name="vtls"
 			>
 			<Filter
 				Name="Source Files"
 				>
 				<File
-					RelativePath="..\..\..\..\lib\vtls\cyassl.c"
+					RelativePath="..\..\..\..\lib\vtls\bearssl.c"
 				>
 				</File>
 				<File
@@ -4612,6 +4684,10 @@
 				>
 				</File>
 				<File
+					RelativePath="..\..\..\..\lib\vtls\mbedtls_threadlock.c"
+				>
+				</File>
+				<File
 					RelativePath="..\..\..\..\lib\vtls\mesalink.c"
 				>
 				</File>
@@ -4621,14 +4697,6 @@
 				</File>
 				<File
 					RelativePath="..\..\..\..\lib\vtls\openssl.c"
-				>
-				</File>
-				<File
-					RelativePath="..\..\..\..\lib\vtls\polarssl.c"
-				>
-				</File>
-				<File
-					RelativePath="..\..\..\..\lib\vtls\polarssl_threadlock.c"
 				>
 				</File>
 				<File
@@ -4647,12 +4715,16 @@
 					RelativePath="..\..\..\..\lib\vtls\vtls.c"
 				>
 				</File>
+				<File
+					RelativePath="..\..\..\..\lib\vtls\wolfssl.c"
+				>
+				</File>
 			</Filter>
 			<Filter
 				Name="Header Files"
 				>
 				<File
-					RelativePath="..\..\..\..\lib\vtls\cyassl.h"
+					RelativePath="..\..\..\..\lib\vtls\bearssl.h"
 				>
 				</File>
 				<File
@@ -4668,6 +4740,10 @@
 				>
 				</File>
 				<File
+					RelativePath="..\..\..\..\lib\vtls\mbedtls_threadlock.h"
+				>
+				</File>
+				<File
 					RelativePath="..\..\..\..\lib\vtls\mesalink.h"
 				>
 				</File>
@@ -4680,14 +4756,6 @@
 				>
 				</File>
 				<File
-					RelativePath="..\..\..\..\lib\vtls\polarssl.h"
-				>
-				</File>
-				<File
-					RelativePath="..\..\..\..\lib\vtls\polarssl_threadlock.h"
-				>
-				</File>
-				<File
 					RelativePath="..\..\..\..\lib\vtls\schannel.h"
 				>
 				</File>
@@ -4697,6 +4765,10 @@
 				</File>
 				<File
 					RelativePath="..\..\..\..\lib\vtls\vtls.h"
+				>
+				</File>
+				<File
+					RelativePath="..\..\..\..\lib\vtls\wolfssl.h"
 				>
 				</File>
 			</Filter>

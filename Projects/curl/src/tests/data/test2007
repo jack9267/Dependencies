@@ -86,11 +86,14 @@ Accept: */*
 <file1 name="log/download2007">
 Something delivered from an HTTP resource
 </file1>
+# The Content-Length replace here is to handle with 4/5 digit port number in
+# the content
 <stripfile2>
 s/Last-Modified:.*//
+s/Content-Length: 49[67]/Content-Length: yeps/
 </stripfile2>
 <file2 name="log/heads2007">
-Content-Length: 496
+Content-Length: yeps
 Accept-ranges: bytes
 
 
@@ -106,7 +109,7 @@ Funny-head: yesyes
 </file2>
 <file3 name="log/stdout2007">
 </file3>
-<file4 name="log/stderr2007">
+<file4 name="log/stderr2007" mode="text">
 Metalink: parsing (file://%PWD/log/test2007.metalink) metalink/XML...
 Metalink: parsing (file://%PWD/log/test2007.metalink) OK
 Metalink: fetching (log/download2007) from (http://%HOSTIP:%HTTPPORT/2007)...

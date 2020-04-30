@@ -21,6 +21,8 @@ README
   curl binaries or other binaries that involve libcurl, you might enjoy the
   LICENSE-MIXING document.
 
+  All of those documents and more can be found in the docs/ directory.
+
 CONTACT
 
   If you have problems, questions, ideas or suggestions, please contact us
@@ -41,6 +43,12 @@ GIT
     git clone https://github.com/curl/curl.git
 
   (you'll get a directory named curl created, filled with the source code)
+
+SECURITY PROBLEMS
+
+  Report suspected security problems via our HackerOne page and not in public!
+
+    https://hackerone.com/curl
 
 NOTICE
 

@@ -5,7 +5,7 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 1998 - 2018, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) 1998 - 2020, Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
@@ -111,16 +111,15 @@ struct httprequest {
   bool ntlm;      /* Authorization ntlm header found */
   int writedelay; /* if non-zero, delay this number of seconds between
                      writes in the response */
-  int pipe;       /* if non-zero, expect this many requests to do a "piped"
-                     request/response */
   int skip;       /* if non-zero, the server is instructed to not read this
                      many bytes from a PUT/POST request. Ie the client sends N
                      bytes said in Content-Length, but the server only reads N
                      - skip bytes. */
   int rcmd;       /* doing a special command, see defines above */
   int prot_version;  /* HTTP version * 10 */
-  bool pipelining;   /* true if request is pipelined */
   int callcount;  /* times ProcessRequest() gets called */
+  bool skipall;   /* skip all incoming data */
+  bool noexpect;  /* refuse Expect: (don't read the body) */
   bool connmon;   /* monitor the state of the connection, log disconnects */
   bool upgrade;   /* test case allows upgrade to http2 */
   bool upgrade_request; /* upgrade request found and allowed */
@@ -182,6 +181,9 @@ const char *serverlogfile = DEFAULT_LOGFILE;
 /* close connection */
 #define CMD_SWSCLOSE "swsclose"
 
+/* deny Expect: requests */
+#define CMD_NOEXPECT "no-expect"
+
 #define END_OF_HEADERS "\r\n\r\n"
 
 enum {
@@ -211,140 +213,8 @@ static const char *doc404 = "HTTP/1.1 404 Not Found\r\n"
     "The requested URL was not found on this server.\n"
     "<P><HR><ADDRESS>" SWSVERSION "</ADDRESS>\n" "</BODY></HTML>\n";
 
-/* do-nothing macro replacement for systems which lack siginterrupt() */
-
-#ifndef HAVE_SIGINTERRUPT
-#define siginterrupt(x,y) do {} while(0)
-#endif
-
-/* vars used to keep around previous signal handlers */
-
-typedef RETSIGTYPE (*SIGHANDLER_T)(int);
-
-#ifdef SIGHUP
-static SIGHANDLER_T old_sighup_handler  = SIG_ERR;
-#endif
-
-#ifdef SIGPIPE
-static SIGHANDLER_T old_sigpipe_handler = SIG_ERR;
-#endif
-
-#ifdef SIGALRM
-static SIGHANDLER_T old_sigalrm_handler = SIG_ERR;
-#endif
-
-#ifdef SIGINT
-static SIGHANDLER_T old_sigint_handler  = SIG_ERR;
-#endif
-
-#ifdef SIGTERM
-static SIGHANDLER_T old_sigterm_handler = SIG_ERR;
-#endif
-
-#if defined(SIGBREAK) && defined(WIN32)
-static SIGHANDLER_T old_sigbreak_handler = SIG_ERR;
-#endif
-
-/* var which if set indicates that the program should finish execution */
-
-SIG_ATOMIC_T got_exit_signal = 0;
-
-/* if next is set indicates the first signal handled in exit_signal_handler */
-
-static volatile int exit_signal = 0;
-
 /* work around for handling trailing headers */
 static int already_recv_zeroed_chunk = FALSE;
-
-/* signal handler that will be triggered to indicate that the program
-  should finish its execution in a controlled manner as soon as possible.
-  The first time this is called it will set got_exit_signal to one and
-  store in exit_signal the signal that triggered its execution. */
-
-static RETSIGTYPE exit_signal_handler(int signum)
-{
-  int old_errno = errno;
-  if(got_exit_signal == 0) {
-    got_exit_signal = 1;
-    exit_signal = signum;
-  }
-  (void)signal(signum, exit_signal_handler);
-  errno = old_errno;
-}
-
-static void install_signal_handlers(void)
-{
-#ifdef SIGHUP
-  /* ignore SIGHUP signal */
-  old_sighup_handler = signal(SIGHUP, SIG_IGN);
-  if(old_sighup_handler == SIG_ERR)
-    logmsg("cannot install SIGHUP handler: %s", strerror(errno));
-#endif
-#ifdef SIGPIPE
-  /* ignore SIGPIPE signal */
-  old_sigpipe_handler = signal(SIGPIPE, SIG_IGN);
-  if(old_sigpipe_handler == SIG_ERR)
-    logmsg("cannot install SIGPIPE handler: %s", strerror(errno));
-#endif
-#ifdef SIGALRM
-  /* ignore SIGALRM signal */
-  old_sigalrm_handler = signal(SIGALRM, SIG_IGN);
-  if(old_sigalrm_handler == SIG_ERR)
-    logmsg("cannot install SIGALRM handler: %s", strerror(errno));
-#endif
-#ifdef SIGINT
-  /* handle SIGINT signal with our exit_signal_handler */
-  old_sigint_handler = signal(SIGINT, exit_signal_handler);
-  if(old_sigint_handler == SIG_ERR)
-    logmsg("cannot install SIGINT handler: %s", strerror(errno));
-  else
-    siginterrupt(SIGINT, 1);
-#endif
-#ifdef SIGTERM
-  /* handle SIGTERM signal with our exit_signal_handler */
-  old_sigterm_handler = signal(SIGTERM, exit_signal_handler);
-  if(old_sigterm_handler == SIG_ERR)
-    logmsg("cannot install SIGTERM handler: %s", strerror(errno));
-  else
-    siginterrupt(SIGTERM, 1);
-#endif
-#if defined(SIGBREAK) && defined(WIN32)
-  /* handle SIGBREAK signal with our exit_signal_handler */
-  old_sigbreak_handler = signal(SIGBREAK, exit_signal_handler);
-  if(old_sigbreak_handler == SIG_ERR)
-    logmsg("cannot install SIGBREAK handler: %s", strerror(errno));
-  else
-    siginterrupt(SIGBREAK, 1);
-#endif
-}
-
-static void restore_signal_handlers(void)
-{
-#ifdef SIGHUP
-  if(SIG_ERR != old_sighup_handler)
-    (void)signal(SIGHUP, old_sighup_handler);
-#endif
-#ifdef SIGPIPE
-  if(SIG_ERR != old_sigpipe_handler)
-    (void)signal(SIGPIPE, old_sigpipe_handler);
-#endif
-#ifdef SIGALRM
-  if(SIG_ERR != old_sigalrm_handler)
-    (void)signal(SIGALRM, old_sigalrm_handler);
-#endif
-#ifdef SIGINT
-  if(SIG_ERR != old_sigint_handler)
-    (void)signal(SIGINT, old_sigint_handler);
-#endif
-#ifdef SIGTERM
-  if(SIG_ERR != old_sigterm_handler)
-    (void)signal(SIGTERM, old_sigterm_handler);
-#endif
-#if defined(SIGBREAK) && defined(WIN32)
-  if(SIG_ERR != old_sigbreak_handler)
-    (void)signal(SIGBREAK, old_sigbreak_handler);
-#endif
-}
 
 /* returns true if the current socket is an IP one */
 static bool socket_domain_is_ip(void)
@@ -365,16 +235,15 @@ static bool socket_domain_is_ip(void)
 static int parse_servercmd(struct httprequest *req)
 {
   FILE *stream;
-  char *filename;
   int error;
 
-  filename = test2file(req->testno);
+  stream = test2fopen(req->testno);
   req->close = FALSE;
-  stream = fopen(filename, "rb");
+  req->connmon = FALSE;
+
   if(!stream) {
     error = errno;
     logmsg("fopen() failed with error: %d %s", error, strerror(error));
-    logmsg("  [1] Error opening file: %s", filename);
     logmsg("  Couldn't open test file %ld", req->testno);
     req->open = FALSE; /* closes connection */
     return 1; /* done */
@@ -393,8 +262,6 @@ static int parse_servercmd(struct httprequest *req)
       req->open = FALSE; /* closes connection */
       return 1; /* done */
     }
-
-    req->connmon = FALSE;
 
     cmd = orgcmd;
     while(cmd && cmdsize) {
@@ -426,17 +293,13 @@ static int parse_servercmd(struct httprequest *req)
         logmsg("swsclose: close this connection after response");
         req->close = TRUE;
       }
-      else if(1 == sscanf(cmd, "pipe: %d", &num)) {
-        logmsg("instructed to allow a pipe size of %d", num);
-        if(num < 0)
-          logmsg("negative pipe size ignored");
-        else if(num > 0)
-          req->pipe = num-1; /* decrease by one since we don't count the
-                                first request in this number */
-      }
       else if(1 == sscanf(cmd, "skip: %d", &num)) {
         logmsg("instructed to skip this number of bytes %d", num);
         req->skip = num;
+      }
+      else if(!strncmp(CMD_NOEXPECT, cmd, strlen(CMD_NOEXPECT))) {
+        logmsg("instructed to reject Expect: 100-continue");
+        req->noexpect = TRUE;
       }
       else if(1 == sscanf(cmd, "writedelay: %d", &num)) {
         logmsg("instructed to delay %d secs between packets", num);
@@ -551,12 +414,11 @@ static int ProcessRequest(struct httprequest *req)
         msnprintf(logbuf, sizeof(logbuf), "Requested test number %ld part %ld",
                   req->testno, req->partno);
         logmsg("%s", logbuf);
-
-        /* find and parse <servercmd> for this test */
-        parse_servercmd(req);
       }
-      else
+      else {
+        logmsg("No test number");
         req->testno = DOCNUMBER_NOTHING;
+      }
 
     }
 
@@ -617,15 +479,7 @@ static int ProcessRequest(struct httprequest *req)
     }
 
     if(req->testno == DOCNUMBER_NOTHING) {
-      /* check for a Testno: header with the test case number */
-      char *testno = strstr(line, "\nTestno: ");
-      if(testno) {
-        req->testno = strtol(&testno[9], NULL, 10);
-        logmsg("Found test number %d in Testno: header!", req->testno);
-      }
-    }
-    if(req->testno == DOCNUMBER_NOTHING) {
-      /* Still no test case number. Try to get the the number off the last dot
+      /* Still no test case number. Try to get the number off the last dot
          instead, IE we consider the TLD to be the test number. Test 123 can
          then be written as "example.com.123". */
 
@@ -664,8 +518,8 @@ static int ProcessRequest(struct httprequest *req)
     }
   }
   else if((req->offset >= 3) && (req->testno == DOCNUMBER_NOTHING)) {
-    logmsg("** Unusual request. Starts with %02x %02x %02x",
-           line[0], line[1], line[2]);
+    logmsg("** Unusual request. Starts with %02x %02x %02x (%c%c%c)",
+           line[0], line[1], line[2], line[0], line[1], line[2]);
   }
 
   if(!end) {
@@ -673,7 +527,22 @@ static int ProcessRequest(struct httprequest *req)
     logmsg("request not complete yet");
     return 0; /* not complete yet */
   }
-  logmsg("- request found to be complete");
+  logmsg("- request found to be complete (%d)", req->testno);
+
+  if(req->testno == DOCNUMBER_NOTHING) {
+    /* check for a Testno: header with the test case number */
+    char *testno = strstr(line, "\nTestno: ");
+    if(testno) {
+      req->testno = strtol(&testno[9], NULL, 10);
+      logmsg("Found test number %d in Testno: header!", req->testno);
+    }
+    else {
+      logmsg("No Testno: header");
+    }
+  }
+
+  /* find and parse <servercmd> for this test */
+  parse_servercmd(req);
 
   if(use_gopher) {
     /* when using gopher we cannot check the request until the entire
@@ -705,11 +574,6 @@ static int ProcessRequest(struct httprequest *req)
       logmsg("%s", logbuf);
     }
   }
-
-  if(req->pipe)
-    /* we do have a full set, advance the checkindex to after the end of the
-       headers, for the pipelining case mostly */
-    req->checkindex += (end - line) + strlen(end_of_headers);
 
   /* **** Persistence ****
    *
@@ -745,19 +609,28 @@ static int ProcessRequest(struct httprequest *req)
         req->open = FALSE; /* closes connection */
         return 1; /* done */
       }
-      req->cl = clen - req->skip;
+      if(req->skipall)
+        req->cl = 0;
+      else
+        req->cl = clen - req->skip;
 
       logmsg("Found Content-Length: %lu in the request", clen);
       if(req->skip)
         logmsg("... but will abort after %zu bytes", req->cl);
-      break;
     }
     else if(strncasecompare("Transfer-Encoding: chunked", line,
                             strlen("Transfer-Encoding: chunked"))) {
       /* chunked data coming in */
       chunked = TRUE;
     }
-
+    else if(req->noexpect &&
+            strncasecompare("Expect: 100-continue", line,
+                            strlen("Expect: 100-continue"))) {
+      if(req->cl)
+        req->cl = 0;
+      req->skipall = TRUE;
+      logmsg("Found Expect: 100-continue, ignore body");
+    }
 
     if(chunked) {
       if(strstr(req->reqbuf, "\r\n0\r\n\r\n")) {
@@ -844,8 +717,7 @@ static int ProcessRequest(struct httprequest *req)
   if(strstr(req->reqbuf, "Connection: close"))
     req->open = FALSE; /* close connection after this request */
 
-  if(!req->pipe &&
-     req->open &&
+  if(req->open &&
      req->prot_version >= 11 &&
      end &&
      req->reqbuf + req->offset > end + strlen(end_of_headers) &&
@@ -855,19 +727,6 @@ static int ProcessRequest(struct httprequest *req)
     /* If we have a persistent connection, HTTP version >= 1.1
        and GET/HEAD request, enable pipelining. */
     req->checkindex = (end - req->reqbuf) + strlen(end_of_headers);
-    req->pipelining = TRUE;
-  }
-
-  while(req->pipe) {
-    if(got_exit_signal)
-      return 1; /* done */
-    /* scan for more header ends within this chunk */
-    line = &req->reqbuf[req->checkindex];
-    end = strstr(line, end_of_headers);
-    if(!end)
-      break;
-    req->checkindex += (end - line) + strlen(end_of_headers);
-    req->pipe--;
   }
 
   /* If authentication is required and no auth was provided, end now. This
@@ -951,13 +810,8 @@ storerequest_cleanup:
 
 static void init_httprequest(struct httprequest *req)
 {
-  /* Pipelining is already set, so do not initialize it here. Only initialize
-     checkindex and offset if pipelining is not set, since in a pipeline they
-     need to be inherited from the previous request. */
-  if(!req->pipelining) {
-    req->checkindex = 0;
-    req->offset = 0;
-  }
+  req->checkindex = 0;
+  req->offset = 0;
   req->testno = DOCNUMBER_NOTHING;
   req->partno = 0;
   req->connect_request = FALSE;
@@ -967,8 +821,9 @@ static void init_httprequest(struct httprequest *req)
   req->cl = 0;
   req->digest = FALSE;
   req->ntlm = FALSE;
-  req->pipe = 0;
   req->skip = 0;
+  req->skipall = FALSE;
+  req->noexpect = FALSE;
   req->writedelay = 0;
   req->rcmd = RCMD_NORMALREQ;
   req->prot_version = 0;
@@ -988,39 +843,19 @@ static int get_request(curl_socket_t sock, struct httprequest *req)
   ssize_t got = 0;
   int overflow = 0;
 
-  char *pipereq = NULL;
-  size_t pipereq_length = 0;
-
-  if(req->pipelining) {
-    pipereq = reqbuf + req->checkindex;
-    pipereq_length = req->offset - req->checkindex;
-
-    /* Now that we've got the pipelining info we can reset the
-       pipelining-related vars which were skipped in init_httprequest */
-    req->pipelining = FALSE;
-    req->checkindex = 0;
-    req->offset = 0;
-  }
-
   if(req->offset >= REQBUFSIZ-1) {
     /* buffer is already full; do nothing */
     overflow = 1;
   }
   else {
-    if(pipereq_length && pipereq) {
-      memmove(reqbuf, pipereq, pipereq_length);
-      got = curlx_uztosz(pipereq_length);
-      pipereq_length = 0;
-    }
-    else {
-      if(req->skip)
-        /* we are instructed to not read the entire thing, so we make sure to
-           only read what we're supposed to and NOT read the enire thing the
-           client wants to send! */
-        got = sread(sock, reqbuf + req->offset, req->cl);
-      else
-        got = sread(sock, reqbuf + req->offset, REQBUFSIZ-1 - req->offset);
-    }
+    if(req->skip)
+      /* we are instructed to not read the entire thing, so we make sure to
+         only read what we're supposed to and NOT read the enire thing the
+         client wants to send! */
+      got = sread(sock, reqbuf + req->offset, req->cl);
+    else
+      got = sread(sock, reqbuf + req->offset, REQBUFSIZ-1 - req->offset);
+
     if(got_exit_signal)
       return -1;
     if(got == 0) {
@@ -1051,11 +886,6 @@ static int get_request(curl_socket_t sock, struct httprequest *req)
     req->done_processing = ProcessRequest(req);
     if(got_exit_signal)
       return -1;
-    if(req->done_processing && req->pipe) {
-      logmsg("Waiting for another piped request");
-      req->done_processing = 0;
-      req->pipe--;
-    }
   }
 
   if(overflow || (req->offset == REQBUFSIZ-1 && got > 0)) {
@@ -1075,7 +905,7 @@ static int get_request(curl_socket_t sock, struct httprequest *req)
 
   /* at the end of a request dump it to an external file */
   if(fail || req->done_processing)
-    storerequest(reqbuf, req->pipelining ? req->checkindex : req->offset);
+    storerequest(reqbuf, req->offset);
   if(got_exit_signal)
     return -1;
 
@@ -1158,7 +988,6 @@ static int send_doc(curl_socket_t sock, struct httprequest *req)
   }
   else {
     char partbuf[80];
-    char *filename = test2file(req->testno);
 
     /* select the <data> tag for "normal" requests and the <connect> one
        for CONNECT requests (within the <reply> section) */
@@ -1171,11 +1000,10 @@ static int send_doc(curl_socket_t sock, struct httprequest *req)
 
     logmsg("Send response test%ld section <%s>", req->testno, partbuf);
 
-    stream = fopen(filename, "rb");
+    stream = test2fopen(req->testno);
     if(!stream) {
       error = errno;
       logmsg("fopen() failed with error: %d %s", error, strerror(error));
-      logmsg("  [3] Error opening file: %s", filename);
       return 0;
     }
     else {
@@ -1194,11 +1022,10 @@ static int send_doc(curl_socket_t sock, struct httprequest *req)
     }
 
     /* re-open the same file again */
-    stream = fopen(filename, "rb");
+    stream = test2fopen(req->testno);
     if(!stream) {
       error = errno;
       logmsg("fopen() failed with error: %d %s", error, strerror(error));
-      logmsg("  [4] Error opening file: %s", filename);
       free(ptr);
       return 0;
     }
@@ -1297,6 +1124,8 @@ static int send_doc(curl_socket_t sock, struct httprequest *req)
     logmsg("Sending response failed. Only (%zu bytes) of (%zu bytes) "
            "were sent",
            responsesize-count, responsesize);
+    prevtestno = req->testno;
+    prevpartno = req->partno;
     free(ptr);
     free(cmd);
     return -1;
@@ -1598,7 +1427,6 @@ static void http_connect(curl_socket_t *infdp,
               logmsg("====> TCP_NODELAY for client DATA connection failed");
           }
 #endif
-          req2.pipelining = FALSE;
           init_httprequest(&req2);
           while(!req2.done_processing) {
             err = get_request(datafd, &req2);
@@ -2015,6 +1843,7 @@ int main(int argc, char *argv[])
   bool unlink_socket = false;
 #endif
   const char *pidname = ".http.pid";
+  const char *portname = ".http.port";
   struct httprequest req;
   int rc = 0;
   int error;
@@ -2046,6 +1875,11 @@ int main(int argc, char *argv[])
       arg++;
       if(argc>arg)
         pidname = argv[arg++];
+    }
+    else if(!strcmp("--portfile", argv[arg])) {
+      arg++;
+      if(argc>arg)
+        portname = argv[arg++];
     }
     else if(!strcmp("--logfile", argv[arg])) {
       arg++;
@@ -2094,7 +1928,7 @@ int main(int argc, char *argv[])
         char *endptr;
         unsigned long ulnum = strtoul(argv[arg], &endptr, 10);
         if((endptr != argv[arg] + strlen(argv[arg])) ||
-           (ulnum < 1025UL) || (ulnum > 65535UL)) {
+           (ulnum && ((ulnum < 1025UL) || (ulnum > 65535UL)))) {
           fprintf(stderr, "sws: invalid --port argument (%s)\n",
                   argv[arg]);
           return 0;
@@ -2127,6 +1961,7 @@ int main(int argc, char *argv[])
            " --version\n"
            " --logfile [file]\n"
            " --pidfile [file]\n"
+           " --portfile [file]\n"
            " --ipv4\n"
            " --ipv6\n"
            " --unix-socket [file]\n"
@@ -2138,14 +1973,12 @@ int main(int argc, char *argv[])
     }
   }
 
-  msnprintf(port_str, sizeof(port_str), "port %hu", port);
-
 #ifdef WIN32
   win32_init();
   atexit(win32_cleanup);
 #endif
 
-  install_signal_handlers();
+  install_signal_handlers(false);
 
   pid = (long)getpid();
 
@@ -2197,7 +2030,7 @@ int main(int argc, char *argv[])
   case AF_UNIX:
     memset(&me.sau, 0, sizeof(me.sau));
     me.sau.sun_family = AF_UNIX;
-    strncpy(me.sau.sun_path, unix_socket, sizeof(me.sau.sun_path));
+    strncpy(me.sau.sun_path, unix_socket, sizeof(me.sau.sun_path) - 1);
     rc = bind(sock, &me.sa, sizeof(me.sau));
     if(0 != rc && errno == EADDRINUSE) {
       struct stat statbuf;
@@ -2246,10 +2079,57 @@ int main(int argc, char *argv[])
   }
   if(0 != rc) {
     error = SOCKERRNO;
-    logmsg("Error binding socket on %s: (%d) %s",
-           location_str, error, strerror(error));
+    logmsg("Error binding socket: (%d) %s", error, strerror(error));
     goto sws_cleanup;
   }
+
+  if(!port) {
+    /* The system was supposed to choose a port number, figure out which
+       port we actually got and update the listener port value with it. */
+    curl_socklen_t la_size;
+    srvr_sockaddr_union_t localaddr;
+#ifdef ENABLE_IPV6
+    if(socket_domain != AF_INET6)
+#endif
+      la_size = sizeof(localaddr.sa4);
+#ifdef ENABLE_IPV6
+    else
+      la_size = sizeof(localaddr.sa6);
+#endif
+    memset(&localaddr.sa, 0, (size_t)la_size);
+    if(getsockname(sock, &localaddr.sa, &la_size) < 0) {
+      error = SOCKERRNO;
+      logmsg("getsockname() failed with error: (%d) %s",
+             error, strerror(error));
+      sclose(sock);
+      goto sws_cleanup;
+    }
+    switch(localaddr.sa.sa_family) {
+    case AF_INET:
+      port = ntohs(localaddr.sa4.sin_port);
+      break;
+#ifdef ENABLE_IPV6
+    case AF_INET6:
+      port = ntohs(localaddr.sa6.sin6_port);
+      break;
+#endif
+    default:
+      break;
+    }
+    if(!port) {
+      /* Real failure, listener port shall not be zero beyond this point. */
+      logmsg("Apparently getsockname() succeeded, with listener port zero.");
+      logmsg("A valid reason for this failure is a binary built without");
+      logmsg("proper network library linkage. This might not be the only");
+      logmsg("reason, but double check it before anything else.");
+      sclose(sock);
+      goto sws_cleanup;
+    }
+  }
+#ifdef USE_UNIX_SOCKETS
+  if(socket_domain != AF_UNIX)
+#endif
+    msnprintf(port_str, sizeof(port_str), "port %hu", port);
 
   logmsg("Running %s %s version on %s",
          use_gopher?"GOPHER":"HTTP", socket_type, location_str);
@@ -2277,11 +2157,14 @@ int main(int argc, char *argv[])
   if(!wrotepidfile)
     goto sws_cleanup;
 
+  wrotepidfile = write_portfile(portname, port);
+  if(!wrotepidfile)
+    goto sws_cleanup;
+
   /* initialization of httprequest struct is done before get_request(), but
      the pipelining struct field must be initialized previously to FALSE
      every time a new connection arrives. */
 
-  req.pipelining = FALSE;
   init_httprequest(&req);
 
   for(;;) {
@@ -2429,7 +2312,7 @@ sws_cleanup:
     clear_advisor_read_lock(SERVERLOGS_LOCK);
   }
 
-  restore_signal_handlers();
+  restore_signal_handlers(false);
 
   if(got_exit_signal) {
     logmsg("========> %s sws (%s pid: %ld) exits with signal (%d)",

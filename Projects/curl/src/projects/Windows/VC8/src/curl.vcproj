@@ -4221,6 +4221,10 @@
 			>
 			</File>
 			<File
+				RelativePath="..\..\..\..\src\tool_progress.c"
+			>
+			</File>
+			<File
 				RelativePath="..\..\..\..\src\tool_setopt.c"
 			>
 			</File>
@@ -4246,6 +4250,10 @@
 			</File>
 			<File
 				RelativePath="..\..\..\..\src\tool_writeout.c"
+			>
+			</File>
+			<File
+				RelativePath="..\..\..\..\src\tool_writeout_json.c"
 			>
 			</File>
 			<File
@@ -4405,6 +4413,10 @@
 			>
 			</File>
 			<File
+				RelativePath="..\..\..\..\src\tool_progress.h"
+			>
+			</File>
+			<File
 				RelativePath="..\..\..\..\src\tool_sdecls.h"
 			>
 			</File>
@@ -4442,6 +4454,10 @@
 			</File>
 			<File
 				RelativePath="..\..\..\..\src\tool_writeout.h"
+			>
+			</File>
+			<File
+				RelativePath="..\..\..\..\src\tool_writeout_json.h"
 			>
 			</File>
 			<File
