@@ -55,9 +55,9 @@ struct SQInstance;
 struct SQDelegable;
 struct SQOuter;
 
-//#ifdef _UNICODE
-//#define SQUNICODE
-//#endif
+#ifdef _UNICODE
+#define SQUNICODE
+#endif
 
 #include "sqconfig.h"
 
