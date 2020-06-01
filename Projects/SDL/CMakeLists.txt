@@ -1,5 +1,10 @@
 disable_rtti()
 
+if(WIN32)
+	add_definitions(-DUNICODE)
+	add_definitions(-D_UNICODE)
+endif()
+
 set(SDL2_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(EXTRA_LIBS "")
 set(HIDAPI ON)
