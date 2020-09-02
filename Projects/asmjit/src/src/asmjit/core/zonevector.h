@@ -1,11 +1,28 @@
-// [AsmJit]
-// Machine Code Generation for C++.
+// AsmJit - Machine code generation for C++
 //
-// [License]
-// Zlib - See LICENSE.md file in the package.
+//  * Official AsmJit Home Page: https://asmjit.com
+//  * Official Github Repository: https://github.com/asmjit/asmjit
+//
+// Copyright (c) 2008-2020 The AsmJit Authors
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//    claim that you wrote the original software. If you use this software
+//    in a product, an acknowledgment in the product documentation would be
+//    appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//    misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
 
-#ifndef _ASMJIT_CORE_ZONEVECTOR_H
-#define _ASMJIT_CORE_ZONEVECTOR_H
+#ifndef ASMJIT_CORE_ZONEVECTOR_H_INCLUDED
+#define ASMJIT_CORE_ZONEVECTOR_H_INCLUDED
 
 #include "../core/support.h"
 #include "../core/zone.h"
@@ -19,9 +36,7 @@ ASMJIT_BEGIN_NAMESPACE
 // [asmjit::ZoneVectorBase]
 // ============================================================================
 
-//! \cond INTERNAL
-
-//! Base class implementing core `ZoneVector<>` functionality.
+//! Base class used by \ref ZoneVector template.
 class ZoneVectorBase {
 public:
   ASMJIT_NONCOPYABLE(ZoneVectorBase)
@@ -76,6 +91,7 @@ protected:
   }
 
   //! \}
+  //! \endcond
 
 public:
   //! \name Accessors
@@ -115,8 +131,6 @@ public:
 
   //! \}
 };
-
-//! \endcond
 
 // ============================================================================
 // [asmjit::ZoneVector<T>]
@@ -163,7 +177,7 @@ public:
   inline const T* data() const noexcept { return static_cast<const T*>(_data); }
 
   //! Returns item at the given index `i` (const).
-  inline const T& at(uint32_t i) const noexcept {
+  inline const T& at(size_t i) const noexcept {
     ASMJIT_ASSERT(i < _size);
     return data()[i];
   }
@@ -217,7 +231,7 @@ public:
   }
 
   //! Inserts an `item` at the specified `index`.
-  inline Error insert(ZoneAllocator* allocator, uint32_t index, const T& item) noexcept {
+  inline Error insert(ZoneAllocator* allocator, size_t index, const T& item) noexcept {
     ASMJIT_ASSERT(index <= _size);
 
     if (ASMJIT_UNLIKELY(_size == _capacity))
@@ -242,6 +256,7 @@ public:
     return kErrorOk;
   }
 
+  //! Appends `other` vector at the end of this vector.
   inline Error concat(ZoneAllocator* allocator, const ZoneVector<T>& other) noexcept {
     uint32_t size = other._size;
     if (_capacity - _size < size)
@@ -283,6 +298,16 @@ public:
     _size++;
   }
 
+  //! Inserts an `item` at the specified `index` (unsafe case).
+  inline void insertUnsafe(size_t index, const T& item) noexcept {
+    ASMJIT_ASSERT(_size < _capacity);
+    ASMJIT_ASSERT(index <= _size);
+
+    T* dst = static_cast<T*>(_data) + index;
+    ::memmove(dst + 1, dst, size_t(_size - index) * sizeof(T));
+    memcpy(dst, &item, sizeof(T));
+    _size++;
+  }
   //! Concatenates all items of `other` at the end of the vector.
   inline void concatUnsafe(const ZoneVector<T>& other) noexcept {
     uint32_t size = other._size;
@@ -311,16 +336,17 @@ public:
   }
 
   //! Removes item at index `i`.
-  inline void removeAt(uint32_t i) noexcept {
+  inline void removeAt(size_t i) noexcept {
     ASMJIT_ASSERT(i < _size);
 
     T* data = static_cast<T*>(_data) + i;
-    uint32_t size = --_size - i;
+    size_t size = --_size - i;
 
     if (size)
       ::memmove(data, data + 1, size_t(size) * sizeof(T));
   }
 
+  //! Pops the last element from the vector and returns it.
   inline T pop() noexcept {
     ASMJIT_ASSERT(_size > 0);
 
@@ -334,21 +360,33 @@ public:
   }
 
   //! Returns item at index `i`.
-  inline T& operator[](uint32_t i) noexcept {
+  inline T& operator[](size_t i) noexcept {
     ASMJIT_ASSERT(i < _size);
     return data()[i];
   }
 
   //! Returns item at index `i`.
-  inline const T& operator[](uint32_t i) const noexcept {
+  inline const T& operator[](size_t i) const noexcept {
     ASMJIT_ASSERT(i < _size);
     return data()[i];
   }
 
+  //! Returns a reference to the first element of the vector.
+  //!
+  //! \note The vector must have at least one element. Attempting to use
+  //! `first()` on empty vector will trigger an assertion failure in debug
+  //! builds.
   inline T& first() noexcept { return operator[](0); }
+  //! \overload
   inline const T& first() const noexcept { return operator[](0); }
 
+  //! Returns a reference to the last element of the vector.
+  //!
+  //! \note The vector must have at least one element. Attempting to use
+  //! `last()` on empty vector will trigger an assertion failure in debug
+  //! builds.
   inline T& last() noexcept { return operator[](_size - 1); }
+  //! \overload
   inline const T& last() const noexcept { return operator[](_size - 1); }
 
   //! \}
@@ -391,6 +429,7 @@ public:
 // [asmjit::ZoneBitVector]
 // ============================================================================
 
+//! Zone-allocated bit vector.
 class ZoneBitVector {
 public:
   typedef Support::BitWord BitWord;
@@ -672,11 +711,10 @@ public:
   };
 
   //! \}
-
 };
 
 //! \}
 
 ASMJIT_END_NAMESPACE
 
-#endif // _ASMJIT_CORE_ZONEVECTOR_H
+#endif // ASMJIT_CORE_ZONEVECTOR_H_INCLUDED

@@ -1,17 +1,34 @@
-// [AsmJit]
-// Machine Code Generation for C++.
+// AsmJit - Machine code generation for C++
 //
-// [License]
-// Zlib - See LICENSE.md file in the package.
+//  * Official AsmJit Home Page: https://asmjit.com
+//  * Official Github Repository: https://github.com/asmjit/asmjit
+//
+// Copyright (c) 2008-2020 The AsmJit Authors
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//    claim that you wrote the original software. If you use this software
+//    in a product, an acknowledgment in the product documentation would be
+//    appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//    misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
 
-#ifndef _ASMJIT_CORE_RADEFS_P_H
-#define _ASMJIT_CORE_RADEFS_P_H
+#ifndef ASMJIT_CORE_RADEFS_P_H_INCLUDED
+#define ASMJIT_CORE_RADEFS_P_H_INCLUDED
 
 #include "../core/api-config.h"
 #ifndef ASMJIT_NO_COMPILER
 
 #include "../core/compiler.h"
-#include "../core/logging.h"
+#include "../core/logger.h"
 #include "../core/support.h"
 #include "../core/zone.h"
 #include "../core/zonevector.h"
@@ -381,10 +398,10 @@ public:
 };
 
 // ============================================================================
-// [asmjit::LiveInterval]
+// [asmjit::RALiveInterval]
 // ============================================================================
 
-struct LiveInterval {
+struct RALiveInterval {
   uint32_t a, b;
 
   enum Misc : uint32_t {
@@ -395,15 +412,15 @@ struct LiveInterval {
   //! \name Construction & Destruction
   //! \{
 
-  inline LiveInterval() noexcept : a(0), b(0) {}
-  inline LiveInterval(uint32_t a, uint32_t b) noexcept : a(a), b(b) {}
-  inline LiveInterval(const LiveInterval& other) noexcept : a(other.a), b(other.b) {}
+  inline RALiveInterval() noexcept : a(0), b(0) {}
+  inline RALiveInterval(uint32_t a, uint32_t b) noexcept : a(a), b(b) {}
+  inline RALiveInterval(const RALiveInterval& other) noexcept : a(other.a), b(other.b) {}
 
   inline void init(uint32_t aVal, uint32_t bVal) noexcept {
     a = aVal;
     b = bVal;
   }
-  inline void init(const LiveInterval& other) noexcept { init(other.a, other.b); }
+  inline void init(const RALiveInterval& other) noexcept { init(other.a, other.b); }
   inline void reset() noexcept { init(0, 0); }
 
   //! \}
@@ -411,7 +428,7 @@ struct LiveInterval {
   //! \name Overloaded Operators
   //! \{
 
-  inline LiveInterval& operator=(const LiveInterval& other) = default;
+  inline RALiveInterval& operator=(const RALiveInterval& other) = default;
 
   //! \}
 
@@ -429,31 +446,31 @@ struct LiveInterval {
 // ============================================================================
 
 template<typename T>
-class RALiveSpan : public LiveInterval, public T {
+class RALiveSpan : public RALiveInterval, public T {
 public:
   typedef T DataType;
 
   //! \name Construction & Destruction
   //! \{
 
-  inline RALiveSpan() noexcept : LiveInterval(), T() {}
-  inline RALiveSpan(const RALiveSpan<T>& other) noexcept : LiveInterval(other), T() {}
-  inline RALiveSpan(const LiveInterval& interval, const T& data) noexcept : LiveInterval(interval), T(data) {}
-  inline RALiveSpan(uint32_t a, uint32_t b) noexcept : LiveInterval(a, b), T() {}
-  inline RALiveSpan(uint32_t a, uint32_t b, const T& data) noexcept : LiveInterval(a, b), T(data) {}
+  inline RALiveSpan() noexcept : RALiveInterval(), T() {}
+  inline RALiveSpan(const RALiveSpan<T>& other) noexcept : RALiveInterval(other), T() {}
+  inline RALiveSpan(const RALiveInterval& interval, const T& data) noexcept : RALiveInterval(interval), T(data) {}
+  inline RALiveSpan(uint32_t a, uint32_t b) noexcept : RALiveInterval(a, b), T() {}
+  inline RALiveSpan(uint32_t a, uint32_t b, const T& data) noexcept : RALiveInterval(a, b), T(data) {}
 
   inline void init(const RALiveSpan<T>& other) noexcept {
-    LiveInterval::init(static_cast<const LiveInterval&>(other));
+    RALiveInterval::init(static_cast<const RALiveInterval&>(other));
     T::init(static_cast<const T&>(other));
   }
 
   inline void init(const RALiveSpan<T>& span, const T& data) noexcept {
-    LiveInterval::init(static_cast<const LiveInterval&>(span));
+    RALiveInterval::init(static_cast<const RALiveInterval&>(span));
     T::init(data);
   }
 
-  inline void init(const LiveInterval& interval, const T& data) noexcept {
-    LiveInterval::init(interval);
+  inline void init(const RALiveInterval& interval, const T& data) noexcept {
+    RALiveInterval::init(interval);
     T::init(data);
   }
 
@@ -503,7 +520,7 @@ public:
 
   inline bool isOpen() const noexcept {
     uint32_t size = _data.size();
-    return size > 0 && _data[size - 1].b == LiveInterval::kInf;
+    return size > 0 && _data[size - 1].b == RALiveInterval::kInf;
   }
 
   //! \}
@@ -940,6 +957,8 @@ public:
 
   //! Argument index (or `kNoArgIndex` if none).
   uint8_t _argIndex;
+  //! Argument value index in the pack (0 by default).
+  uint8_t _argValueIndex;
   //! Global home register ID (if any, assigned by RA).
   uint8_t _homeRegId;
   //! Global hint register ID (provided by RA or user).
@@ -967,10 +986,7 @@ public:
     //! Stack allocation is preferred.
     kFlagStackPreferred = 0x00000004u,
     //! Marked for stack argument reassignment.
-    kFlagStackArgToStack = 0x00000008u,
-
-    // TODO: Used?
-    kFlagDirtyStats       = 0x80000000u
+    kFlagStackArgToStack = 0x00000008u
   };
 
   enum ArgIndex : uint32_t {
@@ -987,11 +1003,12 @@ public:
       _tiedReg(nullptr),
       _stackSlot(nullptr),
       _info(vReg->info()),
-      _flags(kFlagDirtyStats),
+      _flags(0),
       _allocatedMask(0),
       _clobberSurvivalMask(0),
       _regByteMask(0),
       _argIndex(kNoArgIndex),
+      _argValueIndex(0),
       _homeRegId(BaseReg::kIdBad),
       _hintRegId(BaseReg::kIdBad),
       _liveSpans(),
@@ -1046,7 +1063,12 @@ public:
 
   inline bool hasArgIndex() const noexcept { return _argIndex != kNoArgIndex; }
   inline uint32_t argIndex() const noexcept { return _argIndex; }
-  inline void setArgIndex(uint32_t index) noexcept { _argIndex = uint8_t(index); }
+  inline uint32_t argValueIndex() const noexcept { return _argValueIndex; }
+
+  inline void setArgIndex(uint32_t argIndex, uint32_t valueIndex) noexcept {
+    _argIndex = uint8_t(argIndex);
+    _argValueIndex = uint8_t(valueIndex);
+  }
 
   inline bool hasHomeRegId() const noexcept { return _homeRegId != BaseReg::kIdBad; }
   inline uint32_t homeRegId() const noexcept { return _homeRegId; }
@@ -1074,4 +1096,4 @@ public:
 ASMJIT_END_NAMESPACE
 
 #endif // !ASMJIT_NO_COMPILER
-#endif // _ASMJIT_CORE_RADEFS_P_H
+#endif // ASMJIT_CORE_RADEFS_P_H_INCLUDED

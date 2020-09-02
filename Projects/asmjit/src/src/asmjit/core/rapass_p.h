@@ -1,11 +1,28 @@
-// [AsmJit]
-// Machine Code Generation for C++.
+// AsmJit - Machine code generation for C++
 //
-// [License]
-// Zlib - See LICENSE.md file in the package.
+//  * Official AsmJit Home Page: https://asmjit.com
+//  * Official Github Repository: https://github.com/asmjit/asmjit
+//
+// Copyright (c) 2008-2020 The AsmJit Authors
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//    claim that you wrote the original software. If you use this software
+//    in a product, an acknowledgment in the product documentation would be
+//    appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//    misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
 
-#ifndef _ASMJIT_CORE_RAPASS_P_H
-#define _ASMJIT_CORE_RAPASS_P_H
+#ifndef ASMJIT_CORE_RAPASS_P_H_INCLUDED
+#define ASMJIT_CORE_RAPASS_P_H_INCLUDED
 
 #include "../core/api-config.h"
 #ifndef ASMJIT_NO_COMPILER
@@ -25,6 +42,7 @@ ASMJIT_BEGIN_NAMESPACE
 // [asmjit::RABlock]
 // ============================================================================
 
+//! Basic block used by register allocator pass.
 class RABlock {
 public:
   ASMJIT_NONCOPYABLE(RABlock)
@@ -36,24 +54,29 @@ public:
     kUnassignedId = 0xFFFFFFFFu
   };
 
+  //! Basic block flags.
   enum Flags : uint32_t {
     //! Block has been constructed from nodes.
     kFlagIsConstructed    = 0x00000001u,
     //! Block is reachable (set by `buildViews()`).
     kFlagIsReachable      = 0x00000002u,
+    //! Block is a target (has an associated label or multiple labels).
+    kFlagIsTargetable     = 0x00000004u,
     //! Block has been allocated.
-    kFlagIsAllocated      = 0x00000004u,
+    kFlagIsAllocated      = 0x00000008u,
     //! Block is a function-exit.
-    kFlagIsFuncExit       = 0x00000008u,
+    kFlagIsFuncExit       = 0x00000010u,
 
     //! Block has a terminator (jump, conditional jump, ret).
-    kFlagHasTerminator    = 0x00000010u,
+    kFlagHasTerminator    = 0x00000100u,
     //! Block naturally flows to the next block.
-    kFlagHasConsecutive   = 0x00000020u,
+    kFlagHasConsecutive   = 0x00000200u,
+    //! Block has a jump to a jump-table at the end.
+    kFlagHasJumpTable     = 0x00000400u,
     //! Block contains fixed registers (precolored).
-    kFlagHasFixedRegs     = 0x00000040u,
+    kFlagHasFixedRegs     = 0x00000800u,
     //! Block contains function calls.
-    kFlagHasFuncCalls     = 0x00000080u
+    kFlagHasFuncCalls     = 0x00001000u
   };
 
   //! Register allocator pass.
@@ -78,6 +101,7 @@ public:
   uint32_t _weight;
   //! Post-order view order, used during POV construction.
   uint32_t _povOrder;
+
   //! Basic statistics about registers.
   RARegsStats _regsStats;
   //! Maximum live-count per register group.
@@ -93,19 +117,24 @@ public:
   //! Block successors.
   RABlocks _successors;
 
-  // TODO: Used?
-  RABlocks _doms;
-
   enum LiveType : uint32_t {
-    kLiveIn               = 0,
-    kLiveOut              = 1,
-    kLiveGen              = 2,
-    kLiveKill             = 3,
-    kLiveCount            = 4
+    kLiveIn = 0,
+    kLiveOut = 1,
+    kLiveGen = 2,
+    kLiveKill = 3,
+    kLiveCount = 4
   };
 
   //! Liveness in/out/use/kill.
   ZoneBitVector _liveBits[kLiveCount];
+
+  //! Shared assignment it or `Globals::kInvalidId` if this block doesn't
+  //! have shared assignment. See `RASharedAssignment` for more details.
+  uint32_t _sharedAssignmentId;
+  //! Scratch registers that cannot be allocated upon block entry.
+  uint32_t _entryScratchGpRegs;
+  //! Scratch registers used at exit, by a terminator instruction.
+  uint32_t _exitScratchGpRegs;
 
   //! Register assignment (PhysToWork) on entry.
   PhysToWorkMap* _entryPhysToWorkMap;
@@ -131,6 +160,9 @@ public:
       _idom(nullptr),
       _predecessors(),
       _successors(),
+      _sharedAssignmentId(Globals::kInvalidId),
+      _entryScratchGpRegs(0),
+      _exitScratchGpRegs(0),
       _entryPhysToWorkMap(nullptr),
       _entryWorkToPhysMap(nullptr) {}
 
@@ -152,6 +184,7 @@ public:
 
   inline bool isConstructed() const noexcept { return hasFlag(kFlagIsConstructed); }
   inline bool isReachable() const noexcept { return hasFlag(kFlagIsReachable); }
+  inline bool isTargetable() const noexcept { return hasFlag(kFlagIsTargetable); }
   inline bool isAllocated() const noexcept { return hasFlag(kFlagIsAllocated); }
   inline bool isFuncExit() const noexcept { return hasFlag(kFlagIsFuncExit); }
 
@@ -161,12 +194,14 @@ public:
   }
 
   inline void makeReachable() noexcept { _flags |= kFlagIsReachable; }
+  inline void makeTargetable() noexcept { _flags |= kFlagIsTargetable; }
   inline void makeAllocated() noexcept { _flags |= kFlagIsAllocated; }
 
   inline const RARegsStats& regsStats() const noexcept { return _regsStats; }
 
   inline bool hasTerminator() const noexcept { return hasFlag(kFlagHasTerminator); }
   inline bool hasConsecutive() const noexcept { return hasFlag(kFlagHasConsecutive); }
+  inline bool hasJumpTable() const noexcept { return hasFlag(kFlagHasJumpTable); }
 
   inline bool hasPredecessors() const noexcept { return !_predecessors.empty(); }
   inline bool hasSuccessors() const noexcept { return !_successors.empty(); }
@@ -187,6 +222,16 @@ public:
   inline void setEndPosition(uint32_t position) noexcept { _endPosition = position; }
 
   inline uint32_t povOrder() const noexcept { return _povOrder; }
+
+  inline uint32_t entryScratchGpRegs() const noexcept;
+  inline uint32_t exitScratchGpRegs() const noexcept { return _exitScratchGpRegs; }
+
+  inline void addEntryScratchGpRegs(uint32_t regMask) noexcept { _entryScratchGpRegs |= regMask; }
+  inline void addExitScratchGpRegs(uint32_t regMask) noexcept { _exitScratchGpRegs |= regMask; }
+
+  inline bool hasSharedAssignmentId() const noexcept { return _sharedAssignmentId != Globals::kInvalidId; }
+  inline uint32_t sharedAssignmentId() const noexcept { return _sharedAssignmentId; }
+  inline void setSharedAssignmentId(uint32_t id) noexcept { _sharedAssignmentId = id; }
 
   inline uint64_t timestamp() const noexcept { return _timestamp; }
   inline bool hasTimestamp(uint64_t ts) const noexcept { return _timestamp == ts; }
@@ -408,6 +453,12 @@ public:
   //! Returns the number of tied registers added to the builder.
   inline uint32_t tiedRegCount() const noexcept { return uint32_t((size_t)(_cur - _tiedRegs)); }
 
+  inline RATiedReg* begin() noexcept { return _tiedRegs; }
+  inline RATiedReg* end() noexcept { return _cur; }
+
+  inline const RATiedReg* begin() const noexcept { return _tiedRegs; }
+  inline const RATiedReg* end() const noexcept { return _cur; }
+
   //! Returns `RATiedReg` at the given `index`.
   inline RATiedReg* operator[](uint32_t index) noexcept {
     ASMJIT_ASSERT(index < tiedRegCount());
@@ -425,7 +476,7 @@ public:
   //! \name Utilities
   //! \{
 
-  ASMJIT_INLINE Error add(RAWorkReg* workReg, uint32_t flags, uint32_t allocable, uint32_t useId, uint32_t useRewriteMask, uint32_t outId, uint32_t outRewriteMask, uint32_t rmSize = 0) noexcept {
+  Error add(RAWorkReg* workReg, uint32_t flags, uint32_t allocable, uint32_t useId, uint32_t useRewriteMask, uint32_t outId, uint32_t outRewriteMask, uint32_t rmSize = 0) noexcept {
     uint32_t group = workReg->group();
     RATiedReg* tiedReg = workReg->tiedReg();
 
@@ -465,7 +516,6 @@ public:
         if (ASMJIT_UNLIKELY(tiedReg->hasOutId()))
           return DebugUtils::errored(kErrorOverlappedRegs);
         tiedReg->setOutId(outId);
-        // TODO: ? _used[group] |= Support::bitMask(outId);
       }
 
       tiedReg->addRefCount();
@@ -478,7 +528,7 @@ public:
     }
   }
 
-  ASMJIT_INLINE Error addCallArg(RAWorkReg* workReg, uint32_t useId) noexcept {
+  Error addCallArg(RAWorkReg* workReg, uint32_t useId) noexcept {
     ASMJIT_ASSERT(useId != BaseReg::kIdBad);
 
     uint32_t flags = RATiedReg::kUse | RATiedReg::kRead | RATiedReg::kUseFixed;
@@ -518,7 +568,7 @@ public:
     }
   }
 
-  ASMJIT_INLINE Error addCallRet(RAWorkReg* workReg, uint32_t outId) noexcept {
+  Error addCallRet(RAWorkReg* workReg, uint32_t outId) noexcept {
     ASMJIT_ASSERT(outId != BaseReg::kIdBad);
 
     uint32_t flags = RATiedReg::kOut | RATiedReg::kWrite | RATiedReg::kOutFixed;
@@ -554,6 +604,54 @@ public:
   }
 
   //! \}
+};
+
+// ============================================================================
+// [asmjit::RASharedAssignment]
+// ============================================================================
+
+class RASharedAssignment {
+public:
+  typedef RAAssignment::PhysToWorkMap PhysToWorkMap;
+  typedef RAAssignment::WorkToPhysMap WorkToPhysMap;
+
+  //! Bit-mask of registers that cannot be used upon a block entry, for each
+  //! block that has this shared assignment. Scratch registers can come from
+  //! ISA limits (like jecx/loop instructions on x86) or because the registers
+  //! are used by jump/branch instruction that uses registers to perform an
+  //! indirect jump.
+  uint32_t _entryScratchGpRegs;
+  //! Union of all live-in registers.
+  ZoneBitVector _liveIn;
+  //! Register assignment (PhysToWork).
+  PhysToWorkMap* _physToWorkMap;
+  //! Register assignment (WorkToPhys).
+  WorkToPhysMap* _workToPhysMap;
+
+  //! Provided for clarity, most likely never called as we initialize a vector
+  //! of shared assignments to zero.
+  inline RASharedAssignment() noexcept
+    : _entryScratchGpRegs(0),
+      _liveIn(),
+      _physToWorkMap(nullptr),
+      _workToPhysMap(nullptr) {}
+
+  inline uint32_t entryScratchGpRegs() const noexcept { return _entryScratchGpRegs; }
+  inline void addEntryScratchGpRegs(uint32_t mask) noexcept { _entryScratchGpRegs |= mask; }
+
+  inline const ZoneBitVector& liveIn() const noexcept { return _liveIn; }
+
+  inline PhysToWorkMap* physToWorkMap() const noexcept { return _physToWorkMap; }
+  inline WorkToPhysMap* workToPhysMap() const noexcept { return _workToPhysMap; }
+
+  inline bool empty() const noexcept {
+    return _physToWorkMap == nullptr;
+  }
+
+  inline void assignMaps(PhysToWorkMap* physToWorkMap, WorkToPhysMap* workToPhysMap) noexcept {
+    _physToWorkMap = physToWorkMap;
+    _workToPhysMap = workToPhysMap;
+  }
 };
 
 // ============================================================================
@@ -600,6 +698,10 @@ public:
   uint32_t _instructionCount;
   //! Number of created blocks (internal).
   uint32_t _createdBlockCount;
+
+  //! SharedState blocks.
+  ZoneVector<RASharedAssignment> _sharedAssignments;
+
   //! Timestamp generator (incremental).
   mutable uint64_t _lastTimestamp;
 
@@ -613,6 +715,8 @@ public:
   RARegCount _physRegCount;
   //! Total number of physical registers.
   uint32_t _physRegTotal;
+  //! Indexes of a possible scratch registers that can be selected if necessary.
+  uint8_t _scratchRegIndexes[2];
 
   //! Registers available for allocation.
   RARegMask _availableRegs;
@@ -662,15 +766,18 @@ public:
   //! \name Accessors
   //! \{
 
-  //! Returns `Logger` passed to `runOnFunction()`.
+  //! Returns \ref Logger passed to \ref runOnFunction().
   inline Logger* logger() const noexcept { return _logger; }
-  //! Returns `Logger` passed to `runOnFunction()` or null if `kOptionDebugPasses` is not set.
+  //! Returns \ref Logger passed to \ref runOnFunction() or null if `kOptionDebugPasses` is not set.
   inline Logger* debugLogger() const noexcept { return _debugLogger; }
 
-  //! Returns `Zone` passed to `runOnFunction()`.
+  //! Returns \ref Zone passed to \ref runOnFunction().
   inline Zone* zone() const noexcept { return _allocator.zone(); }
-  //! Returns `ZoneAllocator` used by the register allocator.
+  //! Returns \ref ZoneAllocator used by the register allocator.
   inline ZoneAllocator* allocator() const noexcept { return const_cast<ZoneAllocator*>(&_allocator); }
+
+  inline const ZoneVector<RASharedAssignment>& sharedAssignments() const { return _sharedAssignments; }
+  inline uint32_t sharedAssignmentCount() const noexcept { return _sharedAssignments.size(); }
 
   //! Returns the current function node.
   inline FuncNode* func() const noexcept { return _func; }
@@ -698,7 +805,7 @@ public:
   }
 
   //! Runs the register allocator for the given `func`.
-  Error runOnFunction(Zone* zone, Logger* logger, FuncNode* func) noexcept override;
+  Error runOnFunction(Zone* zone, Logger* logger, FuncNode* func) override;
 
   //! Performs all allocation steps sequentially, called by `runOnFunction()`.
   Error onPerformAllSteps() noexcept;
@@ -708,11 +815,11 @@ public:
   //! \name Events
   //! \{
 
-  //! Called by `runOnFunction()` before the register allocation to initialize
+  //! Called by \ref runOnFunction() before the register allocation to initialize
   //! architecture-specific data and constraints.
   virtual void onInit() noexcept = 0;
 
-  //! Called by `runOnFunction()` after register allocation to clean everything
+  //! Called by \ref runOnFunction(` after register allocation to clean everything
   //! up. Called even if the register allocation failed.
   virtual void onDone() noexcept = 0;
 
@@ -732,6 +839,11 @@ public:
     ASMJIT_ASSERT(!_blocks.empty());
     return _blocks[0];
   }
+
+  //! Returns all basic blocks of this function.
+  inline RABlocks& blocks() noexcept { return _blocks; }
+  //! \overload
+  inline const RABlocks& blocks() const noexcept { return _blocks; }
 
   //! Returns the count of basic blocks (returns size of `_blocks` array).
   inline uint32_t blockCount() const noexcept { return _blocks.size(); }
@@ -840,6 +952,9 @@ public:
   //! Use `RACFGBuilder` template that provides the necessary boilerplate.
   virtual Error buildCFG() noexcept = 0;
 
+  //! Called after the CFG is built.
+  Error initSharedAssignments(const ZoneVector<uint32_t>& sharedAssignmentsMap) noexcept;
+
   //! \}
 
   //! \name CFG - Views Order
@@ -899,7 +1014,7 @@ public:
   //! \{
 
   //! Returns a native size of the general-purpose register of the target architecture.
-  inline uint32_t gpSize() const noexcept { return _sp.size(); }
+  inline uint32_t registerSize() const noexcept { return _sp.size(); }
   inline uint32_t availableRegCount(uint32_t group) const noexcept { return _availableRegCount[group]; }
 
   inline RAWorkReg* workRegById(uint32_t workId) const noexcept { return _workRegs[workId]; }
@@ -939,9 +1054,11 @@ public:
 
   inline RAStackSlot* getOrCreateStackSlot(RAWorkReg* workReg) noexcept {
     RAStackSlot* slot = workReg->stackSlot();
-    if (slot) return slot;
 
-    slot = _stackAllocator.newSlot(_sp.id(), workReg->virtReg()->virtSize(), workReg->virtReg()->alignment(), 0);
+    if (slot)
+      return slot;
+
+    slot = _stackAllocator.newSlot(_sp.id(), workReg->virtReg()->virtSize(), workReg->virtReg()->alignment(), RAStackSlot::kFlagRegHome);
     workReg->_stackSlot = slot;
     workReg->markStackUsed();
     return slot;
@@ -999,6 +1116,12 @@ public:
   //! Runs a local register allocator.
   Error runLocalAllocator() noexcept;
   Error setBlockEntryAssignment(RABlock* block, const RABlock* fromBlock, const RAAssignment& fromAssignment) noexcept;
+  Error setSharedAssignment(uint32_t sharedAssignmentId, const RAAssignment& fromAssignment) noexcept;
+
+  //! Called after the RA assignment has been assigned to a block.
+  //!
+  //! This cannot change the assignment, but can examine it.
+  Error blockEntryAssigned(const RAAssignment& as) noexcept;
 
   //! \}
 
@@ -1027,18 +1150,18 @@ public:
 
   //! \}
 
-  #ifndef ASMJIT_NO_LOGGING
+#ifndef ASMJIT_NO_LOGGING
   //! \name Logging
   //! \{
 
   Error annotateCode() noexcept;
 
-  Error _logBlockIds(const RABlocks& blocks) noexcept;
+  Error _dumpBlockIds(String& sb, const RABlocks& blocks) noexcept;
   Error _dumpBlockLiveness(String& sb, const RABlock* block) noexcept;
   Error _dumpLiveSpans(String& sb) noexcept;
 
   //! \}
-  #endif
+#endif
 
   //! \name Emit
   //! \{
@@ -1050,12 +1173,19 @@ public:
   virtual Error onEmitSave(uint32_t workId, uint32_t srcPhysId) noexcept = 0;
 
   virtual Error onEmitJump(const Label& label) noexcept = 0;
-  virtual Error onEmitPreCall(FuncCallNode* call) noexcept = 0;
+  virtual Error onEmitPreCall(InvokeNode* invokeNode) noexcept = 0;
 
   //! \}
 };
 
 inline ZoneAllocator* RABlock::allocator() const noexcept { return _ra->allocator(); }
+
+inline uint32_t RABlock::entryScratchGpRegs() const noexcept {
+  uint32_t regs = _entryScratchGpRegs;
+  if (hasSharedAssignmentId())
+    regs = _ra->_sharedAssignments[_sharedAssignmentId].entryScratchGpRegs();
+  return regs;
+}
 
 //! \}
 //! \endcond
@@ -1063,4 +1193,4 @@ inline ZoneAllocator* RABlock::allocator() const noexcept { return _ra->allocato
 ASMJIT_END_NAMESPACE
 
 #endif // !ASMJIT_NO_COMPILER
-#endif // _ASMJIT_CORE_RAPASS_P_H
+#endif // ASMJIT_CORE_RAPASS_P_H_INCLUDED

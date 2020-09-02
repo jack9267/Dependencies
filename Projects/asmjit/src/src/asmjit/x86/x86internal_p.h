@@ -1,11 +1,28 @@
-// [AsmJit]
-// Machine Code Generation for C++.
+// AsmJit - Machine code generation for C++
 //
-// [License]
-// Zlib - See LICENSE.md file in the package.
+//  * Official AsmJit Home Page: https://asmjit.com
+//  * Official Github Repository: https://github.com/asmjit/asmjit
+//
+// Copyright (c) 2008-2020 The AsmJit Authors
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//    claim that you wrote the original software. If you use this software
+//    in a product, an acknowledgment in the product documentation would be
+//    appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//    misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
 
-#ifndef _ASMJIT_X86_X86INTERNAL_P_H
-#define _ASMJIT_X86_X86INTERNAL_P_H
+#ifndef ASMJIT_X86_X86INTERNAL_P_H_INCLUDED
+#define ASMJIT_X86_X86INTERNAL_P_H_INCLUDED
 
 #include "../core/api-config.h"
 
@@ -26,10 +43,10 @@ ASMJIT_BEGIN_SUB_NAMESPACE(x86)
 //! X86 utilities used at multiple places, not part of public API, not exported.
 struct X86Internal {
   //! Initialize `FuncDetail` (X86 specific).
-  static Error initFuncDetail(FuncDetail& func, const FuncSignature& sign, uint32_t gpSize) noexcept;
+  static Error initFuncDetail(FuncDetail& func, const FuncSignature& signature, uint32_t registerSize) noexcept;
 
   //! Initialize `FuncFrame` (X86 specific).
-  static Error initFuncFrame(FuncFrame& frame, const FuncDetail& func) noexcept;
+  static Error initFuncFrame(FuncFrame& frame, const FuncDetail& signature) noexcept;
 
   //! Finalize `FuncFrame` (X86 specific).
   static Error finalizeFuncFrame(FuncFrame& frame) noexcept;
@@ -67,4 +84,4 @@ struct X86Internal {
 
 ASMJIT_END_SUB_NAMESPACE
 
-#endif // _ASMJIT_X86_X86INTERNAL_P_H
+#endif // ASMJIT_X86_X86INTERNAL_P_H_INCLUDED

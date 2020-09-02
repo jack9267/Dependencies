@@ -1,8 +1,25 @@
-// [AsmJit]
-// Machine Code Generation for C++.
+// AsmJit - Machine code generation for C++
 //
-// [License]
-// Zlib - See LICENSE.md file in the package.
+//  * Official AsmJit Home Page: https://asmjit.com
+//  * Official Github Repository: https://github.com/asmjit/asmjit
+//
+// Copyright (c) 2008-2020 The AsmJit Authors
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//    claim that you wrote the original software. If you use this software
+//    in a product, an acknowledgment in the product documentation would be
+//    appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//    misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
 
 #include "../core/api-build_p.h"
 #ifndef ASMJIT_NO_JIT
@@ -126,7 +143,7 @@ Error VirtMem::alloc(void** p, size_t size, uint32_t flags) noexcept {
 }
 
 Error VirtMem::release(void* p, size_t size) noexcept {
-  ASMJIT_UNUSED(size);
+  DebugUtils::unused(size);
   if (ASMJIT_UNLIKELY(!::VirtualFree(p, 0, MEM_RELEASE)))
     return DebugUtils::errored(kErrorInvalidArgument);
   return kErrorOk;
@@ -179,7 +196,7 @@ Error VirtMem::allocDualMapping(DualMapping* dm, size_t size, uint32_t flags) no
 }
 
 Error VirtMem::releaseDualMapping(DualMapping* dm, size_t size) noexcept {
-  ASMJIT_UNUSED(size);
+  DebugUtils::unused(size);
   bool failed = false;
 
   if (!::UnmapViewOfFile(dm->ro))
@@ -300,9 +317,9 @@ static ASMJIT_INLINE bool VirtMem_isHardened() noexcept {
 // version 10.14+ (Mojave) and IOS.
 static ASMJIT_INLINE bool VirtMem_hasMapJitSupport() noexcept {
 #if TARGET_OS_OSX
-  static volatile uint32_t globalVersion;
+  static volatile int globalVersion;
 
-  uint32_t ver = globalVersion;
+  int ver = globalVersion;
   if (!ver) {
     struct utsname osname;
     uname(&osname);
@@ -316,20 +333,20 @@ static ASMJIT_INLINE bool VirtMem_hasMapJitSupport() noexcept {
 #endif
 }
 
-static ASMJIT_INLINE uint32_t VirtMem_appleSpecificMMapFlags(uint32_t flags) {
+static ASMJIT_INLINE int VirtMem_appleSpecificMMapFlags(uint32_t flags) {
   // Always use MAP_JIT flag if user asked for it (could be used for testing
   // on non-hardened processes) and detect whether it must be used when the
   // process is actually hardened (in that case it doesn't make sense to rely
   // on user `flags`).
   bool useMapJit = ((flags & VirtMem::kMMapEnableMapJit) != 0) || VirtMem_isHardened();
   if (useMapJit)
-    return VirtMem_hasMapJitSupport() ? MAP_JIT : 0u;
+    return VirtMem_hasMapJitSupport() ? int(MAP_JIT) : 0;
   else
     return 0;
 }
 #else
-static ASMJIT_INLINE uint32_t VirtMem_appleSpecificMMapFlags(uint32_t flags) {
-  ASMJIT_UNUSED(flags);
+static ASMJIT_INLINE int VirtMem_appleSpecificMMapFlags(uint32_t flags) {
+  DebugUtils::unused(flags);
   return 0;
 }
 #endif
@@ -363,7 +380,7 @@ static Error VirtMem_openAnonymousMemory(int* fd, bool preferTmpOverDevShm) noex
 
 #if defined(SHM_ANON)
   // Originally FreeBSD extension, apparently works in other BSDs too.
-  ASMJIT_UNUSED(preferTmpOverDevShm);
+  DebugUtils::unused(preferTmpOverDevShm);
   *fd = shm_open(SHM_ANON, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
 
   if (ASMJIT_LIKELY(*fd >= 0))
@@ -389,7 +406,7 @@ static Error VirtMem_openAnonymousMemory(int* fd, bool preferTmpOverDevShm) noex
     bits = ((bits >> 14) ^ (bits << 6)) + uint64_t(++internalCounter) * 10619863;
 
     if (!ASMJIT_VM_SHM_DETECT || preferTmpOverDevShm) {
-      uniqueName.assignString(VirtMem_getTmpDir());
+      uniqueName.assign(VirtMem_getTmpDir());
       uniqueName.appendFormat(kShmFormat, (unsigned long long)bits);
       *fd = open(uniqueName.data(), O_RDWR | O_CREAT | O_EXCL, 0);
       if (ASMJIT_LIKELY(*fd >= 0)) {

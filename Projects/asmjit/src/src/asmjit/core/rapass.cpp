@@ -1,12 +1,30 @@
-// [AsmJit]
-// Machine Code Generation for C++.
+// AsmJit - Machine code generation for C++
 //
-// [License]
-// Zlib - See LICENSE.md file in the package.
+//  * Official AsmJit Home Page: https://asmjit.com
+//  * Official Github Repository: https://github.com/asmjit/asmjit
+//
+// Copyright (c) 2008-2020 The AsmJit Authors
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//    claim that you wrote the original software. If you use this software
+//    in a product, an acknowledgment in the product documentation would be
+//    appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//    misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
 
 #include "../core/api-build_p.h"
 #ifndef ASMJIT_NO_COMPILER
 
+#include "../core/formatter.h"
 #include "../core/ralocal_p.h"
 #include "../core/rapass_p.h"
 #include "../core/support.h"
@@ -69,12 +87,14 @@ RAPass::RAPass() noexcept
     _pov(),
     _instructionCount(0),
     _createdBlockCount(0),
+    _sharedAssignments(),
     _lastTimestamp(0),
     _archRegsInfo(nullptr),
     _archTraits(),
     _physRegIndex(),
     _physRegCount(),
     _physRegTotal(0),
+    _scratchRegIndexes{},
     _availableRegs(),
     _availableRegCount(),
     _clobberedRegs(),
@@ -102,6 +122,8 @@ static void RAPass_reset(RAPass* self, FuncDetail* funcDetail) noexcept {
   self->_workRegs.reset();
   self->_instructionCount = 0;
   self->_createdBlockCount = 0;
+
+  self->_sharedAssignments.reset();
   self->_lastTimestamp = 0;
 
   self->_archRegsInfo = nullptr;
@@ -109,6 +131,9 @@ static void RAPass_reset(RAPass* self, FuncDetail* funcDetail) noexcept {
   self->_physRegIndex.reset();
   self->_physRegCount.reset();
   self->_physRegTotal = 0;
+
+  for (size_t i = 0; i < ASMJIT_ARRAY_SIZE(self->_scratchRegIndexes); i++)
+    self->_scratchRegIndexes[i] = BaseReg::kIdBad;
 
   self->_availableRegs.reset();
   self->_availableRegCount.reset();
@@ -137,10 +162,10 @@ static void RAPass_resetVirtRegData(RAPass* self) noexcept {
   }
 }
 
-Error RAPass::runOnFunction(Zone* zone, Logger* logger, FuncNode* func) noexcept {
+Error RAPass::runOnFunction(Zone* zone, Logger* logger, FuncNode* func) {
   _allocator.reset(zone);
 
-  #ifndef ASMJIT_NO_LOGGING
+#ifndef ASMJIT_NO_LOGGING
   _logger = logger;
   _debugLogger = nullptr;
 
@@ -149,7 +174,9 @@ Error RAPass::runOnFunction(Zone* zone, Logger* logger, FuncNode* func) noexcept
     if (_loggerFlags & FormatOptions::kFlagDebugPasses)
       _debugLogger = logger;
   }
-  #endif
+#else
+  DebugUtils::unused(logger);
+#endif
 
   // Initialize all core structures to use `zone` and `func`.
   BaseNode* end = func->endNode();
@@ -168,7 +195,6 @@ Error RAPass::runOnFunction(Zone* zone, Logger* logger, FuncNode* func) noexcept
   // Must be called regardless of the allocation status.
   onDone();
 
-  // TODO: I don't like this...
   // Reset possible connections introduced by the register allocator.
   RAPass_resetVirtRegData(this);
 
@@ -176,11 +202,11 @@ Error RAPass::runOnFunction(Zone* zone, Logger* logger, FuncNode* func) noexcept
   RAPass_reset(this, nullptr);
   _allocator.reset(nullptr);
 
-  #ifndef ASMJIT_NO_LOGGING
+#ifndef ASMJIT_NO_LOGGING
   _logger = nullptr;
   _debugLogger = nullptr;
   _loggerFlags = 0;
-  #endif
+#endif
 
   _func = nullptr;
   _stop = nullptr;
@@ -206,10 +232,10 @@ Error RAPass::onPerformAllSteps() noexcept {
   ASMJIT_PROPAGATE(buildLiveness());
   ASMJIT_PROPAGATE(assignArgIndexToWorkRegs());
 
-  #ifndef ASMJIT_NO_LOGGING
+#ifndef ASMJIT_NO_LOGGING
   if (logger() && logger()->hasFlag(FormatOptions::kFlagAnnotations))
     ASMJIT_PROPAGATE(annotateCode());
-  #endif
+#endif
 
   ASMJIT_PROPAGATE(runGlobalAllocator());
   ASMJIT_PROPAGATE(runLocalAllocator());
@@ -334,6 +360,49 @@ Error RAPass::addBlock(RABlock* block) noexcept {
 }
 
 // ============================================================================
+// [asmjit::RAPass - CFG - Build]
+// ============================================================================
+
+Error RAPass::initSharedAssignments(const ZoneVector<uint32_t>& sharedAssignmentsMap) noexcept {
+  if (sharedAssignmentsMap.empty())
+    return kErrorOk;
+
+  uint32_t count = 0;
+  for (RABlock* block : _blocks) {
+    if (block->hasSharedAssignmentId()) {
+      uint32_t sharedAssignmentId = sharedAssignmentsMap[block->sharedAssignmentId()];
+      block->setSharedAssignmentId(sharedAssignmentId);
+      count = Support::max(count, sharedAssignmentId + 1);
+    }
+  }
+
+  ASMJIT_PROPAGATE(_sharedAssignments.resize(allocator(), count));
+
+  // Aggregate all entry scratch GP regs from blocks of the same assignment to
+  // the assignment itself. It will then be used instead of RABlock's own scratch
+  // regs mask, as shared assignments have precedence.
+  for (RABlock* block : _blocks) {
+    if (block->hasJumpTable()) {
+      const RABlocks& successors = block->successors();
+      if (!successors.empty()) {
+        RABlock* firstSuccessor = successors[0];
+        // NOTE: Shared assignments connect all possible successors so we only
+        // need the first to propagate exit scratch gp registers.
+        ASMJIT_ASSERT(firstSuccessor->hasSharedAssignmentId());
+        RASharedAssignment& sa = _sharedAssignments[firstSuccessor->sharedAssignmentId()];
+        sa.addEntryScratchGpRegs(block->exitScratchGpRegs());
+      }
+    }
+    if (block->hasSharedAssignmentId()) {
+      RASharedAssignment& sa = _sharedAssignments[block->sharedAssignmentId()];
+      sa.addEntryScratchGpRegs(block->_entryScratchGpRegs);
+    }
+  }
+
+  return kErrorOk;
+}
+
+// ============================================================================
 // [asmjit::RAPass - CFG - Views Order]
 // ============================================================================
 
@@ -357,11 +426,10 @@ public:
 };
 
 Error RAPass::buildViews() noexcept {
-  #ifndef ASMJIT_NO_LOGGING
+#ifndef ASMJIT_NO_LOGGING
   Logger* logger = debugLogger();
-  #endif
-
   ASMJIT_RA_LOG_FORMAT("[RAPass::BuildViews]\n");
+#endif
 
   uint32_t count = blockCount();
   if (ASMJIT_UNLIKELY(!count)) return kErrorOk;
@@ -408,6 +476,22 @@ Error RAPass::buildViews() noexcept {
     i = top.index();
   }
 
+  ASMJIT_RA_LOG_COMPLEX({
+    StringTmp<1024> sb;
+    for (RABlock* block : blocks()) {
+      sb.clear();
+      if (block->hasSuccessors()) {
+        sb.appendFormat("  #%u -> {", block->blockId());
+        _dumpBlockIds(sb, block->successors());
+        sb.append("}\n");
+      }
+      else {
+        sb.appendFormat("  #%u -> {Exit}\n", block->blockId());
+      }
+      logger->log(sb);
+    }
+  });
+
   visited.release(allocator());
   return kErrorOk;
 }
@@ -426,11 +510,10 @@ static ASMJIT_INLINE RABlock* intersectBlocks(RABlock* b1, RABlock* b2) noexcept
 
 // Based on "A Simple, Fast Dominance Algorithm".
 Error RAPass::buildDominators() noexcept {
-  #ifndef ASMJIT_NO_LOGGING
+#ifndef ASMJIT_NO_LOGGING
   Logger* logger = debugLogger();
-  #endif
-
   ASMJIT_RA_LOG_FORMAT("[RAPass::BuildDominators]\n");
+#endif
 
   if (_blocks.empty())
     return kErrorOk;
@@ -539,10 +622,10 @@ Error RAPass::removeUnreachableBlocks() noexcept {
   if (numAllBlocks == numReachableBlocks)
     return kErrorOk;
 
-  #ifndef ASMJIT_NO_LOGGING
+#ifndef ASMJIT_NO_LOGGING
   Logger* logger = debugLogger();
-  #endif
   ASMJIT_RA_LOG_FORMAT("[RAPass::RemoveUnreachableBlocks (%u of %u unreachable)]\n", numAllBlocks - numReachableBlocks, numAllBlocks);
+#endif
 
   for (uint32_t i = 0; i < numAllBlocks; i++) {
     RABlock* block = _blocks[i];
@@ -672,7 +755,7 @@ namespace LiveOps {
 
   struct In {
     static ASMJIT_INLINE BitWord op(BitWord dst, BitWord out, BitWord gen, BitWord kill) noexcept {
-      ASMJIT_UNUSED(dst);
+      DebugUtils::unused(dst);
       return (out | gen) & ~kill;
     }
   };
@@ -741,10 +824,10 @@ namespace LiveOps {
 }
 
 ASMJIT_FAVOR_SPEED Error RAPass::buildLiveness() noexcept {
-  #ifndef ASMJIT_NO_LOGGING
+#ifndef ASMJIT_NO_LOGGING
   Logger* logger = debugLogger();
   StringTmp<512> sb;
-  #endif
+#endif
 
   ASMJIT_RA_LOG_FORMAT("[RAPass::BuildLiveness]\n");
 
@@ -1027,25 +1110,29 @@ Error RAPass::assignArgIndexToWorkRegs() noexcept {
   ZoneBitVector& liveIn = entryBlock()->liveIn();
   uint32_t argCount = func()->argCount();
 
-  for (uint32_t i = 0; i < argCount; i++) {
-    // Unassigned argument.
-    VirtReg* virtReg = func()->arg(i);
-    if (!virtReg) continue;
+  for (uint32_t argIndex = 0; argIndex < argCount; argIndex++) {
+    for (uint32_t valueIndex = 0; valueIndex < Globals::kMaxValuePack; valueIndex++) {
+      // Unassigned argument.
+      VirtReg* virtReg = func()->argPack(argIndex)[valueIndex];
+      if (!virtReg)
+        continue;
 
-    // Unreferenced argument.
-    RAWorkReg* workReg = virtReg->workReg();
-    if (!workReg) continue;
+      // Unreferenced argument.
+      RAWorkReg* workReg = virtReg->workReg();
+      if (!workReg)
+        continue;
 
-    // Overwritten argument.
-    uint32_t workId = workReg->workId();
-    if (!liveIn.bitAt(workId))
-      continue;
+      // Overwritten argument.
+      uint32_t workId = workReg->workId();
+      if (!liveIn.bitAt(workId))
+        continue;
 
-    workReg->setArgIndex(i);
+      workReg->setArgIndex(argIndex, valueIndex);
+      const FuncValue& arg = func()->detail().arg(argIndex, valueIndex);
 
-    const FuncValue& arg = func()->detail().arg(i);
-    if (arg.isReg() && _archRegsInfo->regInfo[arg.regType()].group() == workReg->group()) {
-      workReg->setHintRegId(arg.regId());
+      if (arg.isReg() && _archRegsInfo->regInfo[arg.regType()].group() == workReg->group()) {
+        workReg->setHintRegId(arg.regId());
+      }
     }
   }
 
@@ -1055,17 +1142,19 @@ Error RAPass::assignArgIndexToWorkRegs() noexcept {
 // [asmjit::RAPass - Allocation - Global]
 // ============================================================================
 
+#ifndef ASMJIT_NO_LOGGING
 static void RAPass_dumpSpans(String& sb, uint32_t index, const LiveRegSpans& liveSpans) noexcept {
   sb.appendFormat("  %02u: ", index);
 
   for (uint32_t i = 0; i < liveSpans.size(); i++) {
     const LiveRegSpan& liveSpan = liveSpans[i];
-    if (i) sb.appendString(", ");
+    if (i) sb.append(", ");
     sb.appendFormat("[%u:%u@%u]", liveSpan.a, liveSpan.b, liveSpan.id);
   }
 
-  sb.appendChar('\n');
+  sb.append('\n');
 }
+#endif
 
 Error RAPass::runGlobalAllocator() noexcept {
   ASMJIT_PROPAGATE(initGlobalLiveSpans());
@@ -1098,15 +1187,15 @@ ASMJIT_FAVOR_SPEED Error RAPass::binPack(uint32_t group) noexcept {
   if (workRegCount(group) == 0)
     return kErrorOk;
 
-  #ifndef ASMJIT_NO_LOGGING
+#ifndef ASMJIT_NO_LOGGING
   Logger* logger = debugLogger();
   StringTmp<512> sb;
-  #endif
 
   ASMJIT_RA_LOG_FORMAT("[RAPass::BinPack] Available=%u (0x%08X) Count=%u\n",
     Support::popcnt(_availableRegs[group]),
     _availableRegs[group],
     workRegCount(group));
+#endif
 
   uint32_t i;
   uint32_t physCount = _physRegCount[group];
@@ -1205,6 +1294,9 @@ ASMJIT_FAVOR_SPEED Error RAPass::binPack(uint32_t group) noexcept {
     }
   });
 
+  // Maybe unused if logging is disabled.
+  DebugUtils::unused(physCount);
+
   if (workRegs.empty()) {
     ASMJIT_RA_LOG_FORMAT("  Completed.\n");
   }
@@ -1219,10 +1311,10 @@ ASMJIT_FAVOR_SPEED Error RAPass::binPack(uint32_t group) noexcept {
       sb.appendFormat("  Unassigned (%u): ", count);
       for (i = 0; i < numWorkRegs; i++) {
         RAWorkReg* workReg = workRegs[i];
-        if (i) sb.appendString(", ");
-        sb.appendString(workReg->name());
+        if (i) sb.append(", ");
+        sb.append(workReg->name());
       }
-      sb.appendChar('\n');
+      sb.append('\n');
       logger->log(sb);
     });
   }
@@ -1290,8 +1382,11 @@ Error RAPass::runLocalAllocator() noexcept {
             continue;
           }
           else if (successors.size() > 1) {
-            // TODO: Jump table.
-            ASMJIT_ASSERT(false);
+            RABlock* cont = block->hasConsecutive() ? successors.first() : nullptr;
+            ASMJIT_PROPAGATE(lra.allocJumpTable(inst, successors, cont));
+
+            node = next;
+            continue;
           }
           else {
             // Otherwise this is an unconditional jump, special handling isn't required.
@@ -1300,8 +1395,8 @@ Error RAPass::runLocalAllocator() noexcept {
         }
 
         ASMJIT_PROPAGATE(lra.allocInst(inst));
-        if (inst->type() == BaseNode::kNodeFuncCall)
-          ASMJIT_PROPAGATE(onEmitPreCall(inst->as<FuncCallNode>()));
+        if (inst->type() == BaseNode::kNodeInvoke)
+          ASMJIT_PROPAGATE(onEmitPreCall(inst->as<InvokeNode>()));
         else
           ASMJIT_PROPAGATE(lra.spillAfterAllocation(inst));
       }
@@ -1309,10 +1404,10 @@ Error RAPass::runLocalAllocator() noexcept {
     }
 
     if (consecutive) {
-      if (consecutive->hasEntryAssignment()) {
-        BaseNode* prev = afterLast ? afterLast->prev() : cc()->lastNode();
-        cc()->_setCursor(unconditionalJump ? prev->prev() : prev);
+      BaseNode* prev = afterLast ? afterLast->prev() : cc()->lastNode();
+      cc()->_setCursor(unconditionalJump ? prev->prev() : prev);
 
+      if (consecutive->hasEntryAssignment()) {
         ASMJIT_PROPAGATE(
           lra.switchToAssignment(
             consecutive->entryPhysToWorkMap(),
@@ -1322,6 +1417,7 @@ Error RAPass::runLocalAllocator() noexcept {
             false));
       }
       else {
+        ASMJIT_PROPAGATE(lra.spillRegsBeforeEntry(consecutive));
         ASMJIT_PROPAGATE(setBlockEntryAssignment(consecutive, block, lra._curAssignment));
         lra._curAssignment.copyFrom(consecutive->entryPhysToWorkMap(), consecutive->entryWorkToPhysMap());
       }
@@ -1354,7 +1450,7 @@ Error RAPass::runLocalAllocator() noexcept {
       break;
     }
 
-    // If we switched to some block we have to update `lra`.
+    // If we switched to some block we have to update the local allocator.
     lra.replaceAssignment(block->entryPhysToWorkMap(), block->entryWorkToPhysMap());
   }
 
@@ -1363,6 +1459,18 @@ Error RAPass::runLocalAllocator() noexcept {
 }
 
 Error RAPass::setBlockEntryAssignment(RABlock* block, const RABlock* fromBlock, const RAAssignment& fromAssignment) noexcept {
+  if (block->hasSharedAssignmentId()) {
+    uint32_t sharedAssignmentId = block->sharedAssignmentId();
+
+    // Shouldn't happen. Entry assignment of a block that has a shared-state
+    // will assign to all blocks with the same sharedAssignmentId. It's a bug if
+    // the shared state has been already assigned.
+    if (!_sharedAssignments[sharedAssignmentId].empty())
+      return DebugUtils::errored(kErrorInvalidState);
+
+    return setSharedAssignment(sharedAssignmentId, fromAssignment);
+  }
+
   PhysToWorkMap* physToWorkMap = clonePhysToWorkMap(fromAssignment.physToWorkMap());
   WorkToPhysMap* workToPhysMap = cloneWorkToPhysMap(fromAssignment.workToPhysMap());
 
@@ -1371,16 +1479,21 @@ Error RAPass::setBlockEntryAssignment(RABlock* block, const RABlock* fromBlock, 
 
   block->setEntryAssignment(physToWorkMap, workToPhysMap);
 
-  // Must be first block, otherwise impossible.
-  if (block == fromBlock)
-    return kErrorOk;
+  // True if this is the first (entry) block, nothing to do in this case.
+  if (block == fromBlock) {
+    // Entry block should never have a shared state.
+    if (block->hasSharedAssignmentId())
+      return DebugUtils::errored(kErrorInvalidState);
 
-  const ZoneBitVector& liveOut = fromBlock->liveOut();
-  const ZoneBitVector& liveIn  = block->liveIn();
+    return kErrorOk;
+  }
 
   RAAssignment as;
   as.initLayout(_physRegCount, workRegs());
   as.initMaps(physToWorkMap, workToPhysMap);
+
+  const ZoneBitVector& liveOut = fromBlock->liveOut();
+  const ZoneBitVector& liveIn = block->liveIn();
 
   // It's possible that `fromBlock` has LIVE-OUT regs that `block` doesn't
   // have in LIVE-IN, these have to be unassigned.
@@ -1398,19 +1511,91 @@ Error RAPass::setBlockEntryAssignment(RABlock* block, const RABlock* fromBlock, 
     }
   }
 
-  // Complex allocation strategy: Record register assignments upon block entry.
-  {
-    for (uint32_t group = 0; group < BaseReg::kGroupVirt; group++) {
-      if (_strategy[group].isComplex()) {
-        Support::BitWordIterator<uint32_t> it(as.assigned(group));
+  return blockEntryAssigned(as);
+}
+
+Error RAPass::setSharedAssignment(uint32_t sharedAssignmentId, const RAAssignment& fromAssignment) noexcept {
+  ASMJIT_ASSERT(_sharedAssignments[sharedAssignmentId].empty());
+
+  PhysToWorkMap* physToWorkMap = clonePhysToWorkMap(fromAssignment.physToWorkMap());
+  WorkToPhysMap* workToPhysMap = cloneWorkToPhysMap(fromAssignment.workToPhysMap());
+
+  if (ASMJIT_UNLIKELY(!physToWorkMap || !workToPhysMap))
+    return DebugUtils::errored(kErrorOutOfMemory);
+
+  _sharedAssignments[sharedAssignmentId].assignMaps(physToWorkMap, workToPhysMap);
+  ZoneBitVector& sharedLiveIn = _sharedAssignments[sharedAssignmentId]._liveIn;
+  ASMJIT_PROPAGATE(sharedLiveIn.resize(allocator(), workRegCount()));
+
+  RAAssignment as;
+  as.initLayout(_physRegCount, workRegs());
+
+  uint32_t sharedAssigned[BaseReg::kGroupVirt] {};
+
+  for (RABlock* block : blocks()) {
+    if (block->sharedAssignmentId() == sharedAssignmentId) {
+      ASMJIT_ASSERT(!block->hasEntryAssignment());
+
+      PhysToWorkMap* entryPhysToWorkMap = clonePhysToWorkMap(fromAssignment.physToWorkMap());
+      WorkToPhysMap* entryWorkToPhysMap = cloneWorkToPhysMap(fromAssignment.workToPhysMap());
+
+      if (ASMJIT_UNLIKELY(!entryPhysToWorkMap || !entryWorkToPhysMap))
+        return DebugUtils::errored(kErrorOutOfMemory);
+
+      block->setEntryAssignment(entryPhysToWorkMap, entryWorkToPhysMap);
+      as.initMaps(entryPhysToWorkMap, entryWorkToPhysMap);
+
+      const ZoneBitVector& liveIn = block->liveIn();
+      sharedLiveIn.or_(liveIn);
+
+      for (uint32_t group = 0; group < BaseReg::kGroupVirt; group++) {
+        sharedAssigned[group] |= entryPhysToWorkMap->assigned[group];
+        Support::BitWordIterator<uint32_t> it(entryPhysToWorkMap->assigned[group]);
+
         while (it.hasNext()) {
           uint32_t physId = it.next();
           uint32_t workId = as.physToWorkId(group, physId);
 
-          RAWorkReg* workReg = workRegById(workId);
-          workReg->addAllocatedMask(Support::bitMask(physId));
+          if (!liveIn.bitAt(workId))
+            as.unassign(group, workId, physId);
         }
       }
+    }
+  }
+
+  {
+    as.initMaps(physToWorkMap, workToPhysMap);
+
+    for (uint32_t group = 0; group < BaseReg::kGroupVirt; group++) {
+      Support::BitWordIterator<uint32_t> it(_availableRegs[group] & ~sharedAssigned[group]);
+
+      while (it.hasNext()) {
+        uint32_t physId = it.next();
+        if (as.isPhysAssigned(group, physId)) {
+          uint32_t workId = as.physToWorkId(group, physId);
+          as.unassign(group, workId, physId);
+        }
+      }
+    }
+  }
+
+  return blockEntryAssigned(as);
+}
+
+Error RAPass::blockEntryAssigned(const RAAssignment& as) noexcept {
+  // Complex allocation strategy requires to record register assignments upon
+  // block entry (or per shared state).
+  for (uint32_t group = 0; group < BaseReg::kGroupVirt; group++) {
+    if (!_strategy[group].isComplex())
+      continue;
+
+    Support::BitWordIterator<uint32_t> it(as.assigned(group));
+    while (it.hasNext()) {
+      uint32_t physId = it.next();
+      uint32_t workId = as.physToWorkId(group, physId);
+
+      RAWorkReg* workReg = workRegById(workId);
+      workReg->addAllocatedMask(Support::bitMask(physId));
     }
   }
 
@@ -1425,15 +1610,16 @@ Error RAPass::useTemporaryMem(BaseMem& out, uint32_t size, uint32_t alignment) n
   ASMJIT_ASSERT(alignment <= 64);
 
   if (_temporaryMem.isNone()) {
-    ASMJIT_PROPAGATE(cc()->_newStack(_temporaryMem.as<BaseMem>(), size, alignment));
+    ASMJIT_PROPAGATE(cc()->_newStack(&_temporaryMem.as<BaseMem>(), size, alignment));
   }
   else {
     ASMJIT_ASSERT(_temporaryMem.as<BaseMem>().isRegHome());
-    uint32_t virtId = _temporaryMem.as<BaseMem>().baseId();
 
+    uint32_t virtId = _temporaryMem.as<BaseMem>().baseId();
     VirtReg* virtReg = cc()->virtRegById(virtId);
-    virtReg->_virtSize = Support::max(virtReg->virtSize(), size);
-    virtReg->_alignment = uint8_t(Support::max(virtReg->alignment(), alignment));
+
+    cc()->setStackSize(virtId, Support::max(virtReg->virtSize(), size),
+                               Support::max(virtReg->alignment(), alignment));
   }
 
   out = _temporaryMem.as<BaseMem>();
@@ -1513,7 +1699,7 @@ Error RAPass::_markStackArgsToKeep() noexcept {
       // NOTE: Update StackOffset here so when `_argsAssignment.updateFuncFrame()`
       // is called it will take into consideration moving to stack slots. Without
       // this we may miss some scratch registers later.
-      FuncValue& dstArg = _argsAssignment.arg(workReg->argIndex());
+      FuncValue& dstArg = _argsAssignment.arg(workReg->argIndex(), workReg->argValueIndex());
       dstArg.assignStackOffset(0);
     }
   }
@@ -1546,7 +1732,7 @@ Error RAPass::_updateStackArgs() noexcept {
         }
       }
       else {
-        FuncValue& dstArg = _argsAssignment.arg(workReg->argIndex());
+        FuncValue& dstArg = _argsAssignment.arg(workReg->argIndex(), workReg->argValueIndex());
         dstArg.setStackOffset(slot->offset());
       }
     }
@@ -1573,11 +1759,11 @@ Error RAPass::insertPrologEpilog() noexcept {
 // ============================================================================
 
 Error RAPass::rewrite() noexcept {
-  #ifndef ASMJIT_NO_LOGGING
+#ifndef ASMJIT_NO_LOGGING
   Logger* logger = debugLogger();
-  #endif
-
   ASMJIT_RA_LOG_FORMAT("[RAPass::Rewrite]\n");
+#endif
+
   return _rewrite(_func, _stop);
 }
 
@@ -1681,27 +1867,31 @@ static void RAPass_dumpRAInst(RAPass* pass, String& sb, const RAInst* raInst) no
   for (uint32_t i = 0; i < tiedCount; i++) {
     const RATiedReg& tiedReg = tiedRegs[i];
 
-    if (i != 0) sb.appendChar(' ');
+    if (i != 0)
+      sb.append(' ');
 
     sb.appendFormat("%s{", pass->workRegById(tiedReg.workId())->name());
-    sb.appendChar(tiedReg.isReadWrite() ? 'X' :
-                  tiedReg.isRead()      ? 'R' :
-                  tiedReg.isWrite()     ? 'W' : '?');
+    sb.append(tiedReg.isReadWrite() ? 'X' :
+              tiedReg.isRead()      ? 'R' :
+              tiedReg.isWrite()     ? 'W' : '?');
 
     if (tiedReg.hasUseId())
       sb.appendFormat("|Use=%u", tiedReg.useId());
     else if (tiedReg.isUse())
-      sb.appendString("|Use");
+      sb.append("|Use");
 
     if (tiedReg.hasOutId())
       sb.appendFormat("|Out=%u", tiedReg.outId());
     else if (tiedReg.isOut())
-      sb.appendString("|Out");
+      sb.append("|Out");
 
-    if (tiedReg.isLast()) sb.appendString("|Last");
-    if (tiedReg.isKill()) sb.appendString("|Kill");
+    if (tiedReg.isLast())
+      sb.append("|Last");
 
-    sb.appendString("}");
+    if (tiedReg.isKill())
+      sb.append("|Kill");
+
+    sb.append("}");
   }
 }
 
@@ -1716,13 +1906,13 @@ ASMJIT_FAVOR_SIZE Error RAPass::annotateCode() noexcept {
     BaseNode* last = block->last();
     for (;;) {
       sb.clear();
-      Logging::formatNode(sb, loggerFlags, cc(), node);
+      Formatter::formatNode(sb, loggerFlags, cc(), node);
 
       if ((loggerFlags & FormatOptions::kFlagDebugRA) != 0 && node->isInst() && node->hasPassData()) {
         const RAInst* raInst = node->passData<RAInst>();
         if (raInst->tiedCount() > 0) {
           sb.padEnd(40);
-          sb.appendString(" | ");
+          sb.append(" | ");
           RAPass_dumpRAInst(this, sb, raInst);
         }
       }
@@ -1740,21 +1930,15 @@ ASMJIT_FAVOR_SIZE Error RAPass::annotateCode() noexcept {
   return kErrorOk;
 }
 
-ASMJIT_FAVOR_SIZE Error RAPass::_logBlockIds(const RABlocks& blocks) noexcept {
-  // Can only be called if the `Logger` is present.
-  ASMJIT_ASSERT(debugLogger());
-
-  StringTmp<1024> sb;
-  sb.appendString("  [Succ] {");
-
+ASMJIT_FAVOR_SIZE Error RAPass::_dumpBlockIds(String& sb, const RABlocks& blocks) noexcept {
   for (uint32_t i = 0, size = blocks.size(); i < size; i++) {
     const RABlock* block = blocks[i];
-    if (i != 0) sb.appendString(", ");
-    sb.appendFormat("#%u", block->blockId());
+    if (i != 0)
+      ASMJIT_PROPAGATE(sb.appendFormat(", #%u", block->blockId()));
+    else
+      ASMJIT_PROPAGATE(sb.appendFormat("#%u", block->blockId()));
   }
-
-  sb.appendString("}\n");
-  return debugLogger()->log(sb.data(), sb.size());
+  return kErrorOk;
 }
 
 ASMJIT_FAVOR_SIZE Error RAPass::_dumpBlockLiveness(String& sb, const RABlock* block) noexcept {
@@ -1775,15 +1959,15 @@ ASMJIT_FAVOR_SIZE Error RAPass::_dumpBlockLiveness(String& sb, const RABlock* bl
         if (!n)
           sb.appendFormat("    %s [", bitsName);
         else
-          sb.appendString(", ");
+          sb.append(", ");
 
-        sb.appendString(wReg->name());
+        sb.append(wReg->name());
         n++;
       }
     }
 
     if (n)
-      sb.appendString("]\n");
+      sb.append("]\n");
   }
 
   return kErrorOk;
@@ -1796,10 +1980,10 @@ ASMJIT_FAVOR_SIZE Error RAPass::_dumpLiveSpans(String& sb) noexcept {
   for (uint32_t workId = 0; workId < numWorkRegs; workId++) {
     RAWorkReg* workReg = _workRegs[workId];
 
-    sb.appendString("  ");
+    sb.append("  ");
 
     size_t oldSize = sb.size();
-    sb.appendString(workReg->name());
+    sb.append(workReg->name());
     sb.padEnd(oldSize + maxSize);
 
     RALiveStats& stats = workReg->liveStats();
@@ -1808,16 +1992,17 @@ ASMJIT_FAVOR_SIZE Error RAPass::_dumpLiveSpans(String& sb) noexcept {
       stats.width(),
       stats.freq(),
       stats.priority());
-    sb.appendString(": ");
+    sb.append(": ");
 
     LiveRegSpans& liveSpans = workReg->liveSpans();
     for (uint32_t x = 0; x < liveSpans.size(); x++) {
       const LiveRegSpan& liveSpan = liveSpans[x];
-      if (x) sb.appendString(", ");
+      if (x)
+        sb.append(", ");
       sb.appendFormat("[%u:%u]", liveSpan.a, liveSpan.b);
     }
 
-    sb.appendChar('\n');
+    sb.append('\n');
   }
 
   return kErrorOk;
