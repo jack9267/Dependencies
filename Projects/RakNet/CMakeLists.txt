@@ -5,14 +5,15 @@ if(MSVC)
 	disable_warning(4477)
 endif()
 
-set(RakNet_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(RakNet_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 file(GLOB ALL_HEADER_SRCS ${RakNet_SOURCE_DIR}/Source/*.h)
 file(GLOB ALL_CPP_SRCS ${RakNet_SOURCE_DIR}/Source/*.cpp)
 
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
+include_directories("${RakNet_SOURCE_DIR}/DependentExtensions")
+include_directories("${RakNet_SOURCE_DIR}/Source")
 
-install_include("${CMAKE_CURRENT_SOURCE_DIR}/include")
+install_include("${RakNet_SOURCE_DIR}/Source")
 
 new_library_static(RakNet "${ALL_CPP_SRCS};${ALL_HEADER_SRCS}" "_RAKNET_LIB")
 
