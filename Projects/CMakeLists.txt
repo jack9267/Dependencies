@@ -50,11 +50,6 @@ if(MSVC)
 		# operation' : conversion from 'type1' to 'type2' of greater size
 		disable_warning(4312)
 	endif()
-
-	if(MSVC_VERSION LESS 1900)
-		# Visual studio 2015 adds support for stdbool.h, add it for older versions
-		include_directories("${CMAKE_CURRENT_SOURCE_DIR}/stdbool")
-	endif()
 endif()
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/zlib/include")
