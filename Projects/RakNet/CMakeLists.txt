@@ -13,7 +13,7 @@ file(GLOB ALL_CPP_SRCS ${RakNet_SOURCE_DIR}/Source/*.cpp)
 include_directories("${RakNet_SOURCE_DIR}/DependentExtensions")
 include_directories("${RakNet_SOURCE_DIR}/Source")
 
-install_include("${RakNet_SOURCE_DIR}/Source")
+install(DIRECTORY "${RakNet_SOURCE_DIR}/Source/" DESTINATION include/RakNet FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp")
 
 new_library_static(RakNet "${ALL_CPP_SRCS};${ALL_HEADER_SRCS}" "_RAKNET_LIB")
 
