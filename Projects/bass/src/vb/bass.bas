@@ -1,6 +1,6 @@
 Attribute VB_Name = "modBass"
 ' BASS 2.4 Visual Basic module
-' Copyright (c) 1999-2018 Un4seen Developments Ltd.
+' Copyright (c) 1999-2019 Un4seen Developments Ltd.
 '
 ' See the BASS.CHM file for more detailed documentation
 
@@ -31,6 +31,7 @@ Global Const BASS_ERROR_POSITION = 7   'invalid position
 Global Const BASS_ERROR_INIT = 8       'BASS_Init has not been successfully called
 Global Const BASS_ERROR_START = 9      'BASS_Start has not been successfully called
 Global Const BASS_ERROR_ALREADY = 14   'already initialized/paused/whatever
+Global Const BASS_ERROR_NOTAUDIO = 17  'file does not contain audio
 Global Const BASS_ERROR_NOCHAN = 18    'can't get a free channel
 Global Const BASS_ERROR_ILLTYPE = 19   'an illegal type was specified
 Global Const BASS_ERROR_ILLPARAM = 20  'an illegal parameter was specified
@@ -55,6 +56,7 @@ Global Const BASS_ERROR_VERSION = 43   'invalid BASS version (used by add-ons)
 Global Const BASS_ERROR_CODEC = 44     'codec is not available/supported
 Global Const BASS_ERROR_ENDED = 45     'the channel/file has ended
 Global Const BASS_ERROR_BUSY = 46      'the device is busy
+Global Const BASS_ERROR_UNSTREAMABLE = 47 'unstreamable file
 Global Const BASS_ERROR_UNKNOWN = -1   'some other mystery problem
 
 ' BASS_SetConfig options
@@ -78,6 +80,7 @@ Global Const BASS_CONFIG_MUSIC_VIRTUAL = 22
 Global Const BASS_CONFIG_VERIFY = 23
 Global Const BASS_CONFIG_UPDATETHREADS = 24
 Global Const BASS_CONFIG_DEV_BUFFER = 27
+Global Const BASS_CONFIG_REC_LOOPBACK = 28
 Global Const BASS_CONFIG_VISTA_TRUEPOS = 30
 Global Const BASS_CONFIG_DEV_DEFAULT = 36
 Global Const BASS_CONFIG_NET_READTIMEOUT = 37
@@ -96,10 +99,13 @@ Global Const BASS_CONFIG_FLOAT = 54
 Global Const BASS_CONFIG_NET_SEEK = 56
 Global Const BASS_CONFIG_NET_PLAYLIST_DEPTH = 59
 Global Const BASS_CONFIG_NET_PREBUF_WAIT = 60
+Global Const BASS_CONFIG_WASAPI_PERSIST = 65
+Global Const BASS_CONFIG_REC_WASAPI = 66
 
 ' BASS_SetConfigPtr options
 Global Const BASS_CONFIG_NET_AGENT = 16
 Global Const BASS_CONFIG_NET_PROXY = 17
+Global Const BASS_CONFIG_LIBSSL = 64
 
 ' BASS_ASIO_Init flags
 Global Const BASS_DEVICE_8BITS = 1     '8 bit
@@ -126,6 +132,7 @@ End Type
 Global Const BASS_DEVICE_ENABLED = 1
 Global Const BASS_DEVICE_DEFAULT = 2
 Global Const BASS_DEVICE_INIT = 4
+Global Const BASS_DEVICE_LOOPBACK = 8
 
 Global Const BASS_DEVICE_TYPE_MASK = &Hff000000
 Global Const BASS_DEVICE_TYPE_NETWORK = &H01000000
@@ -306,6 +313,7 @@ Global Const BASS_ORIGRES_FLOAT = &H10000
 Global Const BASS_CTYPE_SAMPLE = 1
 Global Const BASS_CTYPE_RECORD = 2
 Global Const BASS_CTYPE_STREAM = &H10000
+Global Const BASS_CTYPE_STREAM_VORBIS = &H10002
 Global Const BASS_CTYPE_STREAM_OGG = &H10002
 Global Const BASS_CTYPE_STREAM_MP1 = &H10003
 Global Const BASS_CTYPE_STREAM_MP2 = &H10004
@@ -389,6 +397,7 @@ Global Const BASS_STREAMPROC_END = &H80000000 ' end of user stream flag
 Global Const STREAMPROC_DUMMY = 0 ' "dummy" stream
 Global Const STREAMPROC_PUSH = -1 ' push stream
 Global Const STREAMPROC_DEVICE = -2 ' device mix stream
+Global Const STREAMPROC_DEVICE_3D = -3 ' device 3D mix stream
 
 ' BASS_StreamCreateFileUser file systems
 Global Const STREAMFILE_NOBUFFER = 0
@@ -431,6 +440,9 @@ Global Const BASS_SYNC_MUSICPOS = 10
 Global Const BASS_SYNC_MUSICINST = 1
 Global Const BASS_SYNC_MUSICFX = 3
 Global Const BASS_SYNC_OGG_CHANGE = 12
+Global Const BASS_SYNC_DEV_FAIL = 14
+Global Const BASS_SYNC_DEV_FORMAT = 15
+Global Const BASS_SYNC_THREAD = &H20000000 ' flag: call sync in other thread
 Global Const BASS_SYNC_MIXTIME = &H40000000 ' flag: sync at mixtime, else at playtime
 Global Const BASS_SYNC_ONETIME = &H80000000 ' flag: sync only once, else continuously
 
@@ -439,6 +451,7 @@ Global Const BASS_ACTIVE_STOPPED = 0
 Global Const BASS_ACTIVE_PLAYING = 1
 Global Const BASS_ACTIVE_STALLED = 2
 Global Const BASS_ACTIVE_PAUSED = 3
+Global Const BASS_ACTIVE_PAUSED_DEVICE = 4
 
 ' Channel attributes
 Global Const BASS_ATTRIB_FREQ = 1
@@ -454,6 +467,7 @@ Global Const BASS_ATTRIB_SCANINFO = 10
 Global Const BASS_ATTRIB_NORAMP = 11
 Global Const BASS_ATTRIB_BITRATE = 12
 Global Const BASS_ATTRIB_BUFFER = 13
+Global Const BASS_ATTRIB_GRANULE = 14
 Global Const BASS_ATTRIB_MUSIC_AMPLIFY = &H100
 Global Const BASS_ATTRIB_MUSIC_PANSEP = &H101
 Global Const BASS_ATTRIB_MUSIC_PSCALER = &H102
@@ -483,6 +497,7 @@ Global Const BASS_DATA_FFT_INDIVIDUAL = &H10 ' FFT flag: FFT for each channel, e
 Global Const BASS_DATA_FFT_NOWINDOW = &H20   ' FFT flag: no Hanning window
 Global Const BASS_DATA_FFT_REMOVEDC = &H40   ' FFT flag: pre-remove DC bias
 Global Const BASS_DATA_FFT_COMPLEX = &H80    ' FFT flag: return complex data
+Global Const BASS_DATA_FFT_NYQUIST = &H100   ' FFT flag: return extra Nyquist value
 
 ' BASS_ChannelGetLevelEx flags
 Global Const BASS_LEVEL_MONO = 1
@@ -712,6 +727,7 @@ Declare Function BASS_GetCPU Lib "bass.dll" () As Single
 Declare Function BASS_Start Lib "bass.dll" () As Long
 Declare Function BASS_Stop Lib "bass.dll" () As Long
 Declare Function BASS_Pause Lib "bass.dll" () As Long
+Declare Function BASS_IsStarted Lib "bass.dll" () As Long
 Declare Function BASS_SetVolume Lib "bass.dll" (ByVal volume As Single) As Long
 Declare Function BASS_GetVolume Lib "bass.dll" () As Single
 
@@ -861,8 +877,6 @@ Function STREAMPROC(ByVal handle As Long, ByVal buffer As Long, ByVal length As 
     'CALLBACK FUNCTION !!!
     
     ' User stream callback function
-    ' NOTE: A stream function should obviously be as quick
-    ' as possible, other streams (and MOD musics) can't be mixed until it's finished.
     ' handle : The stream that needs writing
     ' buffer : Buffer to write the samples in
     ' length : Number of bytes to write
@@ -886,12 +900,8 @@ End Sub
 Sub SYNCPROC(ByVal handle As Long, ByVal channel As Long, ByVal data As Long, ByVal user As Long)
     
     'CALLBACK FUNCTION !!!
-    
-    'Similarly in here, write what to do when sync function
-    'is called, i.e screen flash etc.
-    
-    ' NOTE: a sync callback function should be very quick as other
-    ' syncs cannot be processed until it has finished.
+
+    ' Sync callback function.
     ' handle : The sync that has occured
     ' channel: Channel that the sync occured in
     ' data   : Additional data associated with the sync's occurance
@@ -903,18 +913,16 @@ Sub DSPPROC(ByVal handle As Long, ByVal channel As Long, ByVal buffer As Long, B
 
     'CALLBACK FUNCTION !!!
 
-    ' VB doesn't support pointers, so you should copy the buffer into an array,
-    ' process it, and then copy it back into the buffer.
-
-    ' DSP callback function. NOTE: A DSP function should obviously be as quick as
-    ' possible... other DSP functions, streams and MOD musics can not be processed
-    ' until it's finished.
+    ' DSP callback function.
     ' handle : The DSP handle
     ' channel: Channel that the DSP is being applied to
     ' buffer : Buffer to apply the DSP to
     ' length : Number of bytes in the buffer
     ' user   : The 'user' parameter given when calling BASS_ChannelSetDSP
     
+    ' VB doesn't support pointers, so you should copy the buffer into an array,
+    ' process it, and then copy it back into the buffer.
+
 End Sub
 
 Function RECORDPROC(ByVal handle As Long, ByVal buffer As Long, ByVal length As Long, ByVal user As Long) As Long

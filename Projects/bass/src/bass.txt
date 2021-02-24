@@ -1,5 +1,5 @@
 BASS 2.4
-Copyright (c) 1999-2018 Un4seen Developments Ltd. All rights reserved.
+Copyright (c) 1999-2020 Un4seen Developments Ltd. All rights reserved.
 
 Files that you should have found in the BASS package
 ====================================================
@@ -17,113 +17,47 @@ X64\
 C\              C/C++ API and examples...
   BASS.H          BASS C/C++ header file
   BASS.LIB        BASS import library
-  BASS.DSW        Visual C++ 6 workspace for examples
-  BASS.SLN        Visual C++ 2005 (and above) solution for examples
-  MAKEFILE        Makefile for all examples
+  BASS.SLN        Visual Studio solution for examples
+  MAKEFILE        Makefile for examples
   MAKEFILE.IN     Makefile helper macros
   X64\
     BASS.LIB        64-bit BASS import library
   3DTEST\         3D/EAX example
-    3DTEST.C
-    3DTEST.RC
-    3DTEST.DSP
-    3DTEST.VCPROJ
-    MAKEFILE
+    ...
   BASSTEST\       Simple playback example
-    BASSTEST.C
-    BASSTEST.RC
-    BASSTEST.DSP
-    BASSTEST.VCPROJ
-    MAKEFILE
+    ...
   CONTEST\        Console example
-    CONTEST.C
-    CONTEST.DSP
-    CONTEST.VCPROJ
-    MAKEFILE
+    ...
   CUSTLOOP\       Custom looping example
-    CUSTLOOP.C
-    CUSTLOOP.DSP
-    CUSTLOOP.VCPROJ
-    MAKEFILE
+    ...
   DEVLIST\        Device list example
-    DEVLIST.C
-    DEVLIST.DSP
-    DEVLIST.VCPROJ
-    MAKEFILE
+    ...
   DSPTEST\        DSP example
-    DSPTEST.C
-    DSPTEST.RC
-    DSPTEST.DSP
-    DSPTEST.VCPROJ
-    MAKEFILE
+    ...
   FXTEST\         DX8 effect example
-    FXTEST.C
-    FXTEST.RC
-    FXTEST.DSP
-    FXTEST.VCPROJ
-    MAKEFILE
+    ...
   LIVEFX\         Full-duplex example
-    LIVEFX.C
-    LIVEFX.RC
-    LIVEFX.DSP
-    LIVEFX.VCPROJ
-    MAKEFILE
+    ...
   LIVESPEC\       "Live" version of spectrum analyser example
-    LIVESPEC.C
-    LIVESPEC.DSP
-    LIVESPEC.VCPROJ
-    MAKEFILE
+    ...
   MODTEST\         MOD music example
-    MODTEST.C
-    MODTEST.RC
-    MODTEST.DSP
-    MODTEST.VCPROJ
-    MAKEFILE
+    ...
   MULTI\          Multiple device example
-    MULTI.C
-    MULTI.RC
-    MULTI.DSP
-    MULTI.VCPROJ
-    MAKEFILE
+    ...
   NETRADIO\       Internet streaming example
-    NETRADIO.C
-    NETRADIO.RC
-    NETRADIO.DSP
-    NETRADIO.VCPROJ
-    MAKEFILE
+    ...
   PLUGINS\        Plugins example
-    PLUGINS.C
-    PLUGINS.RC
-    PLUGINS.DSP
-    PLUGINS.VCPROJ
-    MAKEFILE
+    ...
   RECTEST\        Recording example
-    RECTEST.C
-    RECTEST.RC
-    RECTEST.DSP
-    RECTEST.VCPROJ
-    MAKEFILE
+    ...
   SPEAKERS\       Multi-speaker example
-    SPEAKERS.C
-    SPEAKERS.RC
-    SPEAKERS.DSP
-    SPEAKERS.VCPROJ
-    MAKEFILE
+    ...
   SPECTRUM\       Spectrum analyser example
-    SPECTRUM.C
-    SPECTRUM.DSP
-    SPECTRUM.VCPROJ
-    MAKEFILE
+    ...
   SYNTH\          Low latency custom streaming example
-    SYNTH.C
-    SYNTH.DSP
-    SYNTH.VCPROJ
-    MAKEFILE
+    ...
   WRITEWAV\       WAVE writer example
-    WRITEWAV.C
-    WRITEWAV.DSP
-    WRITEWAV.VCPROJ
-    MAKEFILE
+    ...
   BIN\            Precompiled examples
     3DTEST.EXE
     BASSTEST.EXE
@@ -145,226 +79,138 @@ C\              C/C++ API and examples...
 DELPHI\         Delphi API and examples...
   BASS.PAS        BASS Delphi unit
   3DTEST\         3D/EAX example
-    D3TEST.DPR
-    DTMAIN.PAS
-    DTMAIN.DFM
-    DTSELECT.PAS
-    DTSELECT.DFM
+    ...
   BASSTEST\       Simple playback example
-    BASSTEST.DPR
-    BTMAIN.PAS
-    BTMAIN.DFM
+    ...
   CONTEST\        Console example
-    CONTEST.DPR
+    ...
   CUSTLOOP\       Custom looping example
-    CUSTLOOP.DPR
-    UNIT1.PAS
-    UNIT1.DFM
+    ...
   DSPTEST\        DSP example
-    DSPTEST.DPR
-    DTMAIN.PAS
-    DTMAIN.DFM
+    ...
   FXTEST\         DX8 effect example
-    FXTEST.DPR
-    TEST.PAS
-    TEST.DFM
+    ...
   LIVEFX\         Full-duplex example
-    LIVEFX.DPR
-    UNIT1.PAS
-    UNIT1.DFM
+    ...
   LIVESPEC\       "Live" version of spectrum analyser example
-    LIVESPEC.DPR
+    ...
   MULTI\          Multiple device example
-    MULTI.DPR
-    UNIT1.PAS
-    UNIT1.DFM
-    UNIT2.PAS
-    UNIT2.DFM
+    ...
   NETRADIO\       Internet streaming example
-    NETRADIO.DPR
-    UNIT1.PAS
-    UNIT1.DFM
+    ...
   PLUGINS\        Plugins example
-    PLUGINS.DPR
-    UNIT1.PAS
-    UNIT1.DFM
+    ...
   RECORDTEST\     Recording example
-    RECORDTEST.DPR
-    UNIT1.PAS
-    UNIT1.DFM
+    ...
   SAMPLEVIS\      Visualisation example
-    SAMPLEVIS.DPR
-    MAIN.PAS
-    MAIN.DFM
-    SPECTRUM_VIS.PAS
-    CIRCLE_VIS.PAS
-    OSC_VIS.PAS
-    COMMONTYPES.PAS
+    ...
   SPEAKERS\       Multi-speaker example
-    SPEAKERS.DPR
-    UNIT1.PAS
-    UNIT1.DFM
+    ...
   SPECTRUM\       Spectrum analyser example
-    SPECTRUM.DPR
-    UNIT1.PAS
-    COMMON.INC
+    ...
   STREAMTEST\     User stream example
-    STREAMTEST.DPR
-    STMAIN.PAS
-    STMAIN.DFM
+    ...
   WRITEWAV\       WAVE writer example
-    WRITEWAV.DPR
-    UNITMAIN.PAS
-    UNITMAIN.DFM
+    ...
 VB\             Visual Basic API and examples...
   BASS.BAS        BASS Visual Basic module
   3DTEST\         3D/EAX example
-    PRJ3DTEST.VBP
-    PRJ3DTEST.FRM
-    PRJDEVICE.FRM
+    ...
   BASSTEST\       Simple playback example
-    PRJBASSTEST.VBP
-    FRMBASSTEST.FRM
+    ...
   CUSTLOOP\       Custom looping example
-    PRJCUSTLOOP.VBP
-    FRMCUSTLOOP.FRM
-    MODCUSTLOOP.BAS
+    ...
   DSPTEST\        DSP example
-    PRJDSPTEST.VBP
-    FRMDSPTEST.FRM
-    MODDSPTEST.BAS
+    ...
   FXTEST\         DX8 effect example
-    PRJFXTEST.VBP
-    FRMFXTEST.FRM
+    ...
   LIVEFX\         Full-duplex example
-    PRJLIVEFX.VBP
-    FRMLIVEFX.FRM
-    MODLIVEFX.BAS
+    ...
   LIVESPEC\       "Live" version of spectrum analyser example
-    PRJLIVESPEC.VBP
-    FRMLIVESPEC.FRM
-    MODLIVESPEC.BAS
+    ...
   MULTI\          Multiple device example
-    PRJMULTI.VBP
-    FRMMULTI.FRM
-    FRMDEVICE.FRM
+    ...
   NETRADIO\       Internet streaming example
-    PRJNETRADIO.VBP
-    FRMNETRADIO.FRM
-    MODNETRADIO.BAS
-    CLSFILEIO.CLS
+    ...
   PLUGINS\        Plugins example
-    PRJPLUGINS.VBP
-    FRMPLUGINS.FRM
+    ...
   RECTEST\        Recording example
-    PRJRECTEST.VBP
-    FRMRECTEST.FRM
-    MODRECTEST.BAS
+    ...
   SPEAKERS\       Multi-speaker example
-    PRJSPEAKERS.VBP
-    FRMSPEAKERS.FRM
+    ...
   SPECTRUM\       Spectrum analyser example
-    PRJSPECTRUM.VBP
-    FRMSPECTRUM.FRM
-    MODSPECTRUM.BAS
+    ...
   SYNTH\          Low latency custom streaming example
-    PRJSYNTH.VBP
-    FRMSYNTH.FRM
-    MODSYNTH.BAS
+    ...
   WRITEWAV\       WAVE writer example
-    PRJWRITEWAVE.VBP
-    PRJWRITEWAVE.FRM
+    ...
   MEMORY\         Playing from memory example by Jobnik
-    PRJMEMORY.VBP
-    FRMMEMORY.FRM
-    SYNCTEST.BAS
-    CBASS_TIME.CLS
+    ...
 
-NOTE: You may need to "Unblock" the BASS.CHM file in its "Properties" to
-      view it on Windows 7. The documentation can also be viewed online at
-      the BASS website.
+NOTE: You may need to "Unblock" the BASS.CHM file in its "Properties" to view
+      it on Windows 7. The documentation can also be viewed online at the BASS
+      website.
+
+NOTE: The Delphi and VB examples may not always be up to date with the C
+      examples, so the latter should be preferred as references if possible.
 
 NOTE: To run the example EXEs, first you will need to copy BASS.DLL into the
       same directory as them.
 
-MacOSX version
---------------
+macOS version
+-------------
 BASS.TXT        This file
 LIBBASS.DYLIB   BASS module
 BASS.CHM        BASS documentation
 CHMOX.APP       CHM file viewer
 BASS.H          BASS C/C++ header file
-MAKEFILE        Makefile for all examples
-MAKEFILE.IN     Makefile helper macros
 BASS.XCODEPROJ  Xcode project for examples
+MAKEFILE        Makefile for specific architectures
 MP3-FREE\
   LIBBASS.DYLIB   BASS module using the OS's MP3 decoder
 3DTEST\         3D example
-  3DTEST.C
-  3DTEST.NIB
-  MAKEFILE
+  ...
 BASSTEST\       Simple playback example
-  BASSTEST.C
-  BASSTEST.NIB
-  MAKEFILE
+  ...
 CONTEST\        Console example
-  CONTEST.C
-  MAKEFILE
+  ...
 CUSTLOOP\       Custom looping example
-  CUSTLOOP.C
-  MAKEFILE
+  ...
 DEVLIST\        Device list example
-  DEVLIST.C
-  MAKEFILE
+  ...
 DSPTEST\        DSP example
-  DSPTEST.C
-  DSPTEST.NIB
-  MAKEFILE
+  ...
 FXTEST\         DX8 effect example
-  FXTEST.C
-  FXTEST.NIB
-  MAKEFILE
+  ...
 LIVESPEC\       "Live" version of spectrum analyser example
-  LIVESPEC.C
-  MAKEFILE
+  ...
 MODTEST\        MOD music example
-  MODTEST.C
-  MODTEST.NIB
-  MAKEFILE
+  ...
 MULTI\          Multiple device example
-  MULTI.C
-  MULTI.NIB
-  MAKEFILE
+  ...
 NETRADIO\       Internet streaming example
-  NETRADIO.C
-  NETRADIO.NIB
-  MAKEFILE
+  ...
 PLUGINS\        Plugins example
-  PLUGINS.C
-  PLUGINS.NIB
-  MAKEFILE
+  ...
 RECTEST\        Recording example
-  RECTEST.C
-  RECTEST.NIB
-  MAKEFILE
+  ...
 SPEAKERS\       Multi-speaker example
-  SPEAKERS.C
-  SPEAKERS.NIB
-  MAKEFILE
+  ...
 SPECTRUM\       Spectrum analyser example
-  SPECTRUM.C
-  MAKEFILE
+  ...
 SYNTH\          Low latency custom streaming example
-  SYNTH.C
-  SYNTH.NIB
-  MAKEFILE
+  ...
 WRITEWAV\       WAVE writer example
-  WRITEWAV.C
-  MAKEFILE
+  ...
 
 NOTE: To view the documentation, you will need a CHM viewer, such as the
-      included CHMOX. The documentation can also be viewed online at the
-      BASS website.
+      included CHMOX. The documentation can also be viewed online at the BASS
+      website.
+
+NOTE: The GUI-based examples (not CONTEST/DEVLIST/WRITEWAV) use the old Carbon
+      APIs that are not supported by 64-bit macOS. They will be replaced in
+      future but are currently still included for reference (the BASS parts are
+      still relevant).
 
 Linux version
 -------------
@@ -372,7 +218,7 @@ BASS.TXT        This file
 LIBBASS.SO      BASS module
 BASS.CHM        BASS documentation
 BASS.H          BASS C/C++ header file
-MAKEFILE        Makefile for all examples
+MAKEFILE        Makefile for examples
 MAKEFILE.IN     Makefile helper macros
 MP3-FREE\
   LIBBASS.SO      BASS module using the OS's MP3 decoder
@@ -383,70 +229,42 @@ X64\
 PASCAL\
   BASS.PAS        BASS Delphi/Pascal unit
 3DTEST\         3D example
-  3DTEST.C
-  MAKEFILE
-  3DTEST.GLADE
+  ...
 BASSTEST\       Simple playback example
-  BASSTEST.C
-  MAKEFILE
-  BASSTEST.GLADE
+  ...
 CONTEST\        Console example
-  CONTEST.C
-  MAKEFILE
+  ...
 CUSTLOOP\       Custom looping example
-  CUSTLOOP.C
-  MAKEFILE
+  ...
 DEVLIST\        Device list example
-  DEVLIST.C
-  MAKEFILE
+  ...
 DSPTEST\        DSP example
-  DSPTEST.C
-  MAKEFILE
-  DSPTEST.GLADE
+  ...
 FXTEST\         DX8 effect example
-  FXTEST.C
-  MAKEFILE
-  FXTEST.GLADE
+  ...
 LIVESPEC\       "Live" version of spectrum analyser example
-  LIVESPEC.C
-  MAKEFILE
+  ...
 MODTEST\        MOD music example
-  MODTEST.C
-  MAKEFILE
-  MODTEST.GLADE
+  ...
 MULTI\          Multiple device example
-  MULTI.C
-  MAKEFILE
-  MULTI.GLADE
+  ...
 NETRADIO\       Internet streaming example
-  NETRADIO.C
-  MAKEFILE
-  NETRADIO.GLADE
+  ...
 PLUGINS\        Plugins example
-  PLUGINS.C
-  MAKEFILE
-  PLUGINS.GLADE
+  ...
 RECTEST\        Recording example
-  RECTEST.C
-  MAKEFILE
-  RECTEST.GLADE
+  ...
 SPEAKERS\       Multi-speaker example
-  SPEAKERS.C
-  MAKEFILE
-  SPEAKERS.GLADE
+  ...
 SPECTRUM\       Spectrum analyser example
-  SPECTRUM.C
-  MAKEFILE
+  ...
 SYNTH\          Low latency custom streaming example
-  SYNTH.C
-  MAKEFILE
-  SYNTH.GLADE
+  ...
 WRITEWAV\       WAVE writer example
-  WRITEWAV.C
-  MAKEFILE
+  ...
 
-NOTE: To view the documentation, you will need a CHM viewer. The
-      documentation can also be viewed online at the BASS website.
+NOTE: To view the documentation, you will need a CHM viewer. The documentation
+      can also be viewed online at the BASS website.
 
 
 What's the point?
@@ -465,22 +283,24 @@ Requirements
 ============
 Win32 version
 -------------
-BASS requires WASAPI or DirectSound for playback and recording, but decoding is
-still possible without them. DirectSound has been included with all Windows
-versions since Windows 98. On Windows Vista and above, the default is to WASAPI
-instead of DirectSound for playback. 32-bit and 64-bit Windows are supported.
+BASS requires WASAPI or DirectSound for playback and recording, but decoding
+and silent playback on the "No sound" device is still possible without them.
+DirectSound has been included with all Windows versions since Windows 98. On
+Windows Vista and above, the default is to use WASAPI instead of DirectSound
+for playback. 32-bit and 64-bit Windows are supported.
 
-MacOSX version
---------------
-OSX 10.5 or above is required. BASS uses CoreAudio for playback and recording,
-so there are no special library/driver requirements. 32-bit (i386) and 64-bit
-(x86_64) architectures are supported in a single universal library.
+macOS version
+-------------
+macOS 10.5 or above is required. BASS uses CoreAudio for playback and recording,
+so there are no special library/driver requirements. x86_64 / arm64 / i386
+architectures are supported in a single universal library.
 
 Linux version
 -------------
-BASS requires ALSA for playback and recording, but decoding is still possible
-without it. 32-bit (i386) and 64-bit (x86-64) architectures are supported.
-ARM support is also available as a separate download from the website.
+BASS requires ALSA for playback and recording, but decoding and silent playback
+on the "No sound" device is still possible without it. 32-bit (i386) and 64-bit
+(x86-64) architectures are supported. ARM support is also available as a
+separate download from the website.
 
 
 Main Features
@@ -534,7 +354,7 @@ Main Features
   chorus/compressor/distortion/echo/flanger/gargle/parameq/reverb
 
 * User defined DSP functions
-  custom effects may be applied to musics and streams
+  custom effects may be applied to individual streams or the final output mix
 
 * 32 bit floating-point decoding and processing
   floating-point stream/music decoding, DSP/FX, and recording
@@ -558,7 +378,7 @@ functions that you are using have been affected by a change.
 
 Win32 version
 -------------
-C/C++, Visual Basic, and Delphi APIs and example projects are provided. To
+C/C++, Delphi, and Visual Basic APIs and example projects are provided. To
 use BASS with another language you will first have to convert the header
 file. Or, as a last resort, you could use LoadLibrary and GetProcAddress.
 
@@ -595,18 +415,20 @@ For the BASS functions that return strings (char*), VB users should use
 the VBStrFromAnsiPtr function to convert the returned pointer into a VB
 string.
 
-MacOSX version
---------------
-See the example Xcode project and makefiles.
+macOS version
+-------------
+See the example Xcode project.
 
 NOTE: The LIBBASS.DYLIB file must be put in the same directory as the
       executable, it can't just be somewhere in the path.
 
-LIBBASS.DYLIB is a universal binary, with support for the i386 and
-x86_64 architectures. If only one of those architectures is needed, the
-included makefile can be used extract the wanted one. It will also process
-any BASS add-ons placed in the same directory. Type "make i386" or
-"make x86_64" to extract a particular architecture.
+LIBBASS.DYLIB is a universal binary with support for the x86_64 / arm64 / i386
+architectures. If not all of those architectures are needed, the included
+makefile can be used to extract the wanted one(s). Type "make x86_64" or
+"make arm64" or "make i386" to extract a particular architecture. "make 64bit"
+can be used to extract the x86_64 and arm64 architectures (exclude i386), and
+"make intel" to extract the x86_64 and i386 architectures (exclude arm64). Any
+BASS add-ons placed in the same directory will also be processed.
 
 Linux version
 -------------
@@ -716,12 +538,116 @@ NOTE: Linux does not include an MP3 decoder as standard. The "MP3-FREE"
       BASS version will make use of the libmpg123 decoder, if installed.
 
 
+Credits
+=======
+Ogg Vorbis decoding is based on libogg/vorbis,
+Copyright (c) 2002-2020 Xiph.org Foundation
+
+CHMOX is (c) 2004 Stéphane Boisson, http://chmox.sourceforge.net/
+
+API/Sample contributors
+-----------------------
+Delphi: Titus Miloi, Rogier Timmermans, Alessandro Cappellozza,
+        Jesse Naranjo, Chris Troesken, Evgeny Melnikov
+Visual Basic: Adam Hoult, Hendrik Knaepen, Arthur Aminov,
+              Peter Hebels
+
+
 History
 =======
 These are the major (and not so major) changes at each version stage.
 There are of course bug fixes and other little improvements made along
 the way too! To make upgrading simpler, all functions affected by a
 change to the BASS interface are listed.
+
+2.4.15 - 17/12/2019
+-------------------
+* Channel processing granularity option
+	BASS_ATTRIB_GRANULE (BASS_ChannelSetAttribute option)
+* Asynchronous mixtime sync callbacks
+	BASS_SYNC_THREAD (BASS_ChannelSetSync flag)
+* Output device update period can be set in samples
+	BASS_CONFIG_DEV_PERIOD (BASS_SetConfig option)
+* Continuous output when nothing is playing is now optional on macOS/iOS too
+	BASS_CONFIG_DEV_NONSTOP (BASS_SetConfig option)
+* AAudio output support on Android
+	BASS_Init
+	BASS_CONFIG_ANDROID_AAUDIO (BASS_SetConfig option)
+* Support for audio session IDs on Android
+	BASS_CONFIG_ANDROID_SESSIONID (BASS_SetConfig option)
+* ParcelFileDescriptor support on Android
+	BASS_StreamCreateFile
+	BASS_SampleLoad
+	BASS_MusicLoad
+* FloatValue Java class added to receive floating-point values on Android 10
+	BASS_Get3DFactors
+	BASS_RecordGetInput
+	BASS_ChannelGetAttribute
+	BASS_ChannelGet3DAttributes
+* Audio session configuration option on iOS
+	BASS_CONFIG_IOS_SESSION (BASS_SetConfig option)
+* OGG channel type constant renamed/duplicated to VORBIS
+	BASS_CTYPE_STREAM_VORBIS
+* Error code for recognised file formats without audio
+	BASS_ERROR_NOTAUDIO (BASS_StreamCreateFile/User/URL error code)
+* Error code for unstreamable MP4 files due to atom order
+	BASS_ERROR_UNSTREAMABLE (BASS_StreamCreateFileUser/URL error code)
+* Fix for AAC streaming with BASS_STREAM_BLOCK on macOS 10.15 and iOS 13
+	BASS_StreamCreateURL/FileUser
+* Fix for playback rate changing bug when using DirectSound
+	BASS_ATTRIB_FREQ (BASS_ChannelSetAttribute option)
+* armv6 architecture support dropped on iOS
+
+2.4.14 - 16/1/2019
+------------------
+* Support for playback on the "No sound" device
+	BASS_Init
+	BASS_StreamCreateFile/User/URL
+	BASS_SampleLoad/Create
+	BASS_ChannelPlay
+* Improved sample rate conversion quality, including 64 point option
+	BASS_ATTRIB_SRC (BASS_ChannelSetAttribute option)
+	BASS_CONFIG_SRC/_SAMPLE (BASS_SetConfig options)
+* Loopback (output device) recording on Windows Vista and above
+	BASS_RecordInit
+	BASS_RecordGetDeviceInfo
+	BASS_DEVICE_LOOPBACK (BASS_DEVICEINFO flag)
+	DEVLIST and RECTEST examples updated
+* Native format recording option
+	BASS_RecordStart
+* Access to the 3D output mix for applying DSP/FX
+	STREAMPROC_DEVICE_3D (BASS_StreamCreate option)
+* Retrieval of a device's started/stopped status
+	BASS_IsStarted
+* Sync for when a device stops unexpectedly
+	BASS_SYNC_DEV_FAIL (BASS_ChannelSetSync type)
+* New channel playback state for a paused device
+	BASS_ACTIVE_PAUSED_DEVICE (BASS_ChannelIsActive)
+* Sync for when a device's sample format changes
+	BASS_SYNC_DEV_FORMAT (BASS_ChannelSetSync type)
+* Adjustable output device update period
+	BASS_CONFIG_DEV_PERIOD (BASS_SetConfig option)
+* Nyquist FFT option
+	BASS_DATA_FFT_NYQUIST (BASS_ChannelGetData flag)
+* Plugin-specific flags are ignored in standard stream creation functions
+	BASS_StreamCreateFile/User/URL
+* Pre-buffering during stream creation is now disabled by default
+	BASS_CONFIG_NET_PREBUF_WAIT (BASS_SetConfig option)
+	BASS_StreamCreateURL/FileUser
+* Existing internet streams are unaffected by read timeout config changes
+	BASS_CONFIG_NET_READTIMEOUT (BASS_SetConfig option)
+* Retrieval of the number of existing handles
+	BASS_CONFIG_HANDLES (BASS_GetConfig option)
+* Windows mixer settings are retained by default and optionally not
+	BASS_CONFIG_WASAPI_PERSIST (BASS_SetConfig option)
+* Configurable OpenSSL library filename on Linux/Android
+	BASS_CONFIG_LIBSSL (BASS_SetConfigPtr option)
+* Files can be deleted/renamed while streaming on Windows (already true on other platforms)
+	BASS_StreamCreateFile
+* Fix for bug in playback buffering disabling option
+	BASS_ATTRIB_NOBUFFER (BASS_ChannelSetAttribute option)
+* Fix to support long logarithmic curves in volume effects
+	BASS_FX_VOLUME (BASS_ChannelSetFX type)
 
 2.4.13.8 - 6/2/2018
 -------------------
@@ -743,7 +669,7 @@ change to the BASS interface are listed.
 	BASS_CONFIG_DEV_BUFFER/NONSTOP (BASS_SetConfig options)
 	BASS_CONFIG_SRC/_SAMPLE (BASS_SetConfig options)
 	BASS_ATTRIB_SRC/NORAMP (BASS_ChannelSetAttribute options)
-* Default output device following support extended to Windows Vista and OSX
+* Default output device following support extended to Windows Vista and macOS
 	BASS_CONFIG_DEV_DEFAULT (BASS_SetConfig option)
 * Seamless playback buffer length changing
 	BASS_ATTRIB_BUFFER (BASS_ChannelSetAttribute option)
@@ -829,12 +755,16 @@ change to the BASS interface are listed.
 	BASS_ChannelUpdate
 	BASS_ATTRIB_NOBUFFER (BASS_ChannelSetAttribute option)
 * Net agent and proxy config options now make a copy of the provided string
-	BASS_CONFIG_NET_AGENT/PROXY (BASS_SetConfig options)
+	BASS_CONFIG_NET_AGENT/PROXY (BASS_SetConfigPtr options)
 	NETRADIO example updated
 * Unicode net agent and proxy config options on Windows
-	BASS_CONFIG_NET_AGENT/PROXY (BASS_SetConfig options)
+	BASS_CONFIG_NET_AGENT/PROXY (BASS_SetConfigPtr options)
 * 32768 sample FFT
 	BASS_DATA_FFT32768 (BASS_ChannelGetData flag)
+* Support for iTunes gapless info in MP3 files
+	BASS_StreamCreateFile/User
+* 529 sample delay removed from start of MP3 files without delay info
+	BASS_StreamCreateFile/User/URL
 * Support for numerical MP4 genre (gnre) tags
 	BASS_TAG_MP4 (BASS_ChannelGetTags type)
 * Support for BASSWMA's tag option when using Media Foundation WMA codec
@@ -2123,7 +2053,7 @@ change to the BASS interface are listed.
 * Compressed WAV samples support (using audio CODECs)
 * Updated CD volume handling - now works with SB Live
 * More linear channel volume/pan scales (were slightly off before)
-* "no sound" device option
+* "No sound" device option
 * 3D sound functions
 	BASS_Set3DFactors
 	BASS_Get3DFactors
@@ -2188,25 +2118,10 @@ change to the BASS interface are listed.
 * First public release
 
 
-Credits
-=======
-Ogg Vorbis decoding is based on libogg/vorbis,
-Copyright (c) 2002-2004 Xiph.org Foundation
-
-CHMOX is (c) 2004 Stéphane Boisson, http://chmox.sourceforge.net/
-
-API/Sample contributors
------------------------
-Visual Basic: Adam Hoult, Hendrik Knaepen, Arthur Aminov,
-              Peter Hebels
-Delphi: Titus Miloi, Rogier Timmermans, Alessandro Cappellozza,
-        Jesse Naranjo, Chris Troesken, Evgeny Melnikov
-
-
-Bug reports, Suggestions, Comments, Enquiries, etc...
-=====================================================
-If you have any of the aforementioned please visit the BASS forum at
-the website. If you can't find an answer there, you can also email:
+Bug reports, Suggestions, Comments, Enquiries, etc
+==================================================
+If you have any of the aforementioned please visit the BASS forum at the
+website. If you can't find an answer there, you can also email:
 
 	bass@un4seen.com
 
