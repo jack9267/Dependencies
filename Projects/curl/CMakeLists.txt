@@ -12,6 +12,8 @@ endif()
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/lib")
 
+add_definitions(-DUNICODE -D_UNICODE)
+
 add_definitions(-DBUILDING_LIBCURL)
 
 # HTTP only
@@ -54,6 +56,9 @@ endif()
 new_library_shared(curl "${SOURCES};${VERSION_SOURCES}" "USE_SSLEAY;USE_OPENSSL")
 
 if(WIN32)
-	target_link_libraries(curl wldap32 ws2_32)
+	target_link_libraries(curl wldap32 ws2_32 crypt32)
 endif()
 target_link_libraries(curl ssl crypto zlib)
+
+set_target_properties(curl PROPERTIES RUNTIME_OUTPUT_NAME_DEBUG "libcurl${RUNTIME_DEBUG_POSTFIX}")
+set_target_properties(curl PROPERTIES RUNTIME_OUTPUT_NAME_RELEASE "libcurl${RUNTIME_RELEASE_POSTFIX}")
