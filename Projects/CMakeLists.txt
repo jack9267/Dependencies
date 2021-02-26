@@ -5,6 +5,14 @@ else()
 	set(DEPENDENCIES_SHARED OFF)
 endif()
 
+# To prefix libs with lib on windows
+macro(prefix_lib NAME)
+	if(WIN32)
+		set_target_properties(${NAME} PROPERTIES RUNTIME_OUTPUT_NAME_DEBUG "lib${NAME}${RUNTIME_DEBUG_POSTFIX}")
+		set_target_properties(${NAME} PROPERTIES RUNTIME_OUTPUT_NAME_RELEASE "lib${NAME}${RUNTIME_RELEASE_POSTFIX}")
+	endif()
+endmacro()
+
 if(MSVC)
 	# no deprecated warnings for winsock
 	add_definitions(-D_WINSOCK_DEPRECATED_NO_WARNINGS)

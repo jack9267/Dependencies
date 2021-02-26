@@ -60,5 +60,6 @@ if(WIN32)
 endif()
 
 new_library_shared(theora "${THEORA_SOURCES}" "LIBTHEORA_EXPORTS")
+prefix_lib(theora)
 
 target_link_libraries(theora ogg)

@@ -151,5 +151,6 @@ else()
 	set(DEFINES "")
 endif()
 new_library_shared(png "${libpng_sources};${libpng_version_sources}" "${DEFINES}")
+prefix_lib(png)
 
 target_link_libraries(png zlib)
