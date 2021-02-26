@@ -45,13 +45,13 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/lib")
 install_include("${CMAKE_CURRENT_SOURCE_DIR}/src/include")
 
 new_library_static(vorbis "${VORBIS_SOURCES}" "")
-prefix_lib(vorbis)
 
 if(WIN32)
 	list(APPEND VORBIS_SOURCES "src/win32/vorbis.def")
 endif()
 
 new_library_shared(vorbis "${VORBIS_SOURCES}" "LIBVORBIS_EXPORTS")
+prefix_lib(vorbis)
 
 target_link_libraries(vorbis ogg)
 
