@@ -10,7 +10,7 @@
 #
 # This software is licensed as described in the file COPYING, which
 # you should have received as part of this distribution. The terms
-# are also available at https://curl.haxx.se/docs/copyright.html.
+# are also available at https://curl.se/docs/copyright.html.
 #
 # You may opt to use, copy, modify, merge, publish, distribute and/or sell
 # copies of the Software, and permit persons to whom the Software is
@@ -53,7 +53,7 @@ fi
 for TEXT in "${TOPDIR}/COPYING" "${SCRIPTDIR}/README.OS400"             \
     "${TOPDIR}/CHANGES" "${TOPDIR}/docs/THANKS" "${TOPDIR}/docs/FAQ"    \
     "${TOPDIR}/docs/FEATURES" "${TOPDIR}/docs/SSLCERTS.md"              \
-    "${TOPDIR}/docs/RESOURCES" "${TOPDIR}/docs/VERSIONS"                \
+    "${TOPDIR}/docs/RESOURCES" "${TOPDIR}/docs/VERSIONS.md"             \
     "${TOPDIR}/docs/HISTORY.md"
 do      MEMBER="`basename \"${TEXT}\" .OS400`"
         MEMBER="`basename \"${MEMBER}\" .md`"

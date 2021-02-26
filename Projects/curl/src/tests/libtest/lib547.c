@@ -9,7 +9,7 @@
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
- * are also available at https://curl.haxx.se/docs/copyright.html.
+ * are also available at https://curl.se/docs/copyright.html.
  *
  * You may opt to use, copy, modify, merge, publish, distribute and/or sell
  * copies of the Software, and permit persons to whom the Software is
@@ -38,7 +38,7 @@
 #endif
 
 #ifndef LIB548
-static size_t readcallback(void  *ptr,
+static size_t readcallback(char  *ptr,
                            size_t size,
                            size_t nmemb,
                            void *clientp)
@@ -101,7 +101,7 @@ int test(char *URL)
   test_setopt(curl, CURLOPT_VERBOSE, 1L);
   test_setopt(curl, CURLOPT_HEADER, 1L);
 #ifdef LIB548
-  /* set the data to POST with a mere pointer to a zero-terminated string */
+  /* set the data to POST with a mere pointer to a null-terminated string */
   test_setopt(curl, CURLOPT_POSTFIELDS, UPLOADTHIS);
 #else
   /* 547 style, which means reading the POST data from a callback */

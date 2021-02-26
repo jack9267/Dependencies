@@ -78,7 +78,9 @@
 #include <sys/filio.h>
 #endif
 
+#ifdef HAVE_SETJMP_H
 #include <setjmp.h>
+#endif
 
 #ifdef HAVE_PWD_H
 #include <pwd.h>
@@ -819,11 +821,6 @@ int main(int argc, char **argv)
     sclose(peer);
     peer = CURL_SOCKET_BAD;
 
-    if(test.ofile > 0) {
-      close(test.ofile);
-      test.ofile = 0;
-    }
-
     if(got_exit_signal)
       break;
 
@@ -1183,8 +1180,9 @@ static void sendtftp(struct testcase *test, struct formats *pf)
     }
 
     send_data:
+    logmsg("write");
     if(swrite(peer, sdp, size + 4) != size + 4) {
-      logmsg("write");
+      logmsg("write: fail");
       return;
     }
     read_ahead(test, pf->f_convert);
@@ -1192,7 +1190,9 @@ static void sendtftp(struct testcase *test, struct formats *pf)
 #ifdef HAVE_ALARM
       alarm(rexmtval);        /* read the ack */
 #endif
+      logmsg("read");
       n = sread(peer, &ackbuf.storage[0], sizeof(ackbuf.storage));
+      logmsg("read: %zd", n);
 #ifdef HAVE_ALARM
       alarm(0);
 #endif
@@ -1252,8 +1252,9 @@ static void recvtftp(struct testcase *test, struct formats *pf)
     (void) sigsetjmp(timeoutbuf, 1);
 #endif
 send_ack:
+    logmsg("write");
     if(swrite(peer, &ackbuf.storage[0], 4) != 4) {
-      logmsg("write: fail\n");
+      logmsg("write: fail");
       goto abort;
     }
     write_behind(test, pf->f_convert);
@@ -1261,14 +1262,16 @@ send_ack:
 #ifdef HAVE_ALARM
       alarm(rexmtval);
 #endif
+      logmsg("read");
       n = sread(peer, rdp, PKTSIZE);
+      logmsg("read: %zd", n);
 #ifdef HAVE_ALARM
       alarm(0);
 #endif
       if(got_exit_signal)
         goto abort;
       if(n < 0) {                       /* really? */
-        logmsg("read: fail\n");
+        logmsg("read: fail");
         goto abort;
       }
       rdp->th_opcode = ntohs((unsigned short)rdp->th_opcode);
@@ -1296,6 +1299,11 @@ send_ack:
     }
   } while(size == SEGSIZE);
   write_behind(test, pf->f_convert);
+  /* close the output file as early as possible after upload completion */
+  if(test->ofile > 0) {
+    close(test->ofile);
+    test->ofile = 0;
+  }
 
   rap->th_opcode = htons((unsigned short)opcode_ACK);  /* send the "final"
                                                           ack */
@@ -1318,6 +1326,11 @@ send_ack:
     (void) swrite(peer, &ackbuf.storage[0], 4);  /* resend final ack */
   }
 abort:
+  /* make sure the output file is closed in case of abort */
+  if(test->ofile > 0) {
+    close(test->ofile);
+    test->ofile = 0;
+  }
   return;
 }
 

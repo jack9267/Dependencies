@@ -9,7 +9,7 @@
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
- * are also available at https://curl.haxx.se/docs/copyright.html.
+ * are also available at https://curl.se/docs/copyright.html.
  *
  * You may opt to use, copy, modify, merge, publish, distribute and/or sell
  * copies of the Software, and permit persons to whom the Software is
@@ -75,7 +75,7 @@
  * structured and well behaved manner to achieve proper program cleanup and
  * termination.
  *
- * Even with the above mechanism implemented it is worthwile to note that
+ * Even with the above mechanism implemented it is worthwhile to note that
  * other signals might still be received, or that there might be systems on
  * which it is not possible to trap and ignore some of the above signals.
  * This implies that for increased portability and reliability the program
@@ -676,7 +676,7 @@ static int select_ws(int nfds, fd_set *readfds, fd_set *writefds,
   }
 
   /* allocate internal array for the internal event handles */
-  handles = calloc(nfds, sizeof(HANDLE));
+  handles = calloc(nfds + 1, sizeof(HANDLE));
   if(handles == NULL) {
     CloseHandle(abort);
     CloseHandle(mutex);
@@ -687,7 +687,7 @@ static int select_ws(int nfds, fd_set *readfds, fd_set *writefds,
 
   /* loop over the handles in the input descriptor sets */
   nfd = 0; /* number of handled file descriptors */
-  nth = 0; /* number of interal waiting threads */
+  nth = 0; /* number of internal waiting threads */
   nws = 0; /* number of handled WINSOCK sockets */
   for(fd = 0; fd < nfds; fd++) {
     wsasock = curlx_sitosk(fd);
@@ -705,7 +705,7 @@ static int select_ws(int nfds, fd_set *readfds, fd_set *writefds,
 
     if(FD_ISSET(wsasock, writefds)) {
       FD_SET(wsasock, &writesock);
-      wsaevents.lNetworkEvents |= FD_WRITE|FD_CONNECT;
+      wsaevents.lNetworkEvents |= FD_WRITE|FD_CONNECT|FD_CLOSE;
     }
 
     if(FD_ISSET(wsasock, exceptfds)) {
@@ -785,8 +785,18 @@ static int select_ws(int nfds, fd_set *readfds, fd_set *writefds,
     }
   }
 
+  /* wait on the number of handles */
+  wait = nfd;
+
+  /* make sure we stop waiting on exit signal event */
+  if(exit_event) {
+    /* we allocated handles nfds + 1 for this */
+    handles[nfd] = exit_event;
+    wait += 1;
+  }
+
   /* wait for one of the internal handles to trigger */
-  wait = WaitForMultipleObjectsEx(nfd, handles, FALSE, timeout_ms, FALSE);
+  wait = WaitForMultipleObjectsEx(wait, handles, FALSE, timeout_ms, FALSE);
 
   /* wait for internal mutex to lock event handling in threads */
   WaitForSingleObjectEx(mutex, INFINITE, FALSE);
@@ -825,11 +835,11 @@ static int select_ws(int nfds, fd_set *readfds, fd_set *writefds,
             FD_CLR(wsasock, readfds);
 
           /* remove from descriptor set if not ready for write/connect */
-          if(!(wsaevents.lNetworkEvents & (FD_WRITE|FD_CONNECT)))
+          if(!(wsaevents.lNetworkEvents & (FD_WRITE|FD_CONNECT|FD_CLOSE)))
             FD_CLR(wsasock, writefds);
 
           /* remove from descriptor set if not exceptional */
-          if(!(wsaevents.lNetworkEvents & (FD_OOB)))
+          if(!(wsaevents.lNetworkEvents & FD_OOB))
             FD_CLR(wsasock, exceptfds);
         }
       }

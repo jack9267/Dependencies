@@ -9,7 +9,7 @@
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
- * are also available at https://curl.haxx.se/docs/copyright.html.
+ * are also available at https://curl.se/docs/copyright.html.
  *
  * You may opt to use, copy, modify, merge, publish, distribute and/or sell
  * copies of the Software, and permit persons to whom the Software is
@@ -22,6 +22,7 @@
 #include "curlcheck.h"
 
 #include "doh.h"
+#include "dynbuf.h"
 
 static CURLcode unit_setup(void)
 {
@@ -184,7 +185,7 @@ UNITTEST_START
     char *ptr;
     size_t len;
     int u;
-    memset(&d, 0, sizeof(d));
+    de_init(&d);
     rc = doh_decode((const unsigned char *)resp[i].packet, resp[i].size,
                     resp[i].type, &d);
     if(rc != resp[i].rc) {
@@ -222,7 +223,7 @@ UNITTEST_START
     }
     for(u = 0; u < d.numcname; u++) {
       size_t o;
-      msnprintf(ptr, len, "%s ", d.cname[u].alloc);
+      msnprintf(ptr, len, "%s ", Curl_dyn_ptr(&d.cname[u]));
       o = strlen(ptr);
       len -= o;
       ptr += o;

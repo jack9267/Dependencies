@@ -10,7 +10,7 @@
 #
 # This software is licensed as described in the file COPYING, which
 # you should have received as part of this distribution. The terms
-# are also available at https://curl.haxx.se/docs/copyright.html.
+# are also available at https://curl.se/docs/copyright.html.
 #
 # You may opt to use, copy, modify, merge, publish, distribute and/or sell
 # copies of the Software, and permit persons to whom the Software is
@@ -344,7 +344,7 @@ if($tstunnel_windows) {
     # Put an "exec" in front of the command so that the child process
     # keeps this child's process ID by being tied to the spawned shell.
     exec("exec $cmd") || die "Can't exec() $cmd: $!";
-    # exec() will create a new process, but ties the existance of the
+    # exec() will create a new process, but ties the existence of the
     # new process to the parent waiting perl.exe and sh.exe processes.
 
     # exec() should never return back here to this process. We protect
