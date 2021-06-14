@@ -1,7 +1,6 @@
 if(WIN32)
 	install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/c/bass.h" DESTINATION include)
 
-
 	if(CMAKE_SIZEOF_VOID_P EQUAL 8)
 		set(BASS_FILES
 			${CMAKE_CURRENT_SOURCE_DIR}/src/c/x64/bass.lib
