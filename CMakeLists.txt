@@ -7,6 +7,9 @@ project(Dependencies C CXX)
 # Embedded pdb in static libraries
 set(EMBEDDED_PDB OFF)
 
+# Warning level 3
+set(CUSTOM_MSVC_WARNING_LEVEL 3)
+
 if(WIN32)
 	# Find NASM
 	enable_language(ASM_NASM)
