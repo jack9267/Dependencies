@@ -83,7 +83,7 @@ SDL_TLSSet(SDL_TLSID id, const void *value, void (SDLCALL *destructor)(void *))
     return 0;
 }
 
-void
+static void
 SDL_TLSCleanup()
 {
     SDL_TLSData *storage;
