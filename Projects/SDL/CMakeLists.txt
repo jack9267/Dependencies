@@ -3,6 +3,9 @@ disable_rtti()
 if(WIN32)
 	add_definitions(-DUNICODE)
 	add_definitions(-D_UNICODE)
+
+	add_definitions(-D_WIN32_WINNT=_WIN32_WINNT_WINXP)
+	add_definitions(-DHAVE_LIBC)
 endif()
 
 set(SDL2_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -37,6 +40,7 @@ else()
   set(PROCESSOR_ARCH "x86")
 endif()
 
+# General source files
 file(GLOB SOURCE_FILES
   ${SDL2_SOURCE_DIR}/src/*.c
   ${SDL2_SOURCE_DIR}/src/atomic/*.c
@@ -45,9 +49,14 @@ file(GLOB SOURCE_FILES
   ${SDL2_SOURCE_DIR}/src/dynapi/*.c
   ${SDL2_SOURCE_DIR}/src/events/*.c
   ${SDL2_SOURCE_DIR}/src/file/*.c
+  ${SDL2_SOURCE_DIR}/src/haptic/*.c
   ${SDL2_SOURCE_DIR}/src/libm/*.c
+  ${SDL2_SOURCE_DIR}/src/locale/*.c
+  ${SDL2_SOURCE_DIR}/src/misc/*.c
+  ${SDL2_SOURCE_DIR}/src/power/*.c
   ${SDL2_SOURCE_DIR}/src/render/*.c
   ${SDL2_SOURCE_DIR}/src/render/*/*.c
+  ${SDL2_SOURCE_DIR}/src/sensor/*.c
   ${SDL2_SOURCE_DIR}/src/stdlib/*.c
   ${SDL2_SOURCE_DIR}/src/thread/*.c
   ${SDL2_SOURCE_DIR}/src/timer/*.c
@@ -57,23 +66,20 @@ file(GLOB SOURCE_FILES
 file(GLOB JOYSTICK_SOURCES ${SDL2_SOURCE_DIR}/src/joystick/*.c)
 set(SOURCE_FILES ${SOURCE_FILES} ${JOYSTICK_SOURCES})
 
-file(GLOB HAPTIC_SOURCES ${SDL2_SOURCE_DIR}/src/haptic/*.c)
-set(SOURCE_FILES ${SOURCE_FILES} ${HAPTIC_SOURCES})
-
-file(GLOB SENSOR_SOURCES ${SDL2_SOURCE_DIR}/src/sensor/*.c)
-set(SOURCE_FILES ${SOURCE_FILES} ${SENSOR_SOURCES})
-
-file(GLOB POWER_SOURCES ${SDL2_SOURCE_DIR}/src/power/*.c)
-set(SOURCE_FILES ${SOURCE_FILES} ${POWER_SOURCES})
-
 file(GLOB DUMMYAUDIO_SOURCES ${SDL2_SOURCE_DIR}/src/audio/dummy/*.c)
 set(SOURCE_FILES ${SOURCE_FILES} ${DUMMYAUDIO_SOURCES})
 
 file(GLOB DISKAUDIO_SOURCES ${SDL2_SOURCE_DIR}/src/audio/disk/*.c)
 set(SOURCE_FILES ${SOURCE_FILES} ${DISKAUDIO_SOURCES})
 
+file(GLOB JOYSTICK_VIRTUAL_SOURCES ${SDL2_SOURCE_DIR}/src/joystick/virtual/*.c)
+set(SOURCE_FILES ${SOURCE_FILES} ${JOYSTICK_VIRTUAL_SOURCES})
+
 file(GLOB VIDEO_DUMMY_SOURCES ${SDL2_SOURCE_DIR}/src/video/dummy/*.c)
 set(SOURCE_FILES ${SOURCE_FILES} ${VIDEO_DUMMY_SOURCES})
+
+file(GLOB VIDEO_OFFSCREEN_SOURCES ${SDL2_SOURCE_DIR}/src/video/offscreen/*.c)
+set(SOURCE_FILES ${SOURCE_FILES} ${VIDEO_OFFSCREEN_SOURCES})
 
 if(WIN32)
 	if(MSVC)
@@ -93,6 +99,9 @@ if(WIN32)
 		endif()
 	endif()
 
+	file(GLOB MISC_SOURCES ${SDL2_SOURCE_DIR}/src/misc/windows/*.c)
+	set(SOURCE_FILES ${SOURCE_FILES} ${MISC_SOURCES})
+
 	file(GLOB WINMM_AUDIO_SOURCES ${SDL2_SOURCE_DIR}/src/audio/winmm/*.c)
 	set(SOURCE_FILES ${SOURCE_FILES} ${WINMM_AUDIO_SOURCES})
 
@@ -106,13 +115,20 @@ if(WIN32)
 	set(SOURCE_FILES ${SOURCE_FILES} ${WIN_VIDEO_SOURCES})
 
 	set(SOURCE_FILES ${SOURCE_FILES}
+		${SDL2_SOURCE_DIR}/src/thread/generic/SDL_syscond.c
+		${SDL2_SOURCE_DIR}/src/thread/windows/SDL_syscond_srw.c
 		${SDL2_SOURCE_DIR}/src/thread/windows/SDL_sysmutex.c
 		${SDL2_SOURCE_DIR}/src/thread/windows/SDL_syssem.c
 		${SDL2_SOURCE_DIR}/src/thread/windows/SDL_systhread.c
-		${SDL2_SOURCE_DIR}/src/thread/windows/SDL_systls.c
-		${SDL2_SOURCE_DIR}/src/thread/generic/SDL_syscond.c)
+		${SDL2_SOURCE_DIR}/src/thread/windows/SDL_systls.c)
+
+	file(GLOB WINDOWS_SENSOR_SOURCES ${SDL2_SOURCE_DIR}/src/sensor/windows/*.c)
+	set(SOURCE_FILES ${SOURCE_FILES} ${WINDOWS_SENSOR_SOURCES})
 
 	set(SOURCE_FILES ${SOURCE_FILES} ${SDL2_SOURCE_DIR}/src/power/windows/SDL_syspower.c)
+
+	file(GLOB LOCALE_SOURCES ${SDL2_SOURCE_DIR}/src/locale/windows/*.c)
+	set(SOURCE_FILES ${SOURCE_FILES} ${LOCALE_SOURCES})
 
 	file(GLOB FILESYSTEM_SOURCES ${SDL2_SOURCE_DIR}/src/filesystem/windows/*.c)
 	set(SOURCE_FILES ${SOURCE_FILES} ${FILESYSTEM_SOURCES})
@@ -137,9 +153,6 @@ if(WIN32)
 	file(GLOB HAPTIC_SOURCES ${SDL2_SOURCE_DIR}/src/haptic/windows/*.c)
 	set(SOURCE_FILES ${SOURCE_FILES} ${HAPTIC_SOURCES})
 
-	file(GLOB SENSORS_SOURCES ${SDL2_SOURCE_DIR}/src/sensor/dummy/*.c)
-	set(SOURCE_FILES ${SOURCE_FILES} ${SENSORS_SOURCES})
-
 	file(GLOB VERSION_SOURCES ${SDL2_SOURCE_DIR}/src/main/windows/*.rc)
 	file(GLOB SDLMAIN_SOURCES ${SDL2_SOURCE_DIR}/src/main/windows/*.c)
 
@@ -153,6 +166,6 @@ install_include("${SDL2_SOURCE_DIR}/include")
 add_definitions(-DHAVE_LIBC)
 
 new_library_static(SDL2 "${SOURCE_FILES}" "SDL2_BUILDING;SDL2_STATIC")
-new_library_shared(SDL2 "${SOURCE_FILES};${VERSION_SOURCES}" "SDL2_BUILDING")
+new_library_shared(SDL2 "${SOURCE_FILES};${VERSION_SOURCES}" "SDL2_BUILDING;DLL_EXPORT")
 
 target_link_libraries(SDL2 ${EXTRA_LIBS})
