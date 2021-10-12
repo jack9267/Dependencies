@@ -1,6 +1,6 @@
 /*
-	BASS simple DSP test
-	Copyright (c) 2000-2012 Un4seen Developments Ltd.
+	BASS DSP example
+	Copyright (c) 2000-2021 Un4seen Developments Ltd.
 */
 
 #include <windows.h>
@@ -12,10 +12,9 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-HWND win = NULL;
+HWND win;
 
-DWORD floatable; // floating-point channel support?
-DWORD chan;	// the channel... HMUSIC or HSTREAM
+DWORD chan;			// channel handle
 
 OPENFILENAME ofn;
 
@@ -99,17 +98,16 @@ void CALLBACK Flange(HDSP handle, DWORD channel, void *buffer, DWORD length, voi
 		flapos++;
 		if (flapos == FLABUFLEN) flapos = 0;
 		flas += flasinc;
-		if (flas<0 || flas>FLABUFLEN - 1) {
+		if (flas < 0 || flas > FLABUFLEN - 1) {
 			flasinc = -flasinc;
 			flas += flasinc;
 		}
 	}
 }
 
-
 #define MESS(id,m,w,l) SendDlgItemMessage(win,id,m,(WPARAM)(w),(LPARAM)(l))
 
-INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
+INT_PTR CALLBACK DialogProc(HWND h, UINT m, WPARAM w, LPARAM l)
 {
 	switch (m) {
 		case WM_COMMAND:
@@ -117,40 +115,37 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 				case IDCANCEL:
 					EndDialog(h, 0);
 					break;
+
 				case 10:
 					{
-						BASS_CHANNELINFO info;
 						char file[MAX_PATH] = "";
-						ofn.lpstrFilter = "playable files\0*.mo3;*.xm;*.mod;*.s3m;*.it;*.mtm;*.umx;*.mp3;*.mp2;*.mp1;*.ogg;*.wav;*.aif\0All files\0*.*\0\0";
 						ofn.lpstrFile = file;
 						if (GetOpenFileName(&ofn)) {
-							// free both MOD and stream, it must be one of them! :)
-							BASS_MusicFree(chan);
-							BASS_StreamFree(chan);
-							if (!(chan = BASS_StreamCreateFile(FALSE, file, 0, 0, BASS_SAMPLE_LOOP | floatable))
-								&& !(chan = BASS_MusicLoad(FALSE, file, 0, 0, BASS_SAMPLE_LOOP | BASS_MUSIC_RAMPS | floatable, 1))) {
-								// whatever it is, it ain't playable
-								MESS(10, WM_SETTEXT, 0, "click here to open a file...");
+							BASS_ChannelFree(chan); // free the old channel
+							if (!(chan = BASS_StreamCreateFile(FALSE, file, 0, 0, BASS_SAMPLE_LOOP | BASS_SAMPLE_FLOAT))
+								&& !(chan = BASS_MusicLoad(FALSE, file, 0, 0, BASS_MUSIC_RAMPS | BASS_SAMPLE_LOOP | BASS_SAMPLE_FLOAT, 1))) {
+								MESS(10, WM_SETTEXT, 0, "Open file...");
 								Error("Can't play the file");
-								break;
+							} else {
+								BASS_CHANNELINFO info;
+								BASS_ChannelGetInfo(chan, &info);
+								if (info.chans != 2) { // the DSP expects stereo
+									MESS(10, WM_SETTEXT, 0, "Open file...");
+									BASS_ChannelFree(chan);
+									Error("only stereo sources are supported");
+								} else {
+									MESS(10, WM_SETTEXT, 0, strrchr(file, '\\') + 1);
+									// setup DSPs on new channel
+									SendMessage(win, WM_COMMAND, 11, 0);
+									SendMessage(win, WM_COMMAND, 12, 0);
+									SendMessage(win, WM_COMMAND, 13, 0);
+									BASS_ChannelPlay(chan, FALSE);
+								}
 							}
-							BASS_ChannelGetInfo(chan, &info);
-							if (info.chans != 2) { // only stereo is allowed
-								MESS(10, WM_SETTEXT, 0, "click here to open a file...");
-								BASS_MusicFree(chan);
-								BASS_StreamFree(chan);
-								Error("only stereo sources are supported");
-								break;
-							}
-							MESS(10, WM_SETTEXT, 0, file);
-							// setup DSPs on new channel and play it
-							SendMessage(win, WM_COMMAND, 11, 0);
-							SendMessage(win, WM_COMMAND, 12, 0);
-							SendMessage(win, WM_COMMAND, 13, 0);
-							BASS_ChannelPlay(chan, FALSE);
 						}
 					}
 					break;
+
 				case 11: // toggle "rotate"
 					if (MESS(11, BM_GETCHECK, 0, 0)) {
 						rotpos = M_PI / 4;
@@ -158,6 +153,7 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 					} else
 						BASS_ChannelRemoveDSP(chan, rotdsp);
 					break;
+
 				case 12: // toggle "echo"
 					if (MESS(12, BM_GETCHECK, 0, 0)) {
 						memset(echbuf, 0, sizeof(echbuf));
@@ -166,6 +162,7 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 					} else
 						BASS_ChannelRemoveDSP(chan, echdsp);
 					break;
+
 				case 13: // toggle "flanger"
 					if (MESS(13, BM_GETCHECK, 0, 0)) {
 						memset(flabuf, 0, sizeof(flabuf));
@@ -186,26 +183,22 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 			ofn.hwndOwner = h;
 			ofn.nMaxFile = MAX_PATH;
 			ofn.Flags = OFN_HIDEREADONLY | OFN_EXPLORER;
-			// enable floating-point DSP
-			BASS_SetConfig(BASS_CONFIG_FLOATDSP, TRUE);
+			ofn.lpstrFilter = "Playable files\0*.mo3;*.xm;*.mod;*.s3m;*.it;*.mtm;*.umx;*.mp3;*.mp2;*.mp1;*.ogg;*.wav;*.aif\0All files\0*.*\0\0";
 			// initialize default output device
 			if (!BASS_Init(-1, 44100, 0, win, NULL)) {
 				Error("Can't initialize device");
 				EndDialog(h, 0);
 				break;
 			}
-			// check for floating-point capability
-			floatable = BASS_StreamCreate(44100, 2, BASS_SAMPLE_FLOAT, NULL, 0);
-			if (floatable) { // woohoo!
-				BASS_StreamFree(floatable);
-				floatable = BASS_SAMPLE_FLOAT;
-			}
+			// enable floating-point DSP (not really necessary as the channels will be floating-point anyway)
+			BASS_SetConfig(BASS_CONFIG_FLOATDSP, TRUE);
 			return 1;
 
 		case WM_DESTROY:
 			BASS_Free();
 			break;
 	}
+
 	return 0;
 }
 
@@ -217,7 +210,7 @@ int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		return 0;
 	}
 
-	DialogBox(hInstance, MAKEINTRESOURCE(1000), NULL, dialogproc);
+	DialogBox(hInstance, MAKEINTRESOURCE(1000), NULL, DialogProc);
 
 	return 0;
 }

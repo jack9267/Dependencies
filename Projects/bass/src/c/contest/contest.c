@@ -1,6 +1,6 @@
 /*
 	BASS simple console player
-	Copyright (c) 1999-2019 Un4seen Developments Ltd.
+	Copyright (c) 1999-2021 Un4seen Developments Ltd.
 */
 
 #include <stdlib.h>
@@ -53,12 +53,14 @@ void ListDevices()
 	}
 }
 
-void main(int argc, char **argv)
+int main(int argc, char **argv)
 {
-	DWORD chan, act, time, level;
+	DWORD chan, act, level;
 	BOOL ismod;
 	QWORD pos;
+	double secs;
 	int a, filep, device = -1;
+	BASS_CHANNELINFO info;
 
 	printf("BASS simple console player\n"
 		"--------------------------\n");
@@ -66,64 +68,63 @@ void main(int argc, char **argv)
 	// check the correct BASS was loaded
 	if (HIWORD(BASS_GetVersion()) != BASSVERSION) {
 		printf("An incorrect version of BASS was loaded");
-		return;
+		return 0;
 	}
 
 	for (filep = 1; filep < argc; filep++) {
 		if (!strcmp(argv[filep], "-l")) {
 			ListDevices();
-			return;
-		} else if (!strcmp(argv[filep], "-d") && filep + 1 < argc) device = atoi(argv[++filep]);
-		else break;
+			return 0;
+		} else if (!strcmp(argv[filep], "-d") && filep + 1 < argc)
+			device = atoi(argv[++filep]);
+		else
+			break;
 	}
 	if (filep == argc) {
 		printf("\tusage: contest [-l] [-d #] <file>\n"
 			"\t-l = list devices\n"
 			"\t-d = device number\n");
-		return;
+		return 0;
 	}
 
-	BASS_SetConfig(BASS_CONFIG_NET_PLAYLIST, 1); // enable playlist processing
-	BASS_SetConfig(BASS_CONFIG_NET_PREBUF_WAIT, 0); // disable BASS_StreamCreateURL pre-buffering
+	BASS_SetConfig(BASS_CONFIG_NET_PLAYLIST, 2); // enable playlist processing
 
 	// initialize output device
-	if (!BASS_Init(device, 44100, 0, 0, NULL))
+	if (!BASS_Init(device, 48000, 0, 0, NULL))
 		Error("Can't initialize device");
 
-	// try streaming the file/url
-	if ((chan = BASS_StreamCreateFile(FALSE, argv[filep], 0, 0, BASS_SAMPLE_LOOP))
-		|| (chan = BASS_StreamCreateURL(argv[filep], 0, BASS_SAMPLE_LOOP, 0, 0))) {
-		pos = BASS_ChannelGetLength(chan, BASS_POS_BYTE);
-		if (BASS_StreamGetFilePosition(chan, BASS_FILEPOS_DOWNLOAD) != -1) {
-			// streaming from the internet
-			if (pos != -1)
-				printf("streaming internet file [%lld bytes]", pos);
-			else
-				printf("streaming internet file");
-		} else
-			printf("streaming file [%lld bytes]", pos);
-		ismod = FALSE;
+	ismod = FALSE;
+	if (strstr(argv[filep], "://")) {
+		// try streaming the URL
+		chan = BASS_StreamCreateURL(argv[filep], 0, BASS_SAMPLE_LOOP, 0, 0);
 	} else {
-		// try loading the MOD (with looping, sensitive ramping, and calculate the duration)
-		if (!(chan = BASS_MusicLoad(FALSE, argv[filep], 0, 0, BASS_SAMPLE_LOOP | BASS_MUSIC_RAMPS | BASS_MUSIC_PRESCAN, 1)))
-			// not a MOD either
-			Error("Can't play the file");
-		{ // count channels
-			float dummy;
-			for (a = 0; BASS_ChannelGetAttribute(chan, BASS_ATTRIB_MUSIC_VOL_CHAN + a, &dummy); a++);
+		// try streaming the file
+		chan = BASS_StreamCreateFile(FALSE, argv[filep], 0, 0, BASS_SAMPLE_LOOP);
+		if (!chan && BASS_ErrorGetCode() == BASS_ERROR_FILEFORM) {
+			// try MOD music formats
+			chan = BASS_MusicLoad(FALSE, argv[filep], 0, 0, BASS_SAMPLE_LOOP | BASS_MUSIC_RAMPS | BASS_MUSIC_PRESCAN, 1);
+			ismod = TRUE;
 		}
-		printf("playing MOD music \"%s\" [%u chans, %u orders]",
-			BASS_ChannelGetTags(chan, BASS_TAG_MUSIC_NAME), a, (DWORD)BASS_ChannelGetLength(chan, BASS_POS_MUSIC_ORDER));
-		pos = BASS_ChannelGetLength(chan, BASS_POS_BYTE);
-		ismod = TRUE;
 	}
+	if (!chan) Error("Can't play the file");
 
-	// display the time length
+	BASS_ChannelGetInfo(chan, &info);
+	printf("ctype: %x\n", info.ctype);
+	if (!ismod) {
+		if (info.origres)
+			printf("format: %u Hz, %d chan, %d bit\n", info.freq, info.chans, LOWORD(info.origres));
+		else
+			printf("format: %u Hz, %d chan\n", info.freq, info.chans);
+	}
+	pos = BASS_ChannelGetLength(chan, BASS_POS_BYTE);
 	if (pos != -1) {
-		time = (DWORD)BASS_ChannelBytes2Seconds(chan, pos);
-		printf(" %u:%02u\n", time / 60, time % 60);
-	} else // no time length available
-		printf("\n");
+		double secs = BASS_ChannelBytes2Seconds(chan, pos);
+		if (ismod)
+			printf("length: %u:%02u (%llu samples), %u orders\n", (int)secs / 60, (int)secs % 60, (long long)(secs * info.freq), (DWORD)BASS_ChannelGetLength(chan, BASS_POS_MUSIC_ORDER));
+		else
+			printf("length: %u:%02u (%llu samples)\n", (int)secs / 60, (int)secs % 60, (long long)(secs * info.freq));
+	} else if (ismod)
+		printf("length: %u orders\n", (DWORD)BASS_ChannelGetLength(chan, BASS_POS_MUSIC_ORDER));
 
 	BASS_ChannelPlay(chan, FALSE);
 
@@ -131,13 +132,13 @@ void main(int argc, char **argv)
 		// display some stuff and wait a bit
 		level = BASS_ChannelGetLevel(chan);
 		pos = BASS_ChannelGetPosition(chan, BASS_POS_BYTE);
-		time = BASS_ChannelBytes2Seconds(chan, pos);
-		printf("pos %09llu", pos);
+		secs = BASS_ChannelBytes2Seconds(chan, pos);
+		printf(" %u:%02u (%08lld)", (int)secs / 60, (int)secs % 60, (long long)(secs * info.freq));
 		if (ismod) {
 			pos = BASS_ChannelGetPosition(chan, BASS_POS_MUSIC_ORDER);
-			printf(" (%03u:%03u)", LOWORD(pos), HIWORD(pos));
+			printf(" | %03u:%03u", LOWORD(pos), HIWORD(pos));
 		}
-		printf(" - %u:%02u - L ", time / 60, time % 60);
+		printf(" | L ");
 		if (act == BASS_ACTIVE_STALLED) { // playback has stalled
 			printf("-     buffering: %3u%%     -", 100 - (DWORD)BASS_StreamGetFilePosition(chan, BASS_FILEPOS_BUFFERING));
 		} else {
@@ -145,19 +146,12 @@ void main(int argc, char **argv)
 			putchar(' ');
 			for (a = 210; a < 32768; a = a * 3 / 2) putchar(HIWORD(level) >= a ? '*' : '-');
 		}
-		printf(" R - cpu %.2f%%  \r", BASS_GetCPU());
+		printf(" R | cpu %.2f%%  \r", BASS_GetCPU());
 		fflush(stdout);
 		Sleep(50);
 	}
-	printf("                                                                             \r");
-
-	// wind the frequency down...
-	BASS_ChannelSlideAttribute(chan, BASS_ATTRIB_FREQ, 1000, 500);
-	Sleep(400);
-	// ...and fade-out to avoid a "click"
-	BASS_ChannelSlideAttribute(chan, BASS_ATTRIB_VOL | BASS_SLIDE_LOG, -1, 100);
-	// wait for slide to finish (could use BASS_SYNC_SLIDE instead)
-	while (BASS_ChannelIsSliding(chan, 0)) Sleep(1);
+	printf("                                                                             \n");
 
 	BASS_Free();
+	return 0;
 }

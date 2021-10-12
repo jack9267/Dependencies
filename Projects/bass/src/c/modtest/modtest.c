@@ -1,6 +1,6 @@
 /*
-	BASS MOD music test
-	Copyright (c) 1999-2014 Un4seen Developments Ltd.
+	BASS MOD music example
+	Copyright (c) 1999-2021 Un4seen Developments Ltd.
 */
 
 #include <windows.h>
@@ -8,9 +8,9 @@
 #include <commctrl.h>
 #include "bass.h"
 
-HWND win = NULL;
+HWND win;
 
-DWORD music;	// the HMUSIC channel
+HMUSIC music;
 
 OPENFILENAME ofn;
 
@@ -54,7 +54,7 @@ DWORD GetFlags()
 	return flags;
 }
 
-INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
+INT_PTR CALLBACK DialogProc(HWND h, UINT m, WPARAM w, LPARAM l)
 {
 	switch (m) {
 		case WM_TIMER:
@@ -74,22 +74,23 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 				case IDCANCEL:
 					EndDialog(h, 0);
 					break;
+
 				case 10:
 					{
 						char file[MAX_PATH] = "";
-						ofn.lpstrFilter = "mo3/it/xm/s3m/mtm/mod/umx files\0*.mo3;*.xm;*.mod;*.s3m;*.it;*.mtm;*.umx\0All files\0*.*\0\0";
 						ofn.lpstrFile = file;
 						if (GetOpenFileName(&ofn)) {
-							BASS_MusicFree(music); // free the current music
-							music = BASS_MusicLoad(FALSE, file, 0, 0, GetFlags(), 1); // load the new music
+							BASS_MusicFree(music); // free the current MOD music
+							music = BASS_MusicLoad(FALSE, file, 0, 0, GetFlags() | BASS_SAMPLE_FLOAT, 1); // load the new MOD music
 							if (music) { // success
 								DWORD length = BASS_ChannelGetLength(music, BASS_POS_MUSIC_ORDER); // get the order length
-								MESS(10, WM_SETTEXT, 0, file);
+								MESS(10, WM_SETTEXT, 0, strrchr(file, '\\') + 1);
 								{
 									char text[100], *ctype = "";
 									BASS_CHANNELINFO info;
 									int channels = 0;
-									while (BASS_ChannelGetAttributeEx(music, BASS_ATTRIB_MUSIC_VOL_CHAN + channels, 0, 0)) channels++; // count channels
+									while (BASS_ChannelGetAttributeEx(music, BASS_ATTRIB_MUSIC_VOL_CHAN + channels, 0, 0))
+										channels++; // count channels
 									BASS_ChannelGetInfo(music, &info);
 									switch (info.ctype & ~BASS_CTYPE_MUSIC_MO3) {
 										case BASS_CTYPE_MUSIC_MOD:
@@ -108,13 +109,14 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 											ctype = "IT";
 											break;
 									}
-									_snprintf(text, sizeof(text), "name: %s, format: %dch %s%s", BASS_ChannelGetTags(music, BASS_TAG_MUSIC_NAME), channels, ctype, info.ctype & BASS_CTYPE_MUSIC_MO3 ? " (MO3)" : "");
+									_snprintf(text, sizeof(text), "name: %s, format: %dch %s%s",
+										BASS_ChannelGetTags(music, BASS_TAG_MUSIC_NAME), channels, ctype, info.ctype & BASS_CTYPE_MUSIC_MO3 ? " (MO3)" : "");
 									MESS(11, WM_SETTEXT, 0, text);
 								}
 								MESS(20, TBM_SETRANGEMAX, 1, length - 1); // update scroller range
 								BASS_ChannelPlay(music, FALSE); // start it
 							} else { // failed
-								MESS(10, WM_SETTEXT, 0, "click here to open a file...");
+								MESS(10, WM_SETTEXT, 0, "Open file...");
 								MESS(11, WM_SETTEXT, 0, "");
 								MESS(15, WM_SETTEXT, 0, "");
 								Error("Can't play the file");
@@ -122,12 +124,14 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 						}
 					}
 					break;
+
 				case 12:
 					if (BASS_ChannelIsActive(music) == BASS_ACTIVE_PLAYING)
 						BASS_ChannelPause(music);
 					else
 						BASS_ChannelPlay(music, FALSE);
 					break;
+
 				case 21:
 				case 22:
 				case 23:
@@ -156,6 +160,7 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 			ofn.hwndOwner = h;
 			ofn.nMaxFile = MAX_PATH;
 			ofn.Flags = OFN_HIDEREADONLY | OFN_EXPLORER;
+			ofn.lpstrFilter = "MOD music files (mo3/xm/mod/s3m/it/mtm/umx)\0*.mo3;*.xm;*.mod;*.s3m;*.it;*.mtm;*.umx\0All files\0*.*\0\0";
 			MESS(21, CB_ADDSTRING, 0, "off");
 			MESS(21, CB_ADDSTRING, 0, "linear");
 			MESS(21, CB_ADDSTRING, 0, "sinc");
@@ -175,6 +180,7 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 			BASS_Free();
 			break;
 	}
+
 	return 0;
 }
 
@@ -186,7 +192,12 @@ int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		return 0;
 	}
 
-	DialogBox(hInstance, MAKEINTRESOURCE(1000), NULL, dialogproc);
+	{
+		INITCOMMONCONTROLSEX cc = { sizeof(cc), ICC_BAR_CLASSES };
+		InitCommonControlsEx(&cc);
+	}
+
+	DialogBox(hInstance, MAKEINTRESOURCE(1000), NULL, DialogProc);
 
 	return 0;
 }

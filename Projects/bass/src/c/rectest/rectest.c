@@ -1,27 +1,25 @@
 /*
 	BASS recording example
-	Copyright (c) 2002-2019 Un4seen Developments Ltd.
+	Copyright (c) 2002-2021 Un4seen Developments Ltd.
 */
 
 #include <windows.h>
 #include <commctrl.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 #include "bass.h"
 
-HWND win = NULL;
+HWND win;
 
-#define FREQ 44100
-#define CHANS 2
-#define BUFSTEP 200000	// memory allocation unit
+#define BUFSTEP 1000000	// memory allocation unit
 
 int input;				// current input source
-BYTE *recbuf = NULL;		// recording buffer
+int freq, chans;		// sample format
+BYTE *recbuf;			// recording buffer
 DWORD reclen;			// recording length
-HRECORD rchan = 0;		// recording channel
-HSTREAM chan = 0;			// playback channel
-
-void StopRecording();
+HRECORD rchan;			// recording channel
+HSTREAM pchan;			// playback channel
 
 // display error messages
 void Error(const char *es)
@@ -40,13 +38,17 @@ BOOL CALLBACK RecordingCallback(HRECORD handle, const void *buffer, DWORD length
 {
 	// increase buffer size if needed
 	if ((reclen % BUFSTEP) + length >= BUFSTEP) {
-		recbuf = realloc(recbuf, ((reclen + length) / BUFSTEP + 1) * BUFSTEP);
-		if (!recbuf) {
+		void *newbuf = realloc(recbuf, ((reclen + length) / BUFSTEP + 1) * BUFSTEP);
+		if (!newbuf) {
 			rchan = 0;
+			free(recbuf);
+			recbuf = NULL;
 			Error("Out of memory!");
 			MESS(10, WM_SETTEXT, 0, "Record");
+			EnableWindow(DLGITEM(17), TRUE);
 			return FALSE; // stop recording
 		}
+		recbuf = (BYTE*)newbuf;
 	}
 	// buffer the data
 	memcpy(recbuf + reclen, buffer, length);
@@ -58,28 +60,33 @@ void StartRecording()
 {
 	WAVEFORMATEX *wf;
 	if (recbuf) { // free old recording
-		BASS_StreamFree(chan);
-		chan = 0;
+		BASS_StreamFree(pchan);
+		pchan = 0;
 		free(recbuf);
 		recbuf = NULL;
 		EnableWindow(DLGITEM(11), FALSE);
 		EnableWindow(DLGITEM(12), FALSE);
 	}
+	{ // get selected sample format
+		int format = MESS(17, CB_GETCURSEL, 0, 0);
+		freq = format > 3 ? 22050 : format > 1 ? 44100 : 48000;
+		chans = 1 + (format & 1);
+	}
 	// allocate initial buffer and make space for WAVE header
-	recbuf = malloc(BUFSTEP);
+	recbuf = (BYTE*)malloc(BUFSTEP);
 	reclen = 44;
 	// fill the WAVE header
 	memcpy(recbuf, "RIFF\0\0\0\0WAVEfmt \20\0\0\0", 20);
 	memcpy(recbuf + 36, "data\0\0\0\0", 8);
 	wf = (WAVEFORMATEX*)(recbuf + 20);
 	wf->wFormatTag = 1;
-	wf->nChannels = CHANS;
+	wf->nChannels = chans;
 	wf->wBitsPerSample = 16;
-	wf->nSamplesPerSec = FREQ;
+	wf->nSamplesPerSec = freq;
 	wf->nBlockAlign = wf->nChannels * wf->wBitsPerSample / 8;
 	wf->nAvgBytesPerSec = wf->nSamplesPerSec * wf->nBlockAlign;
 	// start recording
-	rchan = BASS_RecordStart(FREQ, CHANS, 0, RecordingCallback, 0);
+	rchan = BASS_RecordStart(freq, chans, 0, RecordingCallback, NULL);
 	if (!rchan) {
 		Error("Can't start recording");
 		free(recbuf);
@@ -87,24 +94,25 @@ void StartRecording()
 		return;
 	}
 	MESS(10, WM_SETTEXT, 0, "Stop");
+	EnableWindow(DLGITEM(17), FALSE);
 }
 
 void StopRecording()
 {
 	BASS_ChannelStop(rchan);
 	rchan = 0;
-	MESS(10, WM_SETTEXT, 0, "Record");
 	// complete the WAVE header
 	*(DWORD*)(recbuf + 4) = reclen - 8;
 	*(DWORD*)(recbuf + 40) = reclen - 44;
 	// enable "save" button
 	EnableWindow(DLGITEM(12), TRUE);
 	// create a stream from the recording
-	if (chan = BASS_StreamCreateFile(TRUE, recbuf, 0, reclen, 0))
+	if (pchan = BASS_StreamCreateFile(TRUE, recbuf, 0, reclen, 0))
 		EnableWindow(DLGITEM(11), TRUE); // enable "play" button
+	MESS(10, WM_SETTEXT, 0, "Record");
+	EnableWindow(DLGITEM(17), TRUE);
 }
 
-// write the recorded data to disk
 void WriteToDisk()
 {
 	FILE *fp;
@@ -194,11 +202,11 @@ BOOL InitDevice(int device)
 	}
 	{ // get list of inputs
 		int c;
-		const char *i;
+		const char *name;
 		MESS(13, CB_RESETCONTENT, 0, 0);
 		input = 0;
-		for (c = 0; i = BASS_RecordGetInputName(c); c++) {
-			MESS(13, CB_ADDSTRING, 0, i);
+		for (c = 0; name = BASS_RecordGetInputName(c); c++) {
+			MESS(13, CB_ADDSTRING, 0, name);
 			if (!(BASS_RecordGetInput(c, NULL) & BASS_INPUT_OFF)) { // this one is currently "on"
 				input = c;
 				MESS(13, CB_SETCURSEL, input, 0);
@@ -209,10 +217,21 @@ BOOL InitDevice(int device)
 	return TRUE;
 }
 
-INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
+INT_PTR CALLBACK DialogProc(HWND h, UINT m, WPARAM w, LPARAM l)
 {
 	switch (m) {
 		case WM_TIMER:
+			{ // update the level display
+				float level = 0;
+				if (rchan || pchan) {
+					BASS_ChannelGetLevelEx(rchan ? rchan : pchan, &level, 0.1, BASS_LEVEL_MONO); // get current level
+					if (level > 0) {
+						level = 1 + 0.5 * log10(level); // convert to dB (40dB range)
+						if (level < 0) level = 0;
+					}
+				}
+				MESS(21, PBM_SETPOS, level * 100, 0);
+			}
 			{ // update the recording/playback counter
 				char text[30] = "";
 				if (rchan) { // recording
@@ -222,11 +241,11 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 						break;
 					}
 					sprintf(text, "%d", reclen - 44);
-				} else if (chan) {
-					if (BASS_ChannelIsActive(chan)) // playing
-						sprintf(text, "%I64d / %I64d", BASS_ChannelGetPosition(chan, BASS_POS_BYTE), BASS_ChannelGetLength(chan, BASS_POS_BYTE));
+				} else if (pchan) {
+					if (BASS_ChannelIsActive(pchan)) // playing
+						sprintf(text, "%I64d / %I64d", BASS_ChannelGetPosition(pchan, BASS_POS_BYTE), BASS_ChannelGetLength(pchan, BASS_POS_BYTE));
 					else
-						sprintf(text, "%I64d", BASS_ChannelGetLength(chan, BASS_POS_BYTE));
+						sprintf(text, "%I64d", BASS_ChannelGetLength(pchan, BASS_POS_BYTE));
 				}
 				MESS(20, WM_SETTEXT, 0, text);
 			}
@@ -237,28 +256,32 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 				case IDCANCEL:
 					EndDialog(h, 0);
 					break;
+
 				case 10:
 					if (!rchan)
 						StartRecording();
 					else
 						StopRecording();
 					break;
+
 				case 11:
-					BASS_ChannelPlay(chan, TRUE); // play the recorded data
+					BASS_ChannelPlay(pchan, TRUE); // play the recorded data
 					break;
+
 				case 12:
 					WriteToDisk();
 					break;
+
 				case 13:
 					if (HIWORD(w) == CBN_SELCHANGE) { // input selection changed
 						int i;
 						input = MESS(13, CB_GETCURSEL, 0, 0); // get the selection
-						// enable the selected input
 						for (i = 0; BASS_RecordSetInput(i, BASS_INPUT_OFF, -1); i++); // 1st disable all inputs, then...
 						BASS_RecordSetInput(input, BASS_INPUT_ON, -1); // enable the selected
 						UpdateInputInfo();
 					}
 					break;
+
 				case 16:
 					if (HIWORD(w) == CBN_SELCHANGE) { // device selection changed
 						int i = MESS(16, CB_GETCURSEL, 0, 0); // get the selection
@@ -266,11 +289,12 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 						// initialize the selected device
 						if (InitDevice(i)) {
 							if (rchan) { // continue recording on the new device...
-								HRECORD newrchan = BASS_RecordStart(FREQ, CHANS, 0, RecordingCallback, NULL);
-								if (!newrchan)
-									Error("Couldn't start recording");
-								else
-									rchan = newrchan;
+								HRECORD newrchan = BASS_RecordStart(freq, chans, 0, RecordingCallback, NULL);
+								if (!newrchan) {
+									Error("Can't start recording");
+									break;
+								}
+								rchan = newrchan;
 							}
 						}
 					}
@@ -289,6 +313,9 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 		case WM_INITDIALOG:
 			win = h;
 			MESS(14, TBM_SETRANGE, FALSE, MAKELONG(0, 100));
+			// initialize default output device
+			if (!BASS_Init(-1, 48000, 0, win, NULL))
+				Error("Can't initialize output device");
 			{ // get list of recording devices
 				int c, def;
 				BASS_DEVICEINFO di;
@@ -301,10 +328,14 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 				}
 				InitDevice(def); // initialize default recording device
 			}
-			// initialize default output device
-			if (!BASS_Init(-1, FREQ, 0, win, NULL))
-				Error("Can't initialize output device");
-			SetTimer(h, 0, 200, 0); // timer to update the position display
+			MESS(17, CB_ADDSTRING, 0, "48000 Hz mono 16-bit");
+			MESS(17, CB_ADDSTRING, 0, "48000 Hz stereo 16-bit");
+			MESS(17, CB_ADDSTRING, 0, "44100 Hz mono 16-bit");
+			MESS(17, CB_ADDSTRING, 0, "44100 Hz stereo 16-bit");
+			MESS(17, CB_ADDSTRING, 0, "22050 Hz mono 16-bit");
+			MESS(17, CB_ADDSTRING, 0, "22050 Hz stereo 16-bit");
+			MESS(17, CB_SETCURSEL, 3, 0);
+			SetTimer(h, 0, 100, 0); // timer to update the level and position displays
 			return 1;
 
 		case WM_DESTROY:
@@ -313,6 +344,7 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 			BASS_Free();
 			break;
 	}
+
 	return 0;
 }
 
@@ -324,12 +356,12 @@ int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		return 0;
 	}
 
-	{ // enable trackbar support (for the level control)
-		INITCOMMONCONTROLSEX cc = { sizeof(cc),ICC_BAR_CLASSES };
+	{
+		INITCOMMONCONTROLSEX cc = { sizeof(cc), ICC_BAR_CLASSES | ICC_PROGRESS_CLASS };
 		InitCommonControlsEx(&cc);
 	}
 
-	DialogBox(hInstance, MAKEINTRESOURCE(1000), NULL, dialogproc);
+	DialogBox(hInstance, MAKEINTRESOURCE(1000), NULL, DialogProc);
 
 	return 0;
 }

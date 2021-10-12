@@ -1,10 +1,9 @@
 /*
 	BASS internet radio example
-	Copyright (c) 2002-2019 Un4seen Developments Ltd.
+	Copyright (c) 2002-2021 Un4seen Developments Ltd.
 */
 
 #include <windows.h>
-#include <process.h>
 #include <stdio.h>
 #include "bass.h"
 
@@ -12,17 +11,17 @@
 #define BASS_SYNC_HLS_SEGMENT	0x10300
 #define BASS_TAG_HLS_EXTINF		0x14000
 
-HWND win = NULL;
+HWND win;
 CRITICAL_SECTION lock;
-DWORD req = 0;	// request number/counter
+DWORD req;	// request number/counter
 HSTREAM chan;	// stream handle
 
 const char *urls[10] = { // preset stream URLs
 	"http://stream-dc1.radioparadise.com/rp_192m.ogg", "http://www.radioparadise.com/m3u/mp3-32.m3u",
-	"http://network.absoluteradio.co.uk/core/audio/mp3/live.pls?service=a8bb", "http://network.absoluteradio.co.uk/core/audio/aacplus/live.pls?service=a8",
 	"http://somafm.com/secretagent.pls", "http://somafm.com/secretagent32.pls",
 	"http://somafm.com/suburbsofgoa.pls", "http://somafm.com/suburbsofgoa32.pls",
-	"http://ai-radio.org/256.ogg", "http://ai-radio.org/48.aacp"
+	"http://bassdrive.com/bassdrive.m3u", "http://bassdrive.com/bassdrive3.m3u",
+	"http://sc6.radiocaroline.net:8040/listen.pls", "http://sc2.radiocaroline.net:8010/listen.pls"
 };
 
 // display error messages
@@ -89,9 +88,9 @@ void CALLBACK StallSync(HSYNC handle, DWORD channel, DWORD data, void *user)
 		SetTimer(win, 0, 50, 0); // start buffer monitoring
 }
 
-void CALLBACK EndSync(HSYNC handle, DWORD channel, DWORD data, void *user)
+void CALLBACK FreeSync(HSYNC handle, DWORD channel, DWORD data, void *user)
 {
-	KillTimer(win, 0); // stop buffer monitoring
+	chan = 0;
 	MESS(31, WM_SETTEXT, 0, "not playing");
 	MESS(30, WM_SETTEXT, 0, "");
 	MESS(32, WM_SETTEXT, 0, "");
@@ -103,24 +102,23 @@ void CALLBACK StatusProc(const void *buffer, DWORD length, void *user)
 		MESS(32, WM_SETTEXT, 0, buffer); // display status
 }
 
-void __cdecl OpenURL(void *url)
+DWORD WINAPI OpenURL(void *url)
 {
 	DWORD c, r;
 	EnterCriticalSection(&lock); // make sure only 1 thread at a time can do the following
 	r = ++req; // increment the request counter for this request
 	LeaveCriticalSection(&lock);
-	KillTimer(win, 0); // stop buffer monitoring
-	BASS_StreamFree(chan); // close old stream
+	if (chan) BASS_StreamFree(chan); // close old stream
 	MESS(31, WM_SETTEXT, 0, "connecting...");
 	MESS(30, WM_SETTEXT, 0, "");
 	MESS(32, WM_SETTEXT, 0, "");
-	c = BASS_StreamCreateURL(url, 0, BASS_STREAM_BLOCK | BASS_STREAM_STATUS | BASS_STREAM_AUTOFREE, StatusProc, (void*)r); // open URL
+	c = BASS_StreamCreateURL(url, 0, BASS_STREAM_BLOCK | BASS_STREAM_STATUS | BASS_STREAM_AUTOFREE | BASS_SAMPLE_FLOAT, StatusProc, (void*)r); // open URL
 	free(url); // free temp URL buffer
 	EnterCriticalSection(&lock);
 	if (r != req) { // there is a newer request, discard this stream
 		LeaveCriticalSection(&lock);
 		if (c) BASS_StreamFree(c);
-		return;
+		return 0;
 	}
 	chan = c; // this is now the current stream
 	LeaveCriticalSection(&lock);
@@ -128,47 +126,52 @@ void __cdecl OpenURL(void *url)
 		MESS(31, WM_SETTEXT, 0, "not playing");
 		Error("Can't play the stream");
 	} else {
-		// start buffer monitoring
-		SetTimer(win, 0, 50, 0);
 		// set syncs for stream title updates
 		BASS_ChannelSetSync(chan, BASS_SYNC_META, 0, MetaSync, 0); // Shoutcast
 		BASS_ChannelSetSync(chan, BASS_SYNC_OGG_CHANGE, 0, MetaSync, 0); // Icecast/OGG
 		BASS_ChannelSetSync(chan, BASS_SYNC_HLS_SEGMENT, 0, MetaSync, 0); // HLS
 		// set sync for stalling/buffering
 		BASS_ChannelSetSync(chan, BASS_SYNC_STALL, 0, StallSync, 0);
-		// set sync for end of stream
-		BASS_ChannelSetSync(chan, BASS_SYNC_END, 0, EndSync, 0);
+		// set sync for end of stream (when freed due to AUTOFREE)
+		BASS_ChannelSetSync(chan, BASS_SYNC_FREE, 0, FreeSync, 0);
 		// play it!
 		BASS_ChannelPlay(chan, FALSE);
+		// start buffer monitoring (and display stream info when done)
+		SetTimer(win, 0, 50, 0);
 	}
+	return 0;
 }
 
-INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
+INT_PTR CALLBACK DialogProc(HWND h, UINT m, WPARAM w, LPARAM l)
 {
 	switch (m) {
 		case WM_TIMER:
 			{ // monitor buffering progress
-				if (BASS_ChannelIsActive(chan) == BASS_ACTIVE_PLAYING) {
-					KillTimer(win, 0); // finished buffering, stop monitoring
-					MESS(31, WM_SETTEXT, 0, "playing");
-					{ // get the broadcast name and URL
-						const char *icy = BASS_ChannelGetTags(chan, BASS_TAG_ICY);
-						if (!icy) icy = BASS_ChannelGetTags(chan, BASS_TAG_HTTP); // no ICY tags, try HTTP
-						if (icy) {
-							for (; *icy; icy += strlen(icy) + 1) {
-								if (!strnicmp(icy, "icy-name:", 9))
-									MESS(31, WM_SETTEXT, 0, icy + 9);
-								if (!strnicmp(icy, "icy-url:", 8))
-									MESS(32, WM_SETTEXT, 0, icy + 8);
-							}
-						}
-					}
-					// get the stream title
-					DoMeta();
-				} else {
+				DWORD active = BASS_ChannelIsActive(chan);
+				if (active == BASS_ACTIVE_STALLED) {
 					char text[32];
 					sprintf(text, "buffering... %d%%", 100 - (int)BASS_StreamGetFilePosition(chan, BASS_FILEPOS_BUFFERING));
 					MESS(31, WM_SETTEXT, 0, text);
+					break;
+				} else {
+					KillTimer(win, 0); // finished buffering, stop monitoring
+					if (active) {
+						MESS(31, WM_SETTEXT, 0, "playing");
+						{ // get the stream name and URL
+							const char *icy = BASS_ChannelGetTags(chan, BASS_TAG_ICY);
+							if (!icy) icy = BASS_ChannelGetTags(chan, BASS_TAG_HTTP); // no ICY tags, try HTTP
+							if (icy) {
+								for (; *icy; icy += strlen(icy) + 1) {
+									if (!strnicmp(icy, "icy-name:", 9))
+										MESS(31, WM_SETTEXT, 0, icy + 9);
+									if (!strnicmp(icy, "icy-url:", 8))
+										MESS(32, WM_SETTEXT, 0, icy + 8);
+								}
+							}
+						}
+						// get the stream title
+						DoMeta();
+					}
 				}
 			}
 			break;
@@ -177,7 +180,8 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 			switch (LOWORD(w)) {
 				case IDCANCEL:
 					EndDialog(h, 0);
-					return 1;
+					break;
+
 				default:
 					if ((LOWORD(w) >= 10 && LOWORD(w) < 20) || LOWORD(w) == 21) {
 						char *url;
@@ -196,7 +200,7 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 							BASS_SetConfigPtr(BASS_CONFIG_NET_PROXY, proxy); // set proxy server
 						}
 						// open URL in a new thread (so that main thread is free)
-						_beginthread(OpenURL, 0, url);
+						CloseHandle(CreateThread(NULL, 0, OpenURL, url, 0, NULL));
 					}
 			}
 			break;
@@ -209,14 +213,19 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 				EndDialog(win, 0);
 				break;
 			}
+			BASS_PluginLoad("bass_aac.dll", 0); // load BASS_AAC (if present) for AAC support on older Windows
+			BASS_PluginLoad("bassflac.dll", 0); // load BASSFLAC (if present) for FLAC support
+			BASS_PluginLoad("basshls.dll", 0); // load BASSHLS (if present) for HLS support
 			InitializeCriticalSection(&lock);
 			MESS(20, WM_SETTEXT, 0, "http://");
 			return 1;
 
 		case WM_DESTROY:
 			BASS_Free();
+			BASS_PluginFree(0);
 			break;
 	}
+
 	return 0;
 }
 
@@ -229,14 +238,8 @@ int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	}
 
 	BASS_SetConfig(BASS_CONFIG_NET_PLAYLIST, 1); // enable playlist processing
-	BASS_SetConfig(BASS_CONFIG_NET_PREBUF_WAIT, 0); // disable BASS_StreamCreateURL pre-buffering
 
-	BASS_PluginLoad("bass_aac.dll", 0); // load BASS_AAC (if present) for AAC support on older Windows
-	BASS_PluginLoad("bassflac.dll", 0); // load BASSFLAC (if present) for FLAC support
-	BASS_PluginLoad("basshls.dll", 0); // load BASSHLS (if present) for HLS support
-
-	// display the window
-	DialogBox(hInstance, MAKEINTRESOURCE(1000), NULL, dialogproc);
+	DialogBox(hInstance, MAKEINTRESOURCE(1000), NULL, DialogProc);
 
 	return 0;
 }

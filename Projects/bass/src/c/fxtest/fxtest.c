@@ -1,6 +1,6 @@
 /*
-	BASS DX8 effects test
-	Copyright (c) 2001-2017 Un4seen Developments Ltd.
+	BASS effects example
+	Copyright (c) 2001-2021 Un4seen Developments Ltd.
 */
 
 #include <windows.h>
@@ -9,10 +9,10 @@
 #include <math.h>
 #include "bass.h"
 
-HWND win = NULL;
+HWND win;
 
 DWORD chan;			// channel handle
-DWORD fxchan = 0;		// output stream handle
+DWORD fxchan;		// output stream handle
 DWORD fxchansync;	// output stream FREE sync
 HFX fx[4];			// 3 eq bands + reverb
 
@@ -31,17 +31,18 @@ void Error(const char *es)
 void UpdateFX(int b)
 {
 	int v = MESS(20 + b, TBM_GETPOS, 0, 0);
-	if (b < 3) {
+	if (b < 3) { // EQ
 		BASS_DX8_PARAMEQ p;
 		BASS_FXGetParameters(fx[b], &p);
 		p.fGain = 10.0 - v;
 		BASS_FXSetParameters(fx[b], &p);
-	} else {
+	} else if (b == 3) { // reverb
 		BASS_DX8_REVERB p;
 		BASS_FXGetParameters(fx[3], &p);
 		p.fReverbMix = (v < 20 ? log(1 - v / 20.0) * 20 : -96);
 		BASS_FXSetParameters(fx[3], &p);
-	}
+	} else // volume
+		BASS_ChannelSetAttribute(chan, BASS_ATTRIB_VOL, (20 - v) / 10.f);
 }
 
 void SetupFX()
@@ -76,7 +77,7 @@ void CALLBACK DeviceFreeSync(HSYNC handle, DWORD channel, DWORD data, void *user
 	SetupFX();
 }
 
-INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
+INT_PTR CALLBACK DialogProc(HWND h, UINT m, WPARAM w, LPARAM l)
 {
 	switch (m) {
 		case WM_COMMAND:
@@ -84,28 +85,27 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 				case IDCANCEL:
 					EndDialog(h, 0);
 					break;
+
 				case 10:
 					{
 						char file[MAX_PATH] = "";
-						ofn.lpstrFilter = "playable files\0*.mo3;*.xm;*.mod;*.s3m;*.it;*.mtm;*.umx;*.mp3;*.mp2;*.mp1;*.ogg;*.wav;*.aif\0All files\0*.*\0\0";
 						ofn.lpstrFile = file;
 						if (GetOpenFileName(&ofn)) {
-							// free both MOD and stream, it must be one of them! :)
-							BASS_MusicFree(chan);
-							BASS_StreamFree(chan);
+							BASS_ChannelFree(chan); // free the old channel
 							if (!(chan = BASS_StreamCreateFile(FALSE, file, 0, 0, BASS_SAMPLE_LOOP | BASS_SAMPLE_FLOAT))
-								&& !(chan = BASS_MusicLoad(FALSE, file, 0, 0, BASS_SAMPLE_LOOP | BASS_MUSIC_RAMP | BASS_SAMPLE_FLOAT, 1))) {
-								// whatever it is, it ain't playable
-								MESS(10, WM_SETTEXT, 0, "click here to open a file...");
+								&& !(chan = BASS_MusicLoad(FALSE, file, 0, 0, BASS_MUSIC_RAMPS | BASS_SAMPLE_LOOP | BASS_SAMPLE_FLOAT, 1))) {
+								MESS(10, WM_SETTEXT, 0, "Open file...");
 								Error("Can't play the file");
 								break;
 							}
-							MESS(10, WM_SETTEXT, 0, file);
+							MESS(10, WM_SETTEXT, 0, strrchr(file, '\\') + 1);
 							if (!fxchan) SetupFX(); // set effects on file if not using output stream
+							UpdateFX(4); // set volume
 							BASS_ChannelPlay(chan, FALSE);
 						}
 					}
 					break;
+
 				case 30:
 					{
 						// remove current effects
@@ -128,9 +128,7 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 			break;
 
 		case WM_VSCROLL:
-			if (l) {
-				UpdateFX(GetDlgCtrlID((HWND)l) - 20);
-			}
+			if (l) UpdateFX(GetDlgCtrlID((HWND)l) - 20);
 			break;
 
 		case WM_INITDIALOG:
@@ -140,6 +138,7 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 			ofn.hwndOwner = h;
 			ofn.nMaxFile = MAX_PATH;
 			ofn.Flags = OFN_HIDEREADONLY | OFN_EXPLORER;
+			ofn.lpstrFilter = "Playable files\0*.mo3;*.xm;*.mod;*.s3m;*.it;*.mtm;*.umx;*.mp3;*.mp2;*.mp1;*.ogg;*.wav;*.aif\0All files\0*.*\0\0";
 			// initialize default device
 			if (!BASS_Init(-1, 44100, 0, win, NULL)) {
 				Error("Can't initialize device");
@@ -156,19 +155,22 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 					EndDialog(win, 0);
 					return 0;
 				}
-				// disable output stream option if using DirectSound output
-				if (bi.initflags & BASS_DEVICE_DSOUND)
-					EnableWindow(GetDlgItem(win, 30), FALSE);
 			}
-			// initialize eq/reverb sliders
+			// initialize effect sliders
 			MESS(20, TBM_SETRANGE, FALSE, MAKELONG(0, 20));
+			MESS(20, TBM_SETTIC, 0, 10);
 			MESS(20, TBM_SETPOS, TRUE, 10);
 			MESS(21, TBM_SETRANGE, FALSE, MAKELONG(0, 20));
+			MESS(21, TBM_SETTIC, 0, 10);
 			MESS(21, TBM_SETPOS, TRUE, 10);
 			MESS(22, TBM_SETRANGE, FALSE, MAKELONG(0, 20));
+			MESS(22, TBM_SETTIC, 0, 10);
 			MESS(22, TBM_SETPOS, TRUE, 10);
 			MESS(23, TBM_SETRANGE, FALSE, MAKELONG(0, 20));
 			MESS(23, TBM_SETPOS, TRUE, 20);
+			MESS(24, TBM_SETRANGE, FALSE, MAKELONG(0, 20));
+			MESS(24, TBM_SETTIC, 0, 10);
+			MESS(24, TBM_SETPOS, TRUE, 10);
 			return 1;
 
 		case WM_DESTROY:
@@ -176,6 +178,7 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 			BASS_Free();
 			break;
 	}
+
 	return 0;
 }
 
@@ -187,12 +190,12 @@ int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		return 0;
 	}
 
-	{ // enable trackbar support
-		INITCOMMONCONTROLSEX cc = { sizeof(cc),ICC_BAR_CLASSES };
+	{
+		INITCOMMONCONTROLSEX cc = { sizeof(cc), ICC_BAR_CLASSES };
 		InitCommonControlsEx(&cc);
 	}
 
-	DialogBox(hInstance, MAKEINTRESOURCE(1000), NULL, dialogproc);
+	DialogBox(hInstance, MAKEINTRESOURCE(1000), NULL, DialogProc);
 
 	return 0;
 }

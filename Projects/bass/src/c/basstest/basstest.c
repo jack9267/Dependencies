@@ -1,6 +1,6 @@
 /*
 	BASS simple playback test
-	Copyright (c) 1999-2019 Un4seen Developments Ltd.
+	Copyright (c) 1999-2021 Un4seen Developments Ltd.
 */
 
 #include <windows.h>
@@ -8,14 +8,14 @@
 #include <stdio.h>
 #include "bass.h"
 
-HWND win = NULL;
+HWND win;
 
-HSTREAM *strs = NULL;
-int strc = 0;
-HMUSIC *mods = NULL;
-int modc = 0;
-HSAMPLE *sams = NULL;
-int samc = 0;
+HSTREAM *strs;
+int strc;
+HMUSIC *mods;
+int modc;
+HSAMPLE *sams;
+int samc;
 
 // display error messages
 void Error(const char *es)
@@ -34,7 +34,7 @@ void Error(const char *es)
 #define GETMOD() MLM(LB_GETCURSEL,0,0)
 #define GETSAM() SLM(LB_GETCURSEL,0,0)
 
-INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
+INT_PTR CALLBACK DialogProc(HWND h, UINT m, WPARAM w, LPARAM l)
 {
 	static OPENFILENAME ofn;
 
@@ -59,20 +59,21 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 				case 14:
 					{
 						char file[MAX_PATH] = "";
-						HSTREAM str;
 						ofn.lpstrFilter = "Streamable files (wav/aif/mp3/mp2/mp1/ogg)\0*.wav;*.aif;*.mp3;*.mp2;*.mp1;*.ogg\0All files\0*.*\0\0";
 						ofn.lpstrFile = file;
 						if (GetOpenFileName(&ofn)) {
-							if (str = BASS_StreamCreateFile(FALSE, file, 0, 0, 0)) {
+							HSTREAM str = BASS_StreamCreateFile(FALSE, file, 0, 0, 0);
+							if (str) {
 								strc++;
 								strs = (HSTREAM*)realloc((void*)strs, strc * sizeof(*strs));
 								strs[strc - 1] = str;
 								STLM(LB_ADDSTRING, 0, strrchr(file, '\\') + 1);
 							} else
-								Error("Can't open stream");
+								Error("Can't stream the file");
 						}
 					}
 					break;
+
 				case 15:
 					{
 						int s = GETSTR();
@@ -80,10 +81,11 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 							STLM(LB_DELETESTRING, s, 0);
 							BASS_StreamFree(strs[s]); // free the stream
 							strc--;
-							memcpy(strs + s, strs + s + 1, (strc - s) * sizeof(*strs));
+							memmove(strs + s, strs + s + 1, (strc - s) * sizeof(*strs));
 						}
 					}
 					break;
+
 				case 11:
 					{
 						int s = GETSTR();
@@ -92,88 +94,97 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 								Error("Can't play stream");
 					}
 					break;
+
 				case 12:
 					{
 						int s = GETSTR();
 						if (s != LB_ERR) BASS_ChannelStop(strs[s]); // stop the stream
 					}
 					break;
+
 				case 13:
 					{
 						int s = GETSTR();
-						if (s != LB_ERR) BASS_ChannelPlay(strs[s], TRUE); // play the stream from the start
+						if (s != LB_ERR)
+							if (!BASS_ChannelPlay(strs[s], TRUE)) // play the stream from the start
+								Error("Can't play stream");
 					}
 					break;
 
 				case 24:
 					{
 						char file[MAX_PATH] = "";
-						HMUSIC mod;
 						ofn.lpstrFilter = "MOD music files (mo3/xm/mod/s3m/it/mtm/umx)\0*.mo3;*.xm;*.mod;*.s3m;*.it;*.mtm;*.umx\0All files\0*.*\0\0";
 						ofn.lpstrFile = file;
 						if (GetOpenFileName(&ofn)) {
-							// load a music from "file" with ramping enabled
-							if (mod = BASS_MusicLoad(FALSE, file, 0, 0, BASS_MUSIC_RAMPS, 1)) {
+							HMUSIC mod = BASS_MusicLoad(FALSE, file, 0, 0, BASS_MUSIC_RAMPS, 1);
+							if (mod) {
 								modc++;
 								mods = (HMUSIC*)realloc((void*)mods, modc * sizeof(*mods));
 								mods[modc - 1] = mod;
 								MLM(LB_ADDSTRING, 0, strrchr(file, '\\') + 1);
 							} else
-								Error("Can't load music");
+								Error("Can't load the file");
 						}
 					}
 					break;
+
 				case 25:
 					{
 						int s = GETMOD();
 						if (s != LB_ERR) {
 							MLM(LB_DELETESTRING, s, 0);
-							BASS_MusicFree(mods[s]); // free the music
+							BASS_MusicFree(mods[s]); // free the MOD music
 							modc--;
-							memcpy(mods + s, mods + s + 1, (modc - s) * sizeof(*mods));
+							memmove(mods + s, mods + s + 1, (modc - s) * sizeof(*mods));
 						}
 					}
 					break;
+
 				case 21:
 					{
 						int s = GETMOD();
 						if (s != LB_ERR)
-							if (!BASS_ChannelPlay(mods[s], FALSE)) // play the music (continue from current position)
-								Error("Can't play music");
+							if (!BASS_ChannelPlay(mods[s], FALSE)) // play the MOD music (continue from current position)
+								Error("Can't play MOD music");
 					}
 					break;
+
 				case 22:
 					{
 						int s = GETMOD();
-						if (s != LB_ERR) BASS_ChannelStop(mods[s]); // stop the music
+						if (s != LB_ERR) BASS_ChannelStop(mods[s]); // stop the MOD music
 					}
 					break;
+
 				case 23:
 					{
 						int s = GETMOD();
-						if (s != LB_ERR) BASS_ChannelPlay(mods[s], TRUE); // play the music from the start
+						if (s != LB_ERR)
+							if (!BASS_ChannelPlay(mods[s], TRUE)) // play the MOD music from the start
+								Error("Can't play MOD music");
 					}
 					break;
 
 				case 32:
 					{
 						char file[MAX_PATH] = "";
-						HSAMPLE sam;
 						ofn.lpstrFilter = "Sample files (wav/aif)\0*.wav;*.aif\0All files\0*.*\0\0";
 						ofn.lpstrFile = file;
 						if (GetOpenFileName(&ofn)) {
-							/* Load a sample from "file" and give it a max of 3 simultaneous
-								playings using playback position as override decider */
-							if (sam = BASS_SampleLoad(FALSE, file, 0, 0, 3, BASS_SAMPLE_OVER_POS)) {
+							// give the sample a max of 3 simultaneous playbacks using position as override decider
+							HSAMPLE sam = BASS_SampleLoad(FALSE, file, 0, 0, 3, BASS_SAMPLE_OVER_POS);
+							if (sam) {
 								samc++;
 								sams = (HSAMPLE*)realloc((void*)sams, samc * sizeof(*sams));
 								sams[samc - 1] = sam;
 								SLM(LB_ADDSTRING, 0, strrchr(file, '\\') + 1);
 							} else
-								Error("Can't load sample");
+								Error("Can't load the file");
 						}
 					}
 					break;
+
 				case 33:
 					{
 						int s = GETSAM();
@@ -181,10 +192,11 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 							SLM(LB_DELETESTRING, s, 0);
 							BASS_SampleFree(sams[s]); // free the sample
 							samc--;
-							memcpy(sams + s, sams + s + 1, (samc - s) * sizeof(*sams));
+							memmove(sams + s, sams + s + 1, (samc - s) * sizeof(*sams));
 						}
 					}
 					break;
+
 				case 31:
 					{
 						int s = GETSAM();
@@ -202,9 +214,12 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 				case 41:
 					BASS_Pause(); // pause output
 					break;
+
 				case 42:
-					BASS_Start(); // resume output
+					if (!BASS_Start()) // resume output
+						Error("Can't start output");
 					break;
+
 				case 44:
 					BASS_SetConfig(BASS_CONFIG_UPDATETHREADS, MESS(44, BM_GETCHECK, 0, 0) ? 2 : 1); // set 1 or 2 update threads
 					break;
@@ -218,12 +233,15 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 					case 16:
 						BASS_SetConfig(BASS_CONFIG_GVOL_STREAM, p * 100); // global stream volume (0-10000)
 						break;
+
 					case 26:
-						BASS_SetConfig(BASS_CONFIG_GVOL_MUSIC, p * 100); // global MOD volume (0-10000)
+						BASS_SetConfig(BASS_CONFIG_GVOL_MUSIC, p * 100); // global MOD music volume (0-10000)
 						break;
+
 					case 34:
 						BASS_SetConfig(BASS_CONFIG_GVOL_SAMPLE, p * 100); // global sample volume (0-10000)
 						break;
+
 					case 43:
 						BASS_SetVolume(p / 100.f); // output volume (0-1)
 						break;
@@ -258,9 +276,10 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 
 		case WM_DESTROY:
 			KillTimer(h, 1);
-			BASS_Free(); // close output
+			BASS_Free();
 			break;
 	}
+
 	return 0;
 }
 
@@ -272,11 +291,12 @@ int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		return 0;
 	}
 
-	// enable "Default" device that follows default device changes
-	BASS_SetConfig(BASS_CONFIG_DEV_DEFAULT, 1);
+	{
+		INITCOMMONCONTROLSEX cc = { sizeof(cc), ICC_BAR_CLASSES };
+		InitCommonControlsEx(&cc);
+	}
 
-	// display the window
-	DialogBox(hInstance, MAKEINTRESOURCE(1000), NULL, dialogproc);
+	DialogBox(hInstance, MAKEINTRESOURCE(1000), NULL, DialogProc);
 
 	return 0;
 }

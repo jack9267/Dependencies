@@ -59,7 +59,7 @@ void DisplayDeviceInfo(BASS_DEVICEINFO *di)
 	printf(" (%x)\n", di->flags);
 }
 
-void main()
+int main()
 {
 	BASS_DEVICEINFO di;
 	int a;
@@ -73,4 +73,5 @@ void main()
 		printf("%d: ", a);
 		DisplayDeviceInfo(&di);
 	}
+	return 0;
 }

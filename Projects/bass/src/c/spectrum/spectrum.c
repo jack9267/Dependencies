@@ -1,6 +1,6 @@
 /*
 	BASS spectrum analyser example
-	Copyright (c) 2002-2014 Un4seen Developments Ltd.
+	Copyright (c) 2002-2021 Un4seen Developments Ltd.
 */
 
 #include <windows.h>
@@ -11,17 +11,19 @@
 
 #define SPECWIDTH 368	// display width
 #define SPECHEIGHT 127	// height (changing requires palette adjustments too)
+#define SPECRATE 30		// refresh rate
 
-HWND win = NULL;
-DWORD timer = 0;
+HWND win;
+DWORD timer;
 
-DWORD chan;
+DWORD chan;		// channel handle
 
-HDC specdc = 0;
-HBITMAP specbmp = 0;
+HDC specdc;
+HBITMAP specbmp;
 BYTE *specbuf;
 
-int specmode = 0, specpos = 0; // spectrum mode (and marker pos for 3D mode)
+int specmode;	// spectrum mode
+int specpos;	// marker pos for 3D mode
 
 // display error messages
 void Error(const char *es)
@@ -42,11 +44,11 @@ BOOL PlayFile()
 	ofn.lpstrFile = file;
 	ofn.Flags = OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_EXPLORER;
 	ofn.lpstrTitle = "Select a file to play";
-	ofn.lpstrFilter = "playable files\0*.mo3;*.xm;*.mod;*.s3m;*.it;*.mtm;*.umx;*.mp3;*.mp2;*.mp1;*.ogg;*.wav;*.aif\0All files\0*.*\0\0";
+	ofn.lpstrFilter = "Playable files\0*.mo3;*.xm;*.mod;*.s3m;*.it;*.mtm;*.umx;*.mp3;*.mp2;*.mp1;*.ogg;*.wav;*.aif\0All files\0*.*\0\0";
 	if (!GetOpenFileName(&ofn)) return FALSE;
 
-	if (!(chan = BASS_StreamCreateFile(FALSE, file, 0, 0, BASS_SAMPLE_LOOP))
-		&& !(chan = BASS_MusicLoad(FALSE, file, 0, 0, BASS_MUSIC_RAMP | BASS_SAMPLE_LOOP, 1))) {
+	if (!(chan = BASS_StreamCreateFile(FALSE, file, 0, 0, BASS_SAMPLE_LOOP | BASS_SAMPLE_FLOAT))
+		&& !(chan = BASS_MusicLoad(FALSE, file, 0, 0, BASS_MUSIC_RAMPS | BASS_SAMPLE_LOOP | BASS_SAMPLE_FLOAT, 1))) {
 		Error("Can't play file");
 		return FALSE; // Can't load the file
 	}
@@ -56,7 +58,7 @@ BOOL PlayFile()
 	return TRUE;
 }
 
-// update the spectrum display - the interesting bit :)
+// update the display
 void CALLBACK UpdateSpectrum(UINT uTimerID, UINT uMsg, DWORD dwUser, DWORD dw1, DWORD dw2)
 {
 	HDC dc;
@@ -66,10 +68,10 @@ void CALLBACK UpdateSpectrum(UINT uTimerID, UINT uMsg, DWORD dwUser, DWORD dw1, 
 		int c;
 		float *buf;
 		BASS_CHANNELINFO ci;
-		memset(specbuf, 0, SPECWIDTH * SPECHEIGHT);
 		BASS_ChannelGetInfo(chan, &ci); // get number of channels
 		buf = alloca(ci.chans * SPECWIDTH * sizeof(float)); // allocate buffer for data
-		BASS_ChannelGetData(chan, buf, (ci.chans * SPECWIDTH * sizeof(float)) | BASS_DATA_FLOAT); // get the sample data (floating-point to avoid 8 & 16 bit processing)
+		BASS_ChannelGetData(chan, buf, ci.chans * SPECWIDTH * sizeof(float)); // get the sample data
+		memset(specbuf, 0, SPECWIDTH * SPECHEIGHT);
 		for (c = 0; c < ci.chans; c++) {
 			for (x = 0; x < SPECWIDTH; x++) {
 				int v = (1 - buf[x * ci.chans + c]) * SPECHEIGHT / 2; // invert and scale to fit display
@@ -135,7 +137,6 @@ void CALLBACK UpdateSpectrum(UINT uTimerID, UINT uMsg, DWORD dwUser, DWORD dw1, 
 	ReleaseDC(win, dc);
 }
 
-// window procedure
 LRESULT CALLBACK SpectrumWindowProc(HWND h, UINT m, WPARAM w, LPARAM l)
 {
 	switch (m) {
@@ -197,8 +198,8 @@ LRESULT CALLBACK SpectrumWindowProc(HWND h, UINT m, WPARAM w, LPARAM l)
 				specdc = CreateCompatibleDC(0);
 				SelectObject(specdc, specbmp);
 			}
-			// start update timer (40hz)
-			timer = timeSetEvent(25, 25, (LPTIMECALLBACK)&UpdateSpectrum, 0, TIME_PERIODIC);
+			// start display update timer
+			timer = timeSetEvent(1000 / SPECRATE, 1000 / SPECRATE, UpdateSpectrum, 0, TIME_PERIODIC);
 			break;
 
 		case WM_DESTROY:
@@ -209,12 +210,13 @@ LRESULT CALLBACK SpectrumWindowProc(HWND h, UINT m, WPARAM w, LPARAM l)
 			PostQuitMessage(0);
 			break;
 	}
+
 	return DefWindowProc(h, m, w, l);
 }
 
 int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
-	WNDCLASS wc = { 0 };
+	WNDCLASS wc;
 	MSG msg;
 
 	// check the correct BASS was loaded
@@ -224,16 +226,17 @@ int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	}
 
 	// register window class and create the window
+	memset(&wc, 0, sizeof(wc));
 	wc.lpfnWndProc = SpectrumWindowProc;
 	wc.hInstance = hInstance;
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wc.lpszClassName = "BASS-Spectrum";
 	if (!RegisterClass(&wc) || !CreateWindow("BASS-Spectrum",
-			"BASS spectrum example (click to switch mode)",
-			WS_POPUPWINDOW | WS_CAPTION | WS_VISIBLE, 200, 200,
-			SPECWIDTH + 2 * GetSystemMetrics(SM_CXDLGFRAME),
-			SPECHEIGHT + GetSystemMetrics(SM_CYCAPTION) + 2 * GetSystemMetrics(SM_CYDLGFRAME),
-			NULL, NULL, hInstance, NULL)) {
+		"BASS spectrum example (click to switch mode)",
+		WS_POPUPWINDOW | WS_CAPTION | WS_VISIBLE, 200, 200,
+		SPECWIDTH + 2 * GetSystemMetrics(SM_CXDLGFRAME),
+		SPECHEIGHT + GetSystemMetrics(SM_CYCAPTION) + 2 * GetSystemMetrics(SM_CYDLGFRAME),
+		NULL, NULL, hInstance, NULL)) {
 		Error("Can't create window");
 		return 0;
 	}

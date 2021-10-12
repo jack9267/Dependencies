@@ -1,6 +1,6 @@
 /*
-	BASS "live" spectrum analyser example
-	Copyright (c) 2002-2014 Un4seen Developments Ltd.
+	BASS live spectrum analyser example
+	Copyright (c) 2002-2021 Un4seen Developments Ltd.
 */
 
 #include <windows.h>
@@ -10,17 +10,19 @@
 
 #define SPECWIDTH 368	// display width
 #define SPECHEIGHT 127	// height (changing requires palette adjustments too)
+#define SPECRATE 30		// refresh rate
 
-HWND win = NULL;
-DWORD timer = 0;
+HWND win;
+DWORD timer;
 
 HRECORD chan;	// recording channel
 
-HDC specdc = 0;
-HBITMAP specbmp = 0;
+HDC specdc;
+HBITMAP specbmp;
 BYTE *specbuf;
 
-int specmode = 0, specpos = 0; // spectrum mode (and marker pos for 3D mode)
+int specmode;	// spectrum mode
+int specpos;	// marker pos for 3D mode
 
 // display error messages
 void Error(const char *es)
@@ -30,8 +32,8 @@ void Error(const char *es)
 	MessageBox(win, mes, 0, 0);
 }
 
-// update the spectrum display - the interesting bit :)
-void CALLBACK UpdateSpectrum(UINT uTimerID, UINT uMsg, DWORD dwUser, DWORD dw1, DWORD dw2)
+// update the display
+void CALLBACK UpdateSpectrum(UINT uTimerID, UINT uMsg, DWORD_PTR dwUser, DWORD_PTR dw1, DWORD_PTR dw2)
 {
 	static DWORD quietcount = 0;
 	HDC dc;
@@ -39,10 +41,10 @@ void CALLBACK UpdateSpectrum(UINT uTimerID, UINT uMsg, DWORD dwUser, DWORD dw1, 
 
 	if (specmode == 3) { // waveform
 		short buf[SPECWIDTH];
-		memset(specbuf, 0, SPECWIDTH * SPECHEIGHT);
 		BASS_ChannelGetData(chan, buf, sizeof(buf)); // get the sample data
+		memset(specbuf, 0, SPECWIDTH * SPECHEIGHT);
 		for (x = 0; x < SPECWIDTH; x++) {
-			int v = (32767 - buf[x]) * SPECHEIGHT / 65536; // invert and scale to fit display
+			int v = buf[x] * SPECHEIGHT / 65536; // scale to fit display
 			if (!x) y = v;
 			do { // draw line from previous sample...
 				if (y < v) y++;
@@ -101,8 +103,8 @@ void CALLBACK UpdateSpectrum(UINT uTimerID, UINT uMsg, DWORD dwUser, DWORD dw1, 
 	BitBlt(dc, 0, 0, SPECWIDTH, SPECHEIGHT, specdc, 0, 0, SRCCOPY);
 	if (LOWORD(BASS_ChannelGetLevel(chan)) < 1000) { // check if it's quiet
 		quietcount++;
-		if (quietcount > 40 && (quietcount & 16)) { // it's been quiet for over a second
-			RECT r = { 0,0,SPECWIDTH,SPECHEIGHT };
+		if (quietcount > SPECRATE && (quietcount & 16)) { // it's been quiet for over a second
+			RECT r = { 0, 0, SPECWIDTH, SPECHEIGHT };
 			SetTextColor(dc, 0xffffff);
 			SetBkMode(dc, TRANSPARENT);
 			DrawText(dc, "make some noise!", -1, &r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
@@ -113,12 +115,11 @@ void CALLBACK UpdateSpectrum(UINT uTimerID, UINT uMsg, DWORD dwUser, DWORD dw1, 
 }
 
 // Recording callback - not doing anything with the data
-BOOL CALLBACK DuffRecording(HRECORD handle, const void *buffer, DWORD length, void *user)
+BOOL CALLBACK RecordProc(HRECORD handle, const void *buffer, DWORD length, void *user)
 {
 	return TRUE; // continue recording
 }
 
-// window procedure
 LRESULT CALLBACK SpectrumWindowProc(HWND h, UINT m, WPARAM w, LPARAM l)
 {
 	switch (m) {
@@ -145,7 +146,7 @@ LRESULT CALLBACK SpectrumWindowProc(HWND h, UINT m, WPARAM w, LPARAM l)
 				return -1;
 			}
 			// start recording (44100hz mono 16-bit)
-			if (!(chan = BASS_RecordStart(44100, 1, 0, &DuffRecording, 0))) {
+			if (!(chan = BASS_RecordStart(44100, 1, 0, RecordProc, 0))) {
 				Error("Can't start recording");
 				return -1;
 			}
@@ -182,8 +183,8 @@ LRESULT CALLBACK SpectrumWindowProc(HWND h, UINT m, WPARAM w, LPARAM l)
 				specdc = CreateCompatibleDC(0);
 				SelectObject(specdc, specbmp);
 			}
-			// start update timer (40hz)
-			timer = timeSetEvent(25, 25, (LPTIMECALLBACK)&UpdateSpectrum, 0, TIME_PERIODIC);
+			// start display update timer
+			timer = timeSetEvent(1000 / SPECRATE, 1000 / SPECRATE, UpdateSpectrum, 0, TIME_PERIODIC);
 			break;
 
 		case WM_DESTROY:
@@ -194,12 +195,13 @@ LRESULT CALLBACK SpectrumWindowProc(HWND h, UINT m, WPARAM w, LPARAM l)
 			PostQuitMessage(0);
 			break;
 	}
+
 	return DefWindowProc(h, m, w, l);
 }
 
 int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
-	WNDCLASS wc = { 0 };
+	WNDCLASS wc;
 	MSG msg;
 
 	// check the correct BASS was loaded
@@ -209,16 +211,17 @@ int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	}
 
 	// register window class and create the window
+	memset(&wc, 0, sizeof(wc));
 	wc.lpfnWndProc = SpectrumWindowProc;
 	wc.hInstance = hInstance;
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wc.lpszClassName = "BASS-Spectrum";
 	if (!RegisterClass(&wc) || !CreateWindow("BASS-Spectrum",
-			"BASS \"live\" spectrum (click to switch mode)",
-			WS_POPUPWINDOW | WS_CAPTION | WS_VISIBLE, 200, 200,
-			SPECWIDTH + 2 * GetSystemMetrics(SM_CXDLGFRAME),
-			SPECHEIGHT + GetSystemMetrics(SM_CYCAPTION) + 2 * GetSystemMetrics(SM_CYDLGFRAME),
-			NULL, NULL, hInstance, NULL)) {
+		"BASS live spectrum (click to switch mode)",
+		WS_POPUPWINDOW | WS_CAPTION | WS_VISIBLE, 200, 200,
+		SPECWIDTH + 2 * GetSystemMetrics(SM_CXDLGFRAME),
+		SPECHEIGHT + GetSystemMetrics(SM_CYCAPTION) + 2 * GetSystemMetrics(SM_CYDLGFRAME),
+		NULL, NULL, hInstance, NULL)) {
 		Error("Can't create window");
 		return 0;
 	}

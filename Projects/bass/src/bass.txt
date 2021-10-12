@@ -1,5 +1,5 @@
 BASS 2.4
-Copyright (c) 1999-2020 Un4seen Developments Ltd. All rights reserved.
+Copyright (c) 1999-2021 Un4seen Developments Ltd. All rights reserved.
 
 Files that you should have found in the BASS package
 ====================================================
@@ -8,12 +8,8 @@ Win32 version
 BASS.TXT        This file
 BASS.DLL        BASS module
 BASS.CHM        BASS documentation
-MP3-FREE\
-  BASS.DLL        BASS module using the OS's MP3 decoder
 X64\
   BASS.DLL        64-bit BASS module
-  MP3-FREE
-    BASS.DLL        64-bit BASS module using the OS's MP3 decoder
 C\              C/C++ API and examples...
   BASS.H          BASS C/C++ header file
   BASS.LIB        BASS import library
@@ -22,7 +18,7 @@ C\              C/C++ API and examples...
   MAKEFILE.IN     Makefile helper macros
   X64\
     BASS.LIB        64-bit BASS import library
-  3DTEST\         3D/EAX example
+  3DTEST\         3D example
     ...
   BASSTEST\       Simple playback example
     ...
@@ -34,13 +30,13 @@ C\              C/C++ API and examples...
     ...
   DSPTEST\        DSP example
     ...
-  FXTEST\         DX8 effect example
+  FXTEST\         Effects example
     ...
   LIVEFX\         Full-duplex example
     ...
-  LIVESPEC\       "Live" version of spectrum analyser example
+  LIVESPEC\       Live version of spectrum analyser example
     ...
-  MODTEST\         MOD music example
+  MODTEST\        MOD music example
     ...
   MULTI\          Multiple device example
     ...
@@ -78,7 +74,7 @@ C\              C/C++ API and examples...
     WRITEWAV.EXE
 DELPHI\         Delphi API and examples...
   BASS.PAS        BASS Delphi unit
-  3DTEST\         3D/EAX example
+  3DTEST\         3D example
     ...
   BASSTEST\       Simple playback example
     ...
@@ -88,11 +84,11 @@ DELPHI\         Delphi API and examples...
     ...
   DSPTEST\        DSP example
     ...
-  FXTEST\         DX8 effect example
+  FXTEST\         Effects example
     ...
   LIVEFX\         Full-duplex example
     ...
-  LIVESPEC\       "Live" version of spectrum analyser example
+  LIVESPEC\       Live version of spectrum analyser example
     ...
   MULTI\          Multiple device example
     ...
@@ -114,7 +110,7 @@ DELPHI\         Delphi API and examples...
     ...
 VB\             Visual Basic API and examples...
   BASS.BAS        BASS Visual Basic module
-  3DTEST\         3D/EAX example
+  3DTEST\         3D example
     ...
   BASSTEST\       Simple playback example
     ...
@@ -122,11 +118,11 @@ VB\             Visual Basic API and examples...
     ...
   DSPTEST\        DSP example
     ...
-  FXTEST\         DX8 effect example
+  FXTEST\         Effects example
     ...
   LIVEFX\         Full-duplex example
     ...
-  LIVESPEC\       "Live" version of spectrum analyser example
+  LIVESPEC\       Live version of spectrum analyser example
     ...
   MULTI\          Multiple device example
     ...
@@ -166,25 +162,15 @@ CHMOX.APP       CHM file viewer
 BASS.H          BASS C/C++ header file
 BASS.XCODEPROJ  Xcode project for examples
 MAKEFILE        Makefile for specific architectures
-MP3-FREE\
-  LIBBASS.DYLIB   BASS module using the OS's MP3 decoder
-3DTEST\         3D example
-  ...
-BASSTEST\       Simple playback example
-  ...
 CONTEST\        Console example
-  ...
-CUSTLOOP\       Custom looping example
   ...
 DEVLIST\        Device list example
   ...
 DSPTEST\        DSP example
   ...
-FXTEST\         DX8 effect example
+FXTEST\         Effects example
   ...
-LIVESPEC\       "Live" version of spectrum analyser example
-  ...
-MODTEST\        MOD music example
+LIVESPEC\       Live version of spectrum analyser example
   ...
 MULTI\          Multiple device example
   ...
@@ -207,11 +193,6 @@ NOTE: To view the documentation, you will need a CHM viewer, such as the
       included CHMOX. The documentation can also be viewed online at the BASS
       website.
 
-NOTE: The GUI-based examples (not CONTEST/DEVLIST/WRITEWAV) use the old Carbon
-      APIs that are not supported by 64-bit macOS. They will be replaced in
-      future but are currently still included for reference (the BASS parts are
-      still relevant).
-
 Linux version
 -------------
 BASS.TXT        This file
@@ -220,12 +201,8 @@ BASS.CHM        BASS documentation
 BASS.H          BASS C/C++ header file
 MAKEFILE        Makefile for examples
 MAKEFILE.IN     Makefile helper macros
-MP3-FREE\
-  LIBBASS.SO      BASS module using the OS's MP3 decoder
 X64\
   LIBBASS.SO      64-bit BASS module
-  MP3-FREE
-    LIBBASS.SO      64-bit BASS module using the OS's MP3 decoder
 PASCAL\
   BASS.PAS        BASS Delphi/Pascal unit
 3DTEST\         3D example
@@ -240,9 +217,9 @@ DEVLIST\        Device list example
   ...
 DSPTEST\        DSP example
   ...
-FXTEST\         DX8 effect example
+FXTEST\         Effects example
   ...
-LIVESPEC\       "Live" version of spectrum analyser example
+LIVESPEC\       Live version of spectrum analyser example
   ...
 MODTEST\        MOD music example
   ...
@@ -353,7 +330,7 @@ Main Features
 * Effects
   chorus/compressor/distortion/echo/flanger/gargle/parameq/reverb
 
-* User defined DSP functions
+* User-defined DSP functions
   custom effects may be applied to individual streams or the final output mix
 
 * 32 bit floating-point decoding and processing
@@ -516,27 +493,6 @@ Visit the BASS website for the latest pricing:
 
 	www.un4seen.com
 
-MP3
----
-MP3 technology is patented, and Thomson license the use of their and
-Fraunhofer's patents. The inclusion of an MP3 decoder (eg. BASS) in a
-commercial product requires an MP3 patent licence. Contact Thomson for
-details:
-
-	www.mp3licensing.com
-
-Alternatively, the "MP3-FREE" BASS version does not include its own MP3
-decoder but instead makes use of the operating system's already licensed
-decoder. If an MP3 decoder is not available, then MP3 playback will not
-be possible, but everything else will function as normal.
-
-NOTE: When using the OS's MP3 decoder, BASS still does the file handling
-      so all the usual features are still supported, including streaming,
-      tag reading, pre-scanning, gapless playback, etc.
-
-NOTE: Linux does not include an MP3 decoder as standard. The "MP3-FREE"
-      BASS version will make use of the libmpg123 decoder, if installed.
-
 
 Credits
 =======
@@ -559,6 +515,120 @@ These are the major (and not so major) changes at each version stage.
 There are of course bug fixes and other little improvements made along
 the way too! To make upgrading simpler, all functions affected by a
 change to the BASS interface are listed.
+
+2.4.16 - 24/6/2021
+------------------
+* DirectSound output mix is now generated by BASS (as with WASAPI output and
+  on other platforms), losing support for DirectSound-specific features but
+  gaining support for all BASS features
+	BASS_DEVICE_DSOUND (BASS_Init flag)
+* Length trimming
+	BASS_POS_END (BASS_ChannelSetPosition mode)
+	BASS_SYNC_END (BASS_ChannelSetSync type)
+	CUSTLOOP example updated
+* Custom loop start positions
+	BASS_POS_LOOP (BASS_ChannelSetPosition mode)
+	CUSTLOOP example updated
+* Length extending
+	BASS_ATTRIB_TAIL
+	BASS_SYNC_END (BASS_ChannelSetSync type)
+* Device reinitialization while retaining BASS channels and 3D settings
+	BASS_DEVICE_REINIT (BASS_Init flag)
+* Retrieval of a device's activity status
+	BASS_IsStarted
+* BASS_DEVICE_3D flag is no longer needed to enable 3D support
+	BASS_Init
+* The "Default" device is now enabled by default on Windows and macOS
+	BASS_CONFIG_DEV_DEFAULT (BASS_SetConfig option)
+* Default communications device indicator on Windows
+	BASS_DEVICE_DEFAULTCOM (BASS_DEVICEINFO flag)
+* Sample channel "newonly" option changed to a flag
+	BASS_SAMCHAN_NEW (BASS_SampleGetChannel flag)
+* Sample playback streams
+	BASS_SAMCHAN_STREAM (BASS_SampleGetChannel flag)
+	BASS_CTYPE_STREAM_SAMPLE
+* Speaker assignment support for samples
+	BASS_SampleGetChannel
+	BASS_ChannelFlags
+* Overriding of default flags during sample channel creation
+	BASS_SampleGetChannel
+* Same sample channel handle when max=1 is now optional
+	BASS_CONFIG_SAMPLE_ONEHANDLE (BASS_SetConfig option)
+* 3D max distance muting can now be toggled
+	BASS_SAMPLE_MUTEMAX (BASS_ChannelFlags flag)
+* Plugin disabling without affecting existing streams
+	BASS_PluginEnable
+* WASAPI recording on Windows (DirectSound is fallback/optional)
+	BASS_CONFIG_REC_WASAPI (BASS_SetConfig option)
+	BASS_RecordInit
+* Minimum recording buffer reduced to 10ms
+	BASS_CONFIG_REC_BUFFER (BASS_SetConfig option)
+* Recording data/level retrieval without removing from buffer when not using a RECORDPROC
+	BASS_DATA_NOREMOVE (BASS_ChannelGetData flag)
+	BASS_LEVEL_NOREMOVE (BASS_ChannelGetLevelEx flag)
+* Support for level measurements longer than 1s from decoding channels
+	BASS_ChannelGetLevelEx
+* Configurable restricted download rate
+	BASS_CONFIG_NET_RESTRATE (BASS_SetConfig option)
+* Thread-specific internet stream timeout options
+	BASS_CONFIG_THREAD (BASS_SetConfig option)
+	BASS_CONFIG_NET_TIMEOUT (BASS_SetConfig option)
+	BASS_CONFIG_NET_READTIMEOUT (BASS_SetConfig option)
+	BASS_StreamCreateURL
+* Configured "User-Agent" header can be overridden in custom request headers
+	BASS_StreamCreateURL
+* Multiple IPs will be tried when available on Linux/Android (already on other platforms)
+	BASS_StreamCreateURL
+* BASS_STREAM_BLOCK applied automatically on files larger than 2GB
+	BASS_StreamCreateURL/FileUser
+* Redirected URL retrieval
+	BASS_TAG_LOCATION (BASS_ChannelGetTags type)
+* Shoutcast metadata is now optional
+	BASS_CONFIG_NET_META (BASS_SetConfig option)
+	BASS_TAG_META (BASS_ChannelGetTags type)
+* Support for a 2nd ID3v2 tag block
+	BASS_TAG_ID3V2_2 (BASS_ChannelGetTags type)
+* OpenMPT channel name retrieval
+	BASS_TAG_MUSIC_CHAN (BASS_ChannelGetTags type)
+* Delayed OGG file scanning when prescanning is disabled/impossible
+	BASS_ChannelGetLength
+	BASS_ChannelSetPosition
+	BASS_CONFIG_OGG_PRESCAN (BASS_SetConfig option)
+* Faster seeking in large OGG files
+	BASS_ChannelSetPosition
+* Unified freeing function for all channel types
+	BASS_ChannelFree
+* User-defined attribute
+	BASS_ATTRIB_USER (BASS_ChannelSetAttributeEx option)
+* Push stream buffer size limiting
+	BASS_ATTRIB_PUSH_LIMIT (BASS_ChannelSetAttribute option)
+* Retrieval of a stream's available file data amount
+	BASS_FILEPOS_AVAILABLE (BASS_StreamGetFilePosition mode)
+* Error code for unsupported URL protocols
+	BASS_ERROR_PROTOCOL (BASS_StreamCreateURL error code)
+* BASS_ERROR_ALREADY error changed to success in some functions
+	BASS_ChannelPause
+	BASS_ChannelSetDevice
+	BASS_ChannelSetLink
+* Support for custom file streaming with Android Media codecs
+	BASS_StreamCreateFileUser
+* Switch to using native APIs for Android Media codecs (Android 5 or above required now)
+	BASS_StreamCreateFile/User/URL
+* BASS_TAG_AM_MIME value changed to fix conflict on Android
+	BASS_TAG_AM_MIME (BASS_ChannelGetTags type)
+* Improved support for single active input recording devices on Linux
+	BASS_RecordGetInputName
+	BASS_RecordGetInput
+	BASS_RecordSetInput
+* Automatic resumption of recordings after an interruption on iOS
+* Fix for Media Foundation AAC streaming with Windows 10 20H1
+	BASS_StreamCreateURL
+	BASS_StreamCreateFileUser
+* Fix for freeze when freeing a stream after BASS_ChannelSetLink failed with BASS_ERROR_ALREADY on it
+	BASS_ChannelSetLink
+* macOS examples rewritten in Objective-C/Cocoa
+* "MP3-FREE" version removed (MP3 patents expired)
+* armv5 (armeabi) architecture support dropped on Android
 
 2.4.15 - 17/12/2019
 -------------------

@@ -1,6 +1,6 @@
 /*
-	BASS plugin test
-	Copyright (c) 2005-2011 Un4seen Developments Ltd.
+	BASS plugins example
+	Copyright (c) 2005-2021 Un4seen Developments Ltd.
 */
 
 #include <windows.h>
@@ -9,9 +9,9 @@
 #include <commctrl.h>
 #include "bass.h"
 
-HWND win = NULL;
+HWND win;
 
-DWORD chan;	// the channel
+DWORD chan;	// channel handle
 
 OPENFILENAME ofn;
 char filter[2000];
@@ -44,7 +44,7 @@ const char *GetCTypeString(DWORD ctype, HPLUGIN plugin)
 	if (ctype == BASS_CTYPE_STREAM_WAV_PCM) return "PCM WAVE";
 	if (ctype == BASS_CTYPE_STREAM_WAV_FLOAT) return "Floating-point WAVE";
 	if (ctype == BASS_CTYPE_STREAM_MF) { // a Media Foundation codec, check the format...
-		const WAVEFORMATEX *wf = (WAVEFORMATEX*)BASS_ChannelGetTags(chan, BASS_TAG_WAVEFORMAT);
+		const WAVEFORMATEX *wf = (const WAVEFORMATEX*)BASS_ChannelGetTags(chan, BASS_TAG_WAVEFORMAT);
 		if (wf->wFormatTag == 0x1610) return "Advanced Audio Coding";
 		if (wf->wFormatTag >= 0x0160 && wf->wFormatTag <= 0x0163) return "Windows Media Audio";
 	}
@@ -55,7 +55,7 @@ const char *GetCTypeString(DWORD ctype, HPLUGIN plugin)
 
 #define MESS(id,m,w,l) SendDlgItemMessage(win,id,m,(WPARAM)(w),(LPARAM)(l))
 
-INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
+INT_PTR CALLBACK DialogProc(HWND h, UINT m, WPARAM w, LPARAM l)
 {
 	switch (m) {
 		case WM_COMMAND:
@@ -63,6 +63,7 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 				case IDCANCEL:
 					EndDialog(h, 0);
 					break;
+
 				case 10:
 					{
 						char file[MAX_PATH] = "";
@@ -70,23 +71,25 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 						ofn.nMaxFile = MAX_PATH;
 						if (GetOpenFileName(&ofn)) {
 							BASS_StreamFree(chan); // free the old stream
-							if (!(chan = BASS_StreamCreateFile(FALSE, file, 0, 0, BASS_SAMPLE_LOOP))) {
-								// it ain't playable
-								MESS(10, WM_SETTEXT, 0, "click here to open a file...");
+							if (!(chan = BASS_StreamCreateFile(FALSE, file, 0, 0, BASS_SAMPLE_LOOP | BASS_SAMPLE_FLOAT))) {
+								MESS(10, WM_SETTEXT, 0, "Open file...");
 								MESS(11, WM_SETTEXT, 0, "");
+								MESS(13, WM_SETTEXT, 0, "");
+								MESS(12, TBM_SETRANGEMAX, 1, 0);
 								Error("Can't play the file");
 								break;
 							}
-							MESS(10, WM_SETTEXT, 0, file);
-							{ // display the file type and length
-								QWORD bytes = BASS_ChannelGetLength(chan, BASS_POS_BYTE);
-								DWORD time = BASS_ChannelBytes2Seconds(chan, bytes);
+							MESS(10, WM_SETTEXT, 0, strrchr(file, '\\') + 1);
+							{ // display the file type
 								BASS_CHANNELINFO info;
 								BASS_ChannelGetInfo(chan, &info);
-								sprintf(file, "channel type = %x (%s)\nlength = %I64u (%u:%02u)",
-									info.ctype, GetCTypeString(info.ctype, info.plugin), bytes, time / 60, time % 60);
+								sprintf(file, "channel type = %x (%s)", info.ctype, GetCTypeString(info.ctype, info.plugin));
 								MESS(11, WM_SETTEXT, 0, file);
-								MESS(12, TBM_SETRANGEMAX, 1, time); // update scroller range
+							}
+							{ // update scroller range
+								QWORD len = BASS_ChannelGetLength(chan, BASS_POS_BYTE);
+								if (len == -1) len = 0; // unknown length
+								MESS(12, TBM_SETRANGEMAX, 1, BASS_ChannelBytes2Seconds(chan, len) * 1000);
 							}
 							BASS_ChannelPlay(chan, FALSE);
 						}
@@ -98,12 +101,19 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 		case WM_HSCROLL:
 			if (l && LOWORD(w) != SB_THUMBPOSITION && LOWORD(w) != SB_ENDSCROLL) { // set the position
 				int pos = SendMessage((HWND)l, TBM_GETPOS, 0, 0);
-				BASS_ChannelSetPosition(chan, BASS_ChannelSeconds2Bytes(chan, pos), BASS_POS_BYTE);
+				BASS_ChannelSetPosition(chan, BASS_ChannelSeconds2Bytes(chan, pos / 1000.0), BASS_POS_BYTE);
 			}
 			break;
 
 		case WM_TIMER:
-			MESS(12, TBM_SETPOS, 1, (DWORD)BASS_ChannelBytes2Seconds(chan, BASS_ChannelGetPosition(chan, BASS_POS_BYTE))); // update position
+			if (chan) {
+				char text[64];
+				double len = BASS_ChannelBytes2Seconds(chan, BASS_ChannelGetLength(chan, BASS_POS_BYTE));
+				double pos = BASS_ChannelBytes2Seconds(chan, BASS_ChannelGetPosition(chan, BASS_POS_BYTE));
+				sprintf(text, "%u:%02u / %u:%02u", (int)pos / 60, (int)pos % 60, (int)len / 60, (int)len % 60);
+				MESS(13, WM_SETTEXT, 0, text);
+				MESS(12, TBM_SETPOS, 1, pos * 1000);
+			}
 			break;
 
 		case WM_INITDIALOG:
@@ -130,9 +140,10 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 				fh = FindFirstFile(path, &fd);
 				if (fh != INVALID_HANDLE_VALUE) {
 					do {
-						HPLUGIN plug;
-						if (plug = BASS_PluginLoad(fd.cFileName, 0)) { // plugin loaded...
-							const BASS_PLUGININFO *pinfo = BASS_PluginGetInfo(plug); // get plugin info to add to the file selector filter...
+						HPLUGIN plug = BASS_PluginLoad(fd.cFileName, 0);
+						if (plug) { // plugin loaded
+							// get plugin info to add to the file selector filter
+							const BASS_PLUGININFO *pinfo = BASS_PluginGetInfo(plug);
 							int a;
 							for (a = 0; a < pinfo->formatc; a++) {
 								fp += sprintf(fp, "%s (%s) - %s", pinfo->formats[a].name, pinfo->formats[a].exts, fd.cFileName) + 1; // format description
@@ -144,7 +155,7 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 					} while (FindNextFile(fh, &fd));
 					FindClose(fh);
 				}
-				if (!MESS(20, LB_GETCOUNT, 0, 0)) // no plugins...
+				if (!MESS(20, LB_GETCOUNT, 0, 0))
 					MESS(20, LB_ADDSTRING, 0, "no plugins - visit the BASS webpage to get some");
 				// check if Media Foundation is available
 				if (!BASS_GetConfig(BASS_CONFIG_MF_DISABLE)) {
@@ -153,15 +164,16 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 				}
 				memcpy(fp, "All files\0*.*\0\0", 15);
 			}
-			SetTimer(h, 0, 500, 0); // timer to update the position
+			MESS(12, TBM_SETLINESIZE, 0, 1000);
+			SetTimer(h, 0, 100, 0); // timer to update the position display
 			return 1;
 
 		case WM_DESTROY:
-			// "free" the output device and all plugins
 			BASS_Free();
-			BASS_PluginFree(0);
+			BASS_PluginFree(0); // unload all plugins
 			break;
 	}
+
 	return 0;
 }
 
@@ -173,7 +185,12 @@ int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		return 0;
 	}
 
-	DialogBox(hInstance, MAKEINTRESOURCE(1000), NULL, dialogproc);
+	{
+		INITCOMMONCONTROLSEX cc = { sizeof(cc), ICC_BAR_CLASSES };
+		InitCommonControlsEx(&cc);
+	}
+
+	DialogBox(hInstance, MAKEINTRESOURCE(1000), NULL, DialogProc);
 
 	return 0;
 }

@@ -9,16 +9,17 @@
 #include <stdio.h>
 #include "bass.h"
 
-HWND win = NULL;
+HWND win;
 
 // channel (sample/music) info structure
 typedef struct {
-	DWORD channel;			// the channel
-	BASS_3DVECTOR pos, vel;	// position,velocity
+	DWORD channel;			// channel handle
+	BASS_3DVECTOR pos, vel;	// position, velocity
 } Channel;
 
-Channel *chans = NULL;		// the channels
-int chanc = 0, chan = -1;	// number of channels, current channel
+Channel *chans;		// the channels
+int chanc;			// number of channels
+int chan = -1;		// selected channel
 
 #define TIMERPERIOD	50		// timer period (ms)
 #define MAXDIST		50		// maximum distance of the channels (m)
@@ -95,7 +96,7 @@ void UpdateButtons()
 	}
 }
 
-INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
+INT_PTR CALLBACK DialogProc(HWND h, UINT m, WPARAM w, LPARAM l)
 {
 	static OPENFILENAME ofn;
 
@@ -109,16 +110,15 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 				case 10: // change the selected channel
 					if (HIWORD(w) != LBN_SELCHANGE) break;
 					chan = LM(LB_GETCURSEL, 0, 0);
-					if (chan == LB_ERR) chan = -1;
 					UpdateButtons();
 					break;
+
 				case 11: // add a channel
 					{
 						char file[MAX_PATH] = "";
-						DWORD newchan;
 						ofn.lpstrFile = file;
 						if (GetOpenFileName(&ofn)) {
-							// Load a music or sample from "file"
+							DWORD newchan;
 							if ((newchan = BASS_MusicLoad(FALSE, file, 0, 0, BASS_MUSIC_RAMP | BASS_SAMPLE_LOOP | BASS_SAMPLE_3D, 1))
 								|| (newchan = BASS_SampleLoad(FALSE, file, 0, 0, 1, BASS_SAMPLE_LOOP | BASS_SAMPLE_3D | BASS_SAMPLE_MONO))) {
 								Channel *c;
@@ -127,13 +127,14 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 								c = chans + chanc - 1;
 								memset(c, 0, sizeof(Channel));
 								c->channel = newchan;
-								BASS_SampleGetChannel(newchan, FALSE); // initialize sample channel
+								BASS_SampleGetChannel(newchan, FALSE); // initialize sample channel (ignored if MOD music)
 								LM(LB_ADDSTRING, 0, strrchr(file, '\\') + 1);
 							} else
-								Error("Can't load file (note samples must be mono)");
+								Error("Can't load the file");
 						}
 					}
 					break;
+
 				case 12: // remove a channel
 					{
 						Channel *c = chans + chan;
@@ -146,29 +147,35 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 						UpdateButtons();
 					}
 					break;
+
 				case 13:
 					BASS_ChannelPlay(chans[chan].channel, FALSE);
 					break;
+
 				case 14:
 					BASS_ChannelPause(chans[chan].channel);
 					break;
+
 				case 15: // X velocity
 					if (HIWORD(w) == EN_CHANGE) {
 						int v = GetDlgItemInt(win, 15, 0, FALSE);
 						if (abs((int)chans[chan].vel.x) != v) chans[chan].vel.x = v;
 					}
 					break;
+
 				case 16: // Z velocity
 					if (HIWORD(w) == EN_CHANGE) {
 						int v = GetDlgItemInt(win, 16, 0, FALSE);
 						if (abs((int)chans[chan].vel.z) != v) chans[chan].vel.z = v;
 					}
 					break;
+
 				case 17: // reset the position and velocity to 0
 					memset(&chans[chan].pos, 0, sizeof(chans[chan].pos));
 					memset(&chans[chan].vel, 0, sizeof(chans[chan].vel));
 					UpdateButtons();
 					break;
+
 				case IDCANCEL:
 					DestroyWindow(h);
 					break;
@@ -191,12 +198,26 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 
 		case WM_INITDIALOG:
 			win = h;
-
+			// initialize default output device
+			if (!BASS_Init(-1, 44100, 0, win, NULL)) {
+				Error("Can't initialize device");
+				EndDialog(win, 0);
+				return 0;
+			}
+			{ // check if multiple speakers are available
+				BASS_INFO i;
+				BASS_GetInfo(&i);
+				if (i.speakers > 2) {
+					if (MessageBox(win, "Multiple speakers were detected. Would you like to use them?", "Speakers", MB_YESNO) == IDNO)
+						BASS_SetConfig(BASS_CONFIG_3DALGORITHM, BASS_3DALG_OFF); // use stereo 3D output
+				}
+			}
+			// use meters as distance unit, real world rolloff, real doppler effect
+			BASS_Set3DFactors(1, 1, 1);
 			MESS(20, TBM_SETRANGE, FALSE, MAKELONG(0, 20));
 			MESS(20, TBM_SETPOS, TRUE, 10);
 			MESS(21, TBM_SETRANGE, FALSE, MAKELONG(0, 20));
 			MESS(21, TBM_SETPOS, TRUE, 10);
-
 			SetTimer(h, 1, TIMERPERIOD, NULL);
 			memset(&ofn, 0, sizeof(ofn));
 			ofn.lStructSize = sizeof(ofn);
@@ -209,10 +230,11 @@ INT_PTR CALLBACK dialogproc(HWND h, UINT m, WPARAM w, LPARAM l)
 
 		case WM_DESTROY:
 			KillTimer(h, 1);
-			if (chans) free(chans);
-			PostQuitMessage(0);
+			free(chans);
+			BASS_Free();
 			break;
 	}
+
 	return 0;
 }
 
@@ -226,35 +248,12 @@ int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		return 0;
 	}
 
-	{ // enable trackbar support
-		INITCOMMONCONTROLSEX cc = { sizeof(cc),ICC_BAR_CLASSES };
+	{
+		INITCOMMONCONTROLSEX cc = { sizeof(cc), ICC_BAR_CLASSES };
 		InitCommonControlsEx(&cc);
 	}
 
-	// Create the main window
-	if (!CreateDialog(hInstance, MAKEINTRESOURCE(1000), NULL, dialogproc)) {
-		Error("Can't create window");
-		return 0;
-	}
-
-	// Initialize the default output device with 3D support
-	if (!BASS_Init(-1, 44100, BASS_DEVICE_3D, win, NULL)) {
-		Error("Can't initialize output device");
-		DestroyWindow(win);
-		return 0;
-	}
-
-	// Use meters as distance unit, real world rolloff, real doppler effect
-	BASS_Set3DFactors(1, 1, 1);
-
-	while (GetMessage(&msg, NULL, 0, 0) > 0) {
-		if (!IsDialogMessage(win, &msg)) {
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		}
-	}
-
-	BASS_Free();
+	DialogBox(hInstance, MAKEINTRESOURCE(1000), NULL, DialogProc);
 
 	return 0;
 }

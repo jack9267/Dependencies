@@ -45,7 +45,7 @@
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>bass.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>bass.lib;comctl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <SubSystem>Windows</SubSystem>
     </Link>
@@ -57,7 +57,7 @@
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>bass.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>bass.lib;comctl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <SubSystem>Windows</SubSystem>
       <TargetMachine>MachineX64</TargetMachine>

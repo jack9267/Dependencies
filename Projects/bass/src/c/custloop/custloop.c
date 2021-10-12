@@ -1,27 +1,26 @@
 /*
 	BASS custom looping example
-	Copyright (c) 2004-2014 Un4seen Developments Ltd.
+	Copyright (c) 2004-2021 Un4seen Developments Ltd.
 */
 
 #include <windows.h>
 #include <stdio.h>
-#include <process.h>
 #include "bass.h"
 
 #define WIDTH 600	// display width
 #define HEIGHT 201	// height (odd number for centre line)
 
-HWND win = NULL;
-DWORD scanthread = 0;
-BOOL killscan = FALSE;
+HWND win;
 
 DWORD chan;
 DWORD bpp;			// bytes per pixel
-QWORD loop[2] = { 0 };	// loop start & end
-HSYNC lsync;		// looping sync
+QWORD loop[2];		// loop start & end
 
-HDC wavedc = 0;
-HBITMAP wavebmp = 0;
+HANDLE scanthread;
+BOOL killscan;
+
+HDC wavedc;
+HBITMAP wavebmp;
 BYTE *wavebuf;
 
 // display error messages
@@ -32,51 +31,40 @@ void Error(const char *es)
 	MessageBox(win, mes, 0, 0);
 }
 
-void CALLBACK LoopSyncProc(HSYNC handle, DWORD channel, DWORD data, void *user)
-{
-	if (!BASS_ChannelSetPosition(channel, loop[0], BASS_POS_BYTE)) // try seeking to loop start
-		BASS_ChannelSetPosition(channel, 0, BASS_POS_BYTE); // failed, go to start of file instead
-}
-
 void SetLoopStart(QWORD pos)
 {
+	if (loop[1] && pos >= loop[1]) { // the loop end needs to move
+		loop[1] = pos + bpp;
+		BASS_ChannelSetPosition(chan, loop[1], BASS_POS_END);
+	}
+	BASS_ChannelSetPosition(chan, pos, BASS_POS_LOOP);
 	loop[0] = pos;
 }
 
 void SetLoopEnd(QWORD pos)
 {
+	if (pos <= loop[0]) { // the loop start needs to move
+		loop[0] = pos - min(bpp, pos);
+		BASS_ChannelSetPosition(chan, loop[0], BASS_POS_LOOP);
+	}
+	BASS_ChannelSetPosition(chan, pos, BASS_POS_END);
 	loop[1] = pos;
-	BASS_ChannelRemoveSync(chan, lsync); // remove old sync
-	lsync = BASS_ChannelSetSync(chan, BASS_SYNC_POS | BASS_SYNC_MIXTIME, loop[1], LoopSyncProc, 0); // set new sync
 }
 
 // scan the peaks
-void __cdecl ScanPeaks(void *p)
+DWORD WINAPI ScanPeaks(void *p)
 {
 	DWORD decoder = (DWORD)p;
 	DWORD pos = 0;
 	float spp = BASS_ChannelBytes2Seconds(decoder, bpp); // seconds per pixel
 	while (!killscan) {
 		float peak[2];
-		if (spp > 1) { // more than 1 second per pixel, break it down...
-			float todo = spp;
-			peak[1] = peak[0] = 0;
-			do {
-				float level[2], step = (todo < 1 ? todo : 1);
-				BASS_ChannelGetLevelEx(decoder, level, step, BASS_LEVEL_STEREO); // scan peaks
-				if (peak[0] < level[0]) peak[0] = level[0];
-				if (peak[1] < level[1]) peak[1] = level[1];
-				todo -= step;
-			} while (todo > 0);
-		} else
-			BASS_ChannelGetLevelEx(decoder, peak, spp, BASS_LEVEL_STEREO); // scan peaks
-		{
-			DWORD a;
-			for (a = 0; a < peak[0] * (HEIGHT / 2); a++)
-				wavebuf[(HEIGHT / 2 - 1 - a) * WIDTH + pos] = 1 + a; // draw left peak
-			for (a = 0; a < peak[1] * (HEIGHT / 2); a++)
-				wavebuf[(HEIGHT / 2 + 1 + a) * WIDTH + pos] = 1 + a; // draw right peak
-		}
+		int a;
+		BASS_ChannelGetLevelEx(decoder, peak, spp, BASS_LEVEL_STEREO); // scan peaks
+		for (a = 0; a < peak[0] * (HEIGHT / 2); a++)
+			wavebuf[(HEIGHT / 2 - 1 - a) * WIDTH + pos] = 1 + a; // draw left peak
+		for (a = 0; a < peak[1] * (HEIGHT / 2); a++)
+			wavebuf[(HEIGHT / 2 + 1 + a) * WIDTH + pos] = 1 + a; // draw right peak
 		pos++;
 		if (pos >= WIDTH) break; // reached end of display
 		if (!BASS_ChannelIsActive(decoder)) break; // reached end of channel
@@ -93,7 +81,7 @@ void __cdecl ScanPeaks(void *p)
 		}
 	}
 	BASS_StreamFree(decoder); // free the decoder
-	scanthread = 0;
+	return 0;
 }
 
 // select a file to play, and start scanning it
@@ -110,10 +98,10 @@ BOOL PlayFile()
 	ofn.lpstrFilter = "Playable files\0*.mp3;*.mp2;*.mp1;*.ogg;*.wav;*.aif;*.mo3;*.it;*.xm;*.s3m;*.mtm;*.mod;*.umx\0All files\0*.*\0\0";
 	if (!GetOpenFileName(&ofn)) return FALSE;
 
-	if (!(chan = BASS_StreamCreateFile(FALSE, file, 0, 0, 0))
-		&& !(chan = BASS_MusicLoad(FALSE, file, 0, 0, BASS_MUSIC_RAMPS | BASS_MUSIC_POSRESET | BASS_MUSIC_PRESCAN, 1))) {
+	if (!(chan = BASS_StreamCreateFile(FALSE, file, 0, 0, BASS_SAMPLE_LOOP))
+		&& !(chan = BASS_MusicLoad(FALSE, file, 0, 0, BASS_MUSIC_RAMPS | BASS_MUSIC_POSRESET | BASS_MUSIC_PRESCAN | BASS_SAMPLE_LOOP, 1))) {
 		Error("Can't play file");
-		return FALSE; // Can't load the file
+		return FALSE;
 	}
 	{
 		BYTE data[2000] = { 0 };
@@ -141,12 +129,11 @@ BOOL PlayFile()
 		DWORD bpp1 = BASS_ChannelSeconds2Bytes(chan, 0.001); // minimum 1ms per pixel
 		if (bpp < bpp1) bpp = bpp1;
 	}
-	BASS_ChannelSetSync(chan, BASS_SYNC_END | BASS_SYNC_MIXTIME, 0, LoopSyncProc, 0); // set sync to loop at end
 	BASS_ChannelPlay(chan, FALSE); // start playing
 	{ // create another channel to scan
 		DWORD chan2 = BASS_StreamCreateFile(FALSE, file, 0, 0, BASS_STREAM_DECODE);
 		if (!chan2) chan2 = BASS_MusicLoad(FALSE, file, 0, 0, BASS_MUSIC_DECODE, 1);
-		scanthread = _beginthread(ScanPeaks, 0, (void*)chan2); // start scanning in a new thread
+		scanthread = CreateThread(NULL, 0, ScanPeaks, (void*)chan2, 0, NULL); // start scanning in a new thread
 	}
 	return TRUE;
 }
@@ -181,7 +168,7 @@ LRESULT CALLBACK SpectrumWindowProc(HWND h, UINT m, WPARAM w, LPARAM l)
 			return 0;
 
 		case WM_MBUTTONDOWN:
-			BASS_ChannelSetPosition(chan, LOWORD(l) * bpp, BASS_POS_BYTE); // set current pos
+			BASS_ChannelSetPosition(chan, LOWORD(l) * bpp, BASS_POS_BYTE); // set current position
 			return 0;
 
 		case WM_TIMER:
@@ -195,8 +182,8 @@ LRESULT CALLBACK SpectrumWindowProc(HWND h, UINT m, WPARAM w, LPARAM l)
 				if (!(dc = BeginPaint(h, &p))) return 0;
 				BitBlt(dc, 0, 0, WIDTH, HEIGHT, wavedc, 0, 0, SRCCOPY); // draw peak waveform
 				DrawTimeLine(dc, loop[0], 0xffff00, 12); // loop start
-				DrawTimeLine(dc, loop[1], 0x00ffff, 24); // loop end
-				DrawTimeLine(dc, BASS_ChannelGetPosition(chan, BASS_POS_BYTE), 0xffffff, 0); // current pos
+				if (loop[1]) DrawTimeLine(dc, loop[1], 0x00ffff, 24); // loop end
+				DrawTimeLine(dc, BASS_ChannelGetPosition(chan, BASS_POS_BYTE), 0xffffff, 0); // current position
 				EndPaint(h, &p);
 			}
 			return 0;
@@ -217,9 +204,10 @@ LRESULT CALLBACK SpectrumWindowProc(HWND h, UINT m, WPARAM w, LPARAM l)
 
 		case WM_DESTROY:
 			KillTimer(h, 0);
-			if (scanthread) { // still scanning
+			if (scanthread) {
 				killscan = TRUE;
-				WaitForSingleObject((HANDLE)scanthread, 1000); // wait for the thread
+				WaitForSingleObject(scanthread, INFINITE); // wait for the scan thread
+				CloseHandle(scanthread);
 			}
 			BASS_Free();
 			if (wavedc) DeleteDC(wavedc);
@@ -227,6 +215,7 @@ LRESULT CALLBACK SpectrumWindowProc(HWND h, UINT m, WPARAM w, LPARAM l)
 			PostQuitMessage(0);
 			break;
 	}
+
 	return DefWindowProc(h, m, w, l);
 }
 
@@ -248,7 +237,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wc.lpszClassName = "BASS-CustLoop";
 	if (!RegisterClass(&wc) || !CreateWindow("BASS-CustLoop",
-			"BASS custom looping example (left-click to set loop start, right-click to set end)",
+			"BASS custom looping example (left-click to set loop start, right-click to set end, middle-click to seek)",
 			WS_POPUPWINDOW | WS_CAPTION | WS_VISIBLE, 100, 100,
 			WIDTH + 2 * GetSystemMetrics(SM_CXDLGFRAME),
 			HEIGHT + GetSystemMetrics(SM_CYCAPTION) + 2 * GetSystemMetrics(SM_CYDLGFRAME),
