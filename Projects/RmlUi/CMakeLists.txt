@@ -4,7 +4,7 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/Include")
 
 install_include("${CMAKE_CURRENT_SOURCE_DIR}/Include")
 
-add_definitions(-DRMLUI_VERSION="4.3")
+add_definitions(-DRMLUI_VERSION="4.4")
 
 new_library_static(RmlCore "${SOURCES}" "RMLUI_STATIC_LIB")
 new_library_shared(RmlCore "${SOURCES}" "RmlCore_EXPORTS")

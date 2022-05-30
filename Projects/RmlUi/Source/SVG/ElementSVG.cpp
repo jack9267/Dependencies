@@ -27,13 +27,14 @@
  */
 
 #include "../../Include/RmlUi/SVG/ElementSVG.h"
+#include "../../Include/RmlUi/Core/ComputedValues.h"
 #include "../../Include/RmlUi/Core/Core.h"
-#include "../../Include/RmlUi/Core/PropertyIdSet.h"
-#include "../../Include/RmlUi/Core/GeometryUtilities.h"
 #include "../../Include/RmlUi/Core/ElementDocument.h"
-#include "../../Include/RmlUi/Core/SystemInterface.h"
 #include "../../Include/RmlUi/Core/FileInterface.h"
+#include "../../Include/RmlUi/Core/GeometryUtilities.h"
 #include "../../Include/RmlUi/Core/Math.h"
+#include "../../Include/RmlUi/Core/PropertyIdSet.h"
+#include "../../Include/RmlUi/Core/SystemInterface.h"
 #include <cmath>
 #include <lunasvg.h>
 
@@ -54,6 +55,14 @@ bool ElementSVG::GetIntrinsicDimensions(Vector2f& dimensions, float& ratio)
 		LoadSource();
 
 	dimensions = intrinsic_dimensions;
+
+	if (HasAttribute("width")) {
+		dimensions.x = GetAttribute< float >("width", -1);
+	}
+	if (HasAttribute("height")) {
+		dimensions.y = GetAttribute< float >("height", -1);
+	}
+
 	if (dimensions.y > 0)
 		ratio = dimensions.x / dimensions.y;
 
@@ -87,6 +96,12 @@ void ElementSVG::OnAttributeChange(const ElementAttributes& changed_attributes)
 		source_dirty = true;
 		DirtyLayout();
 	}
+
+	if (changed_attributes.find("width") != changed_attributes.end() ||
+		changed_attributes.find("height") != changed_attributes.end())
+	{
+		DirtyLayout();
+	}
 }
 
 void ElementSVG::OnPropertyChange(const PropertyIdSet& changed_properties)
@@ -116,8 +131,8 @@ void ElementSVG::GenerateGeometry()
 
 	const ComputedValues& computed = GetComputedValues();
 
-	const float opacity = computed.opacity;
-	Colourb quad_colour = computed.image_color;
+	const float opacity = computed.opacity();
+	Colourb quad_colour = computed.image_color();
 	quad_colour.alpha = (byte)(opacity * (float)quad_colour.alpha);
 
 	const Vector2f render_dimensions_f = GetBox().GetSize(Box::CONTENT).Round();

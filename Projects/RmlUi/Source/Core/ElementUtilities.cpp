@@ -58,7 +58,7 @@ static void SetBox(Element* element)
 	Box box;
 	LayoutDetails::BuildBox(box, containing_block, element);
 
-	if (element->GetComputedValues().height.type != Style::Height::Auto)
+	if (element->GetComputedValues().height().type != Style::Height::Auto)
 		box.SetContent(Vector2f(box.GetSize().x, containing_block.y));
 
 	element->SetBox(box);
@@ -170,7 +170,7 @@ bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_d
 	clip_origin = Vector2i(-1, -1);
 	clip_dimensions = Vector2i(-1, -1);
 
-	Clip target_element_clip = element->GetComputedValues().clip;
+	Clip target_element_clip = element->GetComputedValues().clip();
 	if (target_element_clip == Clip::Type::None)
 		return false;
 
@@ -184,14 +184,10 @@ bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_d
 	while (clipping_element != nullptr)
 	{
 		const ComputedValues& clip_computed = clipping_element->GetComputedValues();
-		const bool clip_enabled = (clip_computed.overflow_x != Style::Overflow::Visible || clip_computed.overflow_y != Style::Overflow::Visible);
-		const bool clip_always = (clip_computed.clip == Clip::Type::Always);
-		const bool clip_none = (clip_computed.clip == Clip::Type::None);
-		const int clip_number = clip_computed.clip.GetNumber();
-
-		// If this region ignores all clipping regions, then we do too.
-		if (clip_none)
-			break;
+		const bool clip_enabled = (clip_computed.overflow_x() != Style::Overflow::Visible || clip_computed.overflow_y() != Style::Overflow::Visible);
+		const bool clip_always = (clip_computed.clip() == Clip::Type::Always);
+		const bool clip_none = (clip_computed.clip() == Clip::Type::None);
+		const int clip_number = clip_computed.clip().GetNumber();
 
 		// Merge the existing clip region with the current clip region if we aren't ignoring clip regions.
 		if ((clip_always || clip_enabled) && num_ignored_clips == 0)
@@ -234,6 +230,10 @@ bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_d
 		
 		// Inherit how many clip regions this ancestor ignores.
 		num_ignored_clips = Math::Max(num_ignored_clips, clip_number);
+
+		// If this region ignores all clipping regions, then we do too.
+		if (clip_none)
+			break;
 
 		// Climb the tree to this region's parent.
 		clipping_element = clipping_element->GetParentNode();
