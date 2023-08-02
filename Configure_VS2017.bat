@@ -6,4 +6,4 @@ call Configure.bat
 set CMAKE_EXTRA_PATH=_static
 set CMAKE_EXTRA_ARGS=-DFORCE_STATIC_VCRT=ON
 call Configure.bat
-pause
+if not defined AUTOMATION pause

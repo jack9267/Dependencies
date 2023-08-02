@@ -7,4 +7,4 @@ call Compile.bat
 set CMAKE_EXTRA_PATH=_static
 set CMAKE_EXTRA_ARGS=-DFORCE_STATIC_VCRT=ON -DNO_ENHANCED_INSTRUCTIONS=ON
 call Compile.bat
-pause
+if not defined AUTOMATION pause
