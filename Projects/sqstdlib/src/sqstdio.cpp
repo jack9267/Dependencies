@@ -5,7 +5,7 @@
 #include <sqstdio.h>
 #include "sqstdstream.h"
 
-#define SQSTD_FILE_TYPE_TAG (SQSTD_STREAM_TYPE_TAG | 0x00000001)
+#define SQSTD_FILE_TYPE_TAG ((SQUnsignedInteger)(SQSTD_STREAM_TYPE_TAG | 0x00000001))
 //basic API
 SQFILE sqstd_fopen(const SQChar *filename ,const SQChar *mode)
 {
@@ -154,7 +154,7 @@ static SQInteger _file_constructor(HSQUIRRELVM v)
 static SQInteger _file_close(HSQUIRRELVM v)
 {
     SQFile *self = NULL;
-    if(SQ_SUCCEEDED(sq_getinstanceup(v,1,(SQUserPointer*)&self,(SQUserPointer)SQSTD_FILE_TYPE_TAG))
+    if(SQ_SUCCEEDED(sq_getinstanceup(v,1,(SQUserPointer*)&self,(SQUserPointer)SQSTD_FILE_TYPE_TAG, SQTrue))
         && self != NULL)
     {
         self->Close();
@@ -200,7 +200,7 @@ SQRESULT sqstd_createfile(HSQUIRRELVM v, SQFILE file,SQBool own)
 SQRESULT sqstd_getfile(HSQUIRRELVM v, SQInteger idx, SQFILE *file)
 {
     SQFile *fileobj = NULL;
-    if(SQ_SUCCEEDED(sq_getinstanceup(v,idx,(SQUserPointer*)&fileobj,(SQUserPointer)SQSTD_FILE_TYPE_TAG))) {
+    if(SQ_SUCCEEDED(sq_getinstanceup(v,idx,(SQUserPointer*)&fileobj,(SQUserPointer)SQSTD_FILE_TYPE_TAG,SQFalse))) {
         *file = fileobj->GetHandle();
         return SQ_OK;
     }
@@ -372,7 +372,7 @@ SQRESULT sqstd_loadfile(HSQUIRRELVM v,const SQChar *filename,SQBool printerror)
                     }
                     if(uc != 0xBF) {
                         sqstd_fclose(file);
-                        return sq_throwerror(v,_SC("Unrecognozed ecoding"));
+                        return sq_throwerror(v,_SC("Unrecognized encoding"));
                     }
 #ifdef SQUNICODE
                     func = _io_file_lexfeed_UTF8;
@@ -399,6 +399,10 @@ SQRESULT sqstd_loadfile(HSQUIRRELVM v,const SQChar *filename,SQBool printerror)
 
 SQRESULT sqstd_dofile(HSQUIRRELVM v,const SQChar *filename,SQBool retval,SQBool printerror)
 {
+    //at least one entry must exist in order for us to push it as the environment
+    if(sq_gettop(v) == 0)
+        return sq_throwerror(v,_SC("environment table expected"));
+
     if(SQ_SUCCEEDED(sqstd_loadfile(v,filename,printerror))) {
         sq_push(v,-2);
         if(SQ_SUCCEEDED(sq_call(v,1,retval,SQTrue))) {
