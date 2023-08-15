@@ -5,7 +5,7 @@
 #                            | (__| |_| |  _ <| |___
 #                             \___|\___/|_| \_\_____|
 #
-# Copyright (C) 1998 - 2020, Daniel Stenberg, <daniel@haxx.se>, et al.
+# Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
 #
 # This software is licensed as described in the file COPYING, which
 # you should have received as part of this distribution. The terms
@@ -17,6 +17,8 @@
 #
 # This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 # KIND, either express or implied.
+#
+# SPDX-License-Identifier: curl
 #
 ###########################################################################
 
@@ -31,7 +33,7 @@ GENHTMLPAGES = curl.html curl-config.html mk-ca-bundle.html
 PDFPAGES = curl.pdf curl-config.pdf mk-ca-bundle.pdf
 MANDISTPAGES = curl.1.dist curl-config.1.dist
 
-HTMLPAGES = $(GENHTMLPAGES) index.html
+HTMLPAGES = $(GENHTMLPAGES)
 
 # Build targets in this file (.) before cmdline-opts to ensure that
 # the curl.1 rule below runs first
@@ -44,6 +46,7 @@ EXTRA_DIST =                                    \
  $(noinst_man_MANS)                             \
  ALTSVC.md                                      \
  BINDINGS.md                                    \
+ BUFREF.md                                      \
  BUG-BOUNTY.md                                  \
  BUGS.md                                        \
  CHECKSRC.md                                    \
@@ -56,7 +59,6 @@ EXTRA_DIST =                                    \
  CURL-DISABLE.md                                \
  DEPRECATE.md                                   \
  DYNBUF.md                                      \
- ECH.md                                         \
  EXPERIMENTAL.md                                \
  FAQ                                            \
  FEATURES.md                                    \
@@ -80,6 +82,7 @@ EXTRA_DIST =                                    \
  PARALLEL-TRANSFERS.md                          \
  README.md                                      \
  RELEASE-PROCEDURE.md                           \
+ RUSTLS.md                                      \
  ROADMAP.md                                     \
  SECURITY-PROCESS.md                            \
  SSL-PROBLEMS.md                                \
@@ -88,7 +91,8 @@ EXTRA_DIST =                                    \
  TODO                                           \
  TheArtOfHttpScripting.md                       \
  URL-SYNTAX.md                                  \
- VERSIONS.md
+ VERSIONS.md                                    \
+ WEBSOCKET.md
 
 MAN2HTML= roffit $< >$@
 

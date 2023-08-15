@@ -6,7 +6,7 @@
 #                            | (__| |_| |  _ <| |___
 #                             \___|\___/|_| \_\_____|
 #
-# Copyright (C) 1998 - 2020, Daniel Stenberg, <daniel@haxx.se>, et al.
+# Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
 #
 # This software is licensed as described in the file COPYING, which
 # you should have received as part of this distribution. The terms
@@ -18,6 +18,8 @@
 #
 # This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 # KIND, either express or implied.
+#
+# SPDX-License-Identifier: curl
 #
 ###########################################################################
 
@@ -146,6 +148,7 @@ my $nodataconn425; # set if ftp srvr doesn't establish data ch and replies 425
 my $nodataconn421; # set if ftp srvr doesn't establish data ch and replies 421
 my $nodataconn150; # set if ftp srvr doesn't establish data ch and replies 150
 my $storeresp;
+my $postfetch;
 my @capabilities;  # set if server supports capability commands
 my @auth_mechs;    # set if server supports authentication commands
 my %fulltextreply; #
@@ -643,6 +646,7 @@ sub protocolsetup {
             'STATUS'     => \&STATUS_imap,
             'STORE'      => \&STORE_imap,
             'UID'        => \&UID_imap,
+            'IDLE'       => \&IDLE_imap,
         );
         %displaytext = (
             'welcome' => join("",
@@ -1231,7 +1235,8 @@ sub FETCH_imap {
             sendcontrol $d;
         }
 
-        sendcontrol ")\r\n";
+        # Set the custom extra header content with POSTFETCH
+        sendcontrol "$postfetch)\r\n";
         sendcontrol "$cmdid OK FETCH completed\r\n";
     }
 
@@ -1584,6 +1589,13 @@ sub COPY_imap {
         sendcontrol "$cmdid OK COPY completed\r\n";
     }
 
+    return 0;
+}
+
+sub IDLE_imap {
+    logmsg "IDLE received\n";
+
+    sendcontrol "+ entering idle mode\r\n";
     return 0;
 }
 
@@ -2092,8 +2104,7 @@ my @ftpdir=("total 20\r\n",
     logmsg "pass LIST data on data connection\n";
 
     if($cwd_testno) {
-        loadtest("$logdir/test$cwd_testno") ||
-            loadtest("$srcdir/data/test$cwd_testno");
+        loadtest("$logdir/test$cwd_testno");
 
         my @data = getpart("reply", "data");
         for(@data) {
@@ -2156,8 +2167,7 @@ sub MDTM_ftp {
         $testno = int($testno / 10000);
     }
 
-    loadtest("$logdir/test$testno") ||
-        loadtest("$srcdir/data/test$testno");
+    loadtest("$logdir/test$testno");
 
     my @data = getpart("reply", "mdtm");
 
@@ -2210,9 +2220,7 @@ sub SIZE_ftp {
         $testno = int($testno / 10000);
     }
 
-    loadtest("$logdir/test$testno") ||
-        loadtest("$srcdir/data/test$testno");
-
+    loadtest("$logdir/test$testno");
     my @data = getpart("reply", "size");
 
     my $size = $data[0];
@@ -2300,8 +2308,7 @@ sub RETR_ftp {
         $testno = int($testno / 10000);
     }
 
-    loadtest("$logdir/test$testno") ||
-        loadtest("$srcdir/data/test$testno");
+    loadtest("$logdir/test$testno");
 
     my @data = getpart("reply", "data$testpart");
 
@@ -2795,6 +2802,7 @@ sub customize {
     $nodataconn421 = 0; # default is to not send 421 without data channel
     $nodataconn150 = 0; # default is to not send 150 without data channel
     $storeresp = "";    # send as ultimate STOR response
+    $postfetch = "";    # send as header after a FETCH response
     @capabilities = (); # default is to not support capability commands
     @auth_mechs = ();   # default is to not support authentication commands
     %fulltextreply = ();#
@@ -2836,6 +2844,10 @@ sub customize {
         elsif($_ =~ /DELAY ([A-Z]+) (\d*)/) {
             $delayreply{$1}=$2;
             logmsg "FTPD: delay reply for $1 with $2 seconds\n";
+        }
+        elsif($_ =~ /POSTFETCH (.*)/) {
+            logmsg "FTPD: read POSTFETCH header data\n";
+            $postfetch = $1;
         }
         elsif($_ =~ /SLOWDOWN/) {
             $ctrldelay=1;
@@ -3090,8 +3102,7 @@ while(1) {
     $| = 1;
 
     &customize(); # read test control instructions
-    loadtest("$logdir/test$testno") ||
-        loadtest("$srcdir/data/test$testno");
+    loadtest("$logdir/test$testno");
 
     my $welcome = $commandreply{"welcome"};
     if(!$welcome) {

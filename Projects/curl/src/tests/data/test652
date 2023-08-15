@@ -14,18 +14,21 @@ MIME
 #
 # Client-side
 <client>
+<features>
+Mime
+</features>
 <server>
 smtp
 </server>
 <tool>
-lib652
+lib%TESTNUMBER
 </tool>
 
  <name>
 SMTP with encoded huge mime data contents
  </name>
  <command>
-smtp://%HOSTIP:%SMTPPORT/652
+smtp://%HOSTIP:%SMTPPORT/%TESTNUMBER
 </command>
 </client>
 
@@ -37,7 +40,7 @@ s/^--------------------------[a-z0-9]*/------------------------------/
 s/boundary=------------------------[a-z0-9]*/boundary=----------------------------/
 </strippart>
 <protocol>
-EHLO 652
+EHLO %TESTNUMBER
 MAIL FROM:<somebody@example.com>
 RCPT TO:<someone@example.com>
 DATA
