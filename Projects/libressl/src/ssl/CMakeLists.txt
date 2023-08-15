@@ -28,6 +28,7 @@ set(
 	ssl_ciph.c
 	ssl_clnt.c
 	ssl_err.c
+	ssl_init.c
 	ssl_lib.c
 	ssl_packet.c
 	ssl_pkt.c
@@ -47,7 +48,9 @@ set(
 )
 
 add_library(ssl-objects OBJECT ${SSL_SRC})
+set(SSL_LIBRARIES ssl)
 if (BUILD_SHARED)
+	list(APPEND SSL_LIBRARIES ssl-shared)
 	add_library(ssl STATIC $<TARGET_OBJECTS:ssl-objects>)
 	add_library(ssl-shared SHARED $<TARGET_OBJECTS:ssl-objects>)
 	export_symbol(ssl-shared ${CMAKE_CURRENT_SOURCE_DIR}/ssl.sym)
@@ -61,12 +64,15 @@ if (BUILD_SHARED)
 		ARCHIVE_OUTPUT_NAME ssl${SSL_POSTFIX})
 	set_target_properties(ssl-shared PROPERTIES VERSION ${SSL_VERSION}
 		SOVERSION ${SSL_MAJOR_VERSION})
-	if(ENABLE_LIBRESSL_INSTALL)
-		install(TARGETS ssl ssl-shared DESTINATION ${CMAKE_INSTALL_LIBDIR})
-	endif(ENABLE_LIBRESSL_INSTALL)
 else()
 	add_library(ssl STATIC ${SSL_SRC})
-	if(ENABLE_LIBRESSL_INSTALL)
-		install(TARGETS ssl DESTINATION ${CMAKE_INSTALL_LIBDIR})
-	endif(ENABLE_LIBRESSL_INSTALL)
 endif()
+
+if(ENABLE_LIBRESSL_INSTALL)
+	install(
+		TARGETS ${SSL_LIBRARIES}
+		ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+		LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+	)
+endif(ENABLE_LIBRESSL_INSTALL)

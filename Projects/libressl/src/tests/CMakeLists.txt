@@ -5,6 +5,7 @@ include_directories(
 	../crypto/modes
 	../crypto/asn1
 	../ssl
+	../tls
 	../apps/openssl
 	../apps/openssl/compat
 )
@@ -23,6 +24,8 @@ foreach(lib IN LISTS OPENSSL_LIBS)
 	endif()
 endforeach()
 
+file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR} TEST_SOURCE_DIR)
+
 # aeadtest
 add_executable(aeadtest aeadtest.c)
 target_link_libraries(aeadtest ${TESTS_LIBS})
@@ -40,6 +43,11 @@ if(NOT CMAKE_HOST_WIN32 AND NOT CMAKE_SYSTEM_NAME MATCHES "MINGW")
 	target_link_libraries(arc4randomforktest ${TESTS_LIBS})
 	add_test(arc4randomforktest ${CMAKE_CURRENT_SOURCE_DIR}/arc4randomforktest.sh)
 endif()
+
+# asn1evp
+add_executable(asn1evp asn1evp.c)
+target_link_libraries(asn1evp ${TESTS_LIBS})
+add_test(asn1evp asn1evp)
 
 # asn1test
 add_executable(asn1test asn1test.c)
@@ -105,6 +113,11 @@ add_executable(clienttest clienttest.c)
 target_link_libraries(clienttest ${TESTS_LIBS})
 add_test(clienttest clienttest)
 
+# configtest
+add_executable(configtest configtest.c)
+target_link_libraries(configtest ${TESTS_LIBS})
+add_test(configtest configtest)
+
 # cts128test
 add_executable(cts128test cts128test.c)
 target_link_libraries(cts128test ${TESTS_LIBS})
@@ -152,7 +165,7 @@ add_test(evptest evptest ${CMAKE_CURRENT_SOURCE_DIR}/evptests.txt)
 
 # explicit_bzero
 # explicit_bzero relies on SA_ONSTACK, which is unavailable on Windows
-if(NOT CMAKE_HOST_WIN32)
+if(NOT WIN32)
 	if(HAVE_MEMMEM)
 		add_executable(explicit_bzero explicit_bzero.c)
 	else()
@@ -203,6 +216,14 @@ add_executable(igetest igetest.c)
 target_link_libraries(igetest ${TESTS_LIBS})
 add_test(igetest igetest)
 
+# keypairtest
+add_executable(keypairtest keypairtest.c)
+target_link_libraries(keypairtest ${TESTS_LIBS})
+add_test(keypairtest keypairtest
+	${CMAKE_CURRENT_SOURCE_DIR}/ca.pem
+	${CMAKE_CURRENT_SOURCE_DIR}/server.pem
+	${CMAKE_CURRENT_SOURCE_DIR}/server.pem)
+
 # md4test
 add_executable(md4test md4test.c)
 target_link_libraries(md4test ${TESTS_LIBS})
@@ -223,9 +244,9 @@ if(ENABLE_EXTRATESTS)
 	add_executable(ocsp_test ocsp_test.c)
 	target_link_libraries(ocsp_test ${TESTS_LIBS})
 	if(NOT MSVC)
-		add_test(ocsptest ${CMAKE_CURRENT_SOURCE_DIR}/ocsptest.sh)
+		add_test(NAME ocsptest COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ocsptest.sh)
 	else()
-		add_test(ocsptest ${CMAKE_CURRENT_SOURCE_DIR}/ocsptest.bat)
+		add_test(NAME ocsptest COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ocsptest.bat $<TARGET_FILE:ocsp_test>)
 	endif()
 endif()
 
@@ -262,11 +283,11 @@ add_test(poly1305test poly1305test)
 add_executable(pq_test pq_test.c)
 target_link_libraries(pq_test ${TESTS_LIBS})
 if(NOT MSVC)
-	add_test(pq_test ${CMAKE_CURRENT_SOURCE_DIR}/pq_test.sh)
+	add_test(NAME pq_test COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/pq_test.sh)
 else()
-	add_test(pq_test ${CMAKE_CURRENT_SOURCE_DIR}/pq_test.bat)
+	add_test(NAME pq_test COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/pq_test.bat $<TARGET_FILE:pq_test>)
 endif()
-set_tests_properties(pq_test PROPERTIES ENVIRONMENT "srcdir=${CMAKE_CURRENT_SOURCE_DIR}")
+set_tests_properties(pq_test PROPERTIES ENVIRONMENT "srcdir=${TEST_SOURCE_DIR}")
 
 # randtest
 add_executable(randtest randtest.c)
@@ -306,11 +327,11 @@ add_test(rsa_test rsa_test)
 add_executable(servertest servertest.c)
 target_link_libraries(servertest ${TESTS_LIBS})
 if(NOT MSVC)
-	add_test(servertest ${CMAKE_CURRENT_SOURCE_DIR}/servertest.sh)
+	add_test(NAME servertest COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/servertest.sh)
 else()
-	add_test(servertest ${CMAKE_CURRENT_SOURCE_DIR}/servertest.bat)
+	add_test(NAME servertest COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/servertest.bat $<TARGET_FILE:servertest>)
 endif()
-set_tests_properties(servertest PROPERTIES ENVIRONMENT "srcdir=${CMAKE_CURRENT_SOURCE_DIR}")
+set_tests_properties(servertest PROPERTIES ENVIRONMENT "srcdir=${TEST_SOURCE_DIR}")
 
 # sha1test
 add_executable(sha1test sha1test.c)
@@ -336,35 +357,35 @@ add_test(ssl_versions ssl_versions)
 add_executable(ssltest ssltest.c)
 target_link_libraries(ssltest ${TESTS_LIBS})
 if(NOT MSVC)
-	add_test(ssltest ${CMAKE_CURRENT_SOURCE_DIR}/ssltest.sh)
+	add_test(NAME ssltest COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ssltest.sh)
 else()
-	add_test(ssltest ${CMAKE_CURRENT_SOURCE_DIR}/ssltest.bat)
+	add_test(NAME ssltest COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ssltest.bat $<TARGET_FILE:ssltest> $<TARGET_FILE:openssl>)
 endif()
-set_tests_properties(ssltest PROPERTIES ENVIRONMENT "srcdir=${CMAKE_CURRENT_SOURCE_DIR}")
+set_tests_properties(ssltest PROPERTIES ENVIRONMENT "srcdir=${TEST_SOURCE_DIR}")
 
 # testdsa
 if(NOT MSVC)
-	add_test(testdsa ${CMAKE_CURRENT_SOURCE_DIR}/testdsa.sh)
+	add_test(NAME testdsa COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/testdsa.sh)
 else()
-	add_test(testdsa ${CMAKE_CURRENT_SOURCE_DIR}/testdsa.bat)
+	add_test(NAME testdsa COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/testdsa.bat $<TARGET_FILE:openssl>)
 endif()
-set_tests_properties(testdsa PROPERTIES ENVIRONMENT "srcdir=${CMAKE_CURRENT_SOURCE_DIR}")
+set_tests_properties(testdsa PROPERTIES ENVIRONMENT "srcdir=${TEST_SOURCE_DIR}")
 
 # testenc
 if(NOT MSVC)
-	add_test(testenc ${CMAKE_CURRENT_SOURCE_DIR}/testenc.sh)
+	add_test(NAME testenc COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/testenc.sh)
 else()
-	add_test(testenc ${CMAKE_CURRENT_SOURCE_DIR}/testenc.bat)
+	add_test(NAME testenc COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/testenc.bat $<TARGET_FILE:openssl>)
 endif()
-set_tests_properties(testenc PROPERTIES ENVIRONMENT "srcdir=${CMAKE_CURRENT_SOURCE_DIR}")
+set_tests_properties(testenc PROPERTIES ENVIRONMENT "srcdir=${TEST_SOURCE_DIR}")
 
 # testrsa
 if(NOT MSVC)
-	add_test(testrsa ${CMAKE_CURRENT_SOURCE_DIR}/testrsa.sh)
+	add_test(NAME testrsa COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/testrsa.sh)
 else()
-	add_test(testrsa ${CMAKE_CURRENT_SOURCE_DIR}/testrsa.bat)
+	add_test(NAME testrsa COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/testrsa.bat $<TARGET_FILE:openssl>)
 endif()
-set_tests_properties(testrsa PROPERTIES ENVIRONMENT "srcdir=${CMAKE_CURRENT_SOURCE_DIR}")
+set_tests_properties(testrsa PROPERTIES ENVIRONMENT "srcdir=${TEST_SOURCE_DIR}")
 
 # timingsafe
 add_executable(timingsafe timingsafe.c)
@@ -388,11 +409,11 @@ endif()
 add_executable(tlstest ${TLSTEST_SRC})
 target_link_libraries(tlstest ${TESTS_LIBS})
 if(NOT MSVC)
-	add_test(tlstest ${CMAKE_CURRENT_SOURCE_DIR}/tlstest.sh)
+	add_test(NAME tlstest COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tlstest.sh)
 else()
-	add_test(tlstest ${CMAKE_CURRENT_SOURCE_DIR}/tlstest.bat)
+	add_test(NAME tlstest COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tlstest.bat $<TARGET_FILE:tlstest>)
 endif()
-set_tests_properties(tlstest PROPERTIES ENVIRONMENT "srcdir=${CMAKE_CURRENT_SOURCE_DIR}")
+set_tests_properties(tlstest PROPERTIES ENVIRONMENT "srcdir=${TEST_SOURCE_DIR}")
 
 # tls_ext_alpn
 add_executable(tls_ext_alpn tls_ext_alpn.c)

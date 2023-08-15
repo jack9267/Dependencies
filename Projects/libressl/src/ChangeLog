@@ -28,18 +28,47 @@ history is also available from Git.
 
 LibreSSL Portable Release Notes:
 
-2.6.5 - Security fixes
+2.7.0 - Bug fixes and improvements
 
-	* Avoid a timing side-channel leak when generating DSA and ECDSA
-	  signatures. This is caused by an attempt to do fast modular
-	  arithmetic, which introduces branches that leak information
-	  regarding secret values. Issue identified and reported by Keegan
-	  Ryan of NCC Group.
+	* Added support for many new OpenSSL 1.0.2 and 1.1 APIs, based on an
+	  observations of real-world usage among applications. These are
+	  implemented in parallel with existing OpenSSL 1.0.1 APIs for
+	  backward compatibility.
 
-	* Reject excessively large primes in DH key generation. Problem
-	  reported by Guido Vranken to OpenSSL
-	  (https://github.com/openssl/openssl/pull/6457) and based on his
-	  diff.
+	* Extensive corrections, improvements, and additions to the
+	  API documentation, including new public APIs from OpenSSL that had
+	  no pre-existing documentation.
+
+	* Added support for automatic library initialization in libcrypto,
+	  libssl, and libtls. Support for pthread_once or a compatible
+	  equivalent is now required of the target operating system. As a
+	  side-effect, minimum Windows support is Vista or higher.
+
+	* Converted more packet handling methods to CBB, which improves
+	  resiliency when processing malformed input data.
+
+	* Rewrote TLS extension handling, improving consistency of
+	  checks for malformed or duplicate extensions.
+
+	* Rewrite ASN1_TYPE_{get,set}_octetstring() using templated ASN.1.
+	  This removes the last remaining use of the old M_ASN1_* macros
+	  (asn1_mac.h) from API that needs to continue to exist.
+
+	* Added support for client-side session resumption in libtls.
+	  A libtls client can specify a session file descriptor (a regular
+	  file with appropriate ownership and permissions) and libtls will
+	  manage reading and writing of session data across TLS handshakes.
+
+	* Improved support for strict alignment on ARMv7 architectures,
+	  conditionally enabling assembly in those cases.
+
+	* Fixed a memory leak in libtls when reusing a tls_config.
+
+	* Merged more DTLS support into the regular TLS code path, removing
+	  duplicated code.
+
+	* Many improvements to Windows Cmake-based builds and tests,
+	  especially when targeting Visual Studio.
 
 2.6.4 - Bug fixes
 

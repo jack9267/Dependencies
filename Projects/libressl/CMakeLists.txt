@@ -2,6 +2,24 @@ disable_rtti()
 
 include(CheckTypeSize)
 
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src" ${CMAKE_MODULE_PATH})
+include(cmake_export_symbol)
+
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/src/ssl/VERSION SSL_VERSION)
+string(STRIP ${SSL_VERSION} SSL_VERSION)
+string(REPLACE ":" "." SSL_VERSION ${SSL_VERSION})
+string(REGEX REPLACE "\\..*" "" SSL_MAJOR_VERSION ${SSL_VERSION})
+
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/VERSION CRYPTO_VERSION)
+string(STRIP ${CRYPTO_VERSION} CRYPTO_VERSION)
+string(REPLACE ":" "." CRYPTO_VERSION ${CRYPTO_VERSION})
+string(REGEX REPLACE "\\..*" "" CRYPTO_MAJOR_VERSION ${CRYPTO_VERSION})
+
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/src/tls/VERSION TLS_VERSION)
+string(STRIP ${TLS_VERSION} TLS_VERSION)
+string(REPLACE ":" "." TLS_VERSION ${TLS_VERSION})
+string(REGEX REPLACE "\\..*" "" TLS_MAJOR_VERSION ${TLS_VERSION})
+
 add_definitions(-DLIBRESSL_INTERNAL)
 add_definitions(-DOPENSSL_NO_HW_PADLOCK)
 add_definitions(-D__BEGIN_HIDDEN_DECLS=)
@@ -43,6 +61,7 @@ set(CRYPTO_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/whrlpool/wp_block.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/cpt_err.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/cryptlib.c
+	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/crypto_init.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/cversion.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/ex_data.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/malloc-wrapper.c
@@ -148,6 +167,7 @@ set(CRYPTO_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/bio/bio_cb.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/bio/bio_err.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/bio/bio_lib.c
+	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/bio/bio_meth.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/bio/bss_acpt.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/bio/bss_bio.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/bio/bss_conn.c
@@ -254,6 +274,7 @@ set(CRYPTO_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/dsa/dsa_gen.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/dsa/dsa_key.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/dsa/dsa_lib.c
+	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/dsa/dsa_meth.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/dsa/dsa_ossl.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/dsa/dsa_pmeth.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/dsa/dsa_prn.c
@@ -482,6 +503,7 @@ set(CRYPTO_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/rsa/rsa_err.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/rsa/rsa_gen.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/rsa/rsa_lib.c
+	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/rsa/rsa_meth.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/rsa/rsa_none.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/rsa/rsa_oaep.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/rsa/rsa_pk1.c
@@ -577,7 +599,6 @@ set(CRYPTO_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/compat/bsd-asprintf.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/compat/freezero.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/compat/getpagesize.c
-	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/compat/inet_pton.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/compat/reallocarray.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/compat/recallocarray.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/compat/strcasecmp.c
@@ -609,17 +630,70 @@ file(GLOB_RECURSE SSL_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/ssl/*.c)
 install_include("${CMAKE_CURRENT_SOURCE_DIR}/src/include")
 
 new_library_static(crypto "${CRYPTO_SOURCES}" "")
-new_library_shared(crypto "${CRYPTO_SOURCES};crypto_p.def" "")
+new_library_shared(crypto "${CRYPTO_SOURCES}" "")
 
-set_target_properties(crypto PROPERTIES RUNTIME_OUTPUT_NAME_DEBUG "crypto-42${RUNTIME_DEBUG_POSTFIX}")
-set_target_properties(crypto PROPERTIES RUNTIME_OUTPUT_NAME_RELEASE "crypto-42${RUNTIME_RELEASE_POSTFIX}")
+if(WIN32)
+	set(CRYPTO_UNEXPORT ${CRYPTO_UNEXPORT} BIO_s_log)
+
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} gettimeofday)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_perror)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_fopen)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_fgets)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_open)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_rename)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_connect)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_close)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_read)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_write)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_getsockopt)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_setsockopt)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} sleep)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} asprintf)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} vasprintf)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} freezero)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} reallocarray)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} recallocarray)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} strcasecmp)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} strlcat)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} strlcpy)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} strndup)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} strnlen)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} strsep)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} timegm)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} explicit_bzero)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} arc4random)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} arc4random_buf)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} arc4random_uniform)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} getentropy)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} timingsafe_bcmp)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} timingsafe_memcmp)
+endif()
+
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/crypto.sym SYMS)
+foreach(SYM IN LISTS CRYPTO_UNEXPORT)
+	string(REPLACE "${SYM}\n" "" SYMS ${SYMS})
+endforeach()
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/crypto_p.sym ${SYMS})
+if(EXTRA_EXPORT)
+	list(SORT EXTRA_EXPORT)
+	foreach(SYM IN LISTS EXTRA_EXPORT)
+		file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/crypto_p.sym "${SYM}\n")
+	endforeach()
+endif()
+
+export_symbol(crypto ${CMAKE_CURRENT_BINARY_DIR}/crypto_p.sym)
+
+set_target_properties(crypto PROPERTIES RUNTIME_OUTPUT_NAME_DEBUG "crypto-${CRYPTO_MAJOR_VERSION}${RUNTIME_DEBUG_POSTFIX}")
+set_target_properties(crypto PROPERTIES RUNTIME_OUTPUT_NAME_RELEASE "crypto-${CRYPTO_MAJOR_VERSION}${RUNTIME_RELEASE_POSTFIX}")
 
 target_link_libraries(crypto shell32 comdlg32 ws2_32)
 
 new_library_static(ssl "${SSL_SOURCES}" "")
-new_library_shared(ssl "${SSL_SOURCES};ssl.def" "")
+new_library_shared(ssl "${SSL_SOURCES}" "")
 
-set_target_properties(ssl PROPERTIES RUNTIME_OUTPUT_NAME_DEBUG "ssl-44${RUNTIME_DEBUG_POSTFIX}")
-set_target_properties(ssl PROPERTIES RUNTIME_OUTPUT_NAME_RELEASE "ssl-44${RUNTIME_RELEASE_POSTFIX}")
+export_symbol(ssl ${CMAKE_CURRENT_SOURCE_DIR}/src/ssl/ssl.sym)
+
+set_target_properties(ssl PROPERTIES RUNTIME_OUTPUT_NAME_DEBUG "ssl-${SSL_MAJOR_VERSION}${RUNTIME_DEBUG_POSTFIX}")
+set_target_properties(ssl PROPERTIES RUNTIME_OUTPUT_NAME_RELEASE "ssl-${SSL_MAJOR_VERSION}${RUNTIME_RELEASE_POSTFIX}")
 
 target_link_libraries(ssl shell32 comdlg32 ws2_32 crypto)
