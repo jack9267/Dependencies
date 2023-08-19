@@ -5,7 +5,7 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
@@ -67,7 +67,7 @@
     ((__W32API_MAJOR_VERSION == 3) && (__W32API_MINOR_VERSION < 6))
 const struct in6_addr in6addr_any = {{ IN6ADDR_ANY_INIT }};
 #endif /* w32api < 3.6 */
-#endif /* ENABLE_IPV6 && __MINGW32__*/
+#endif /* ENABLE_IPV6 && __MINGW32__ */
 
 static struct timeval tvnow(void);
 
@@ -147,16 +147,22 @@ void logmsg(const char *msg, ...)
 }
 
 #ifdef WIN32
+/* use instead of strerror() on generic Windows */
+static const char *win32_strerror(int err, char *buf, size_t buflen)
+{
+  if(!FormatMessageA((FORMAT_MESSAGE_FROM_SYSTEM |
+                      FORMAT_MESSAGE_IGNORE_INSERTS), NULL, err,
+                     LANG_NEUTRAL, buf, (DWORD)buflen, NULL))
+    msnprintf(buf, buflen, "Unknown error %lu (%#lx)", err, err);
+  return buf;
+}
+
 /* use instead of perror() on generic windows */
 void win32_perror(const char *msg)
 {
   char buf[512];
   DWORD err = SOCKERRNO;
-
-  if(!FormatMessageA((FORMAT_MESSAGE_FROM_SYSTEM |
-                      FORMAT_MESSAGE_IGNORE_INSERTS), NULL, err,
-                     LANG_NEUTRAL, buf, sizeof(buf), NULL))
-    msnprintf(buf, sizeof(buf), "Unknown error %lu (%#lx)", err, err);
+  win32_strerror(err, buf, sizeof(buf));
   if(msg)
     fprintf(stderr, "%s: ", msg);
   fprintf(stderr, "%s\n", buf);
@@ -197,17 +203,24 @@ void win32_cleanup(void)
   /* flush buffers of all streams regardless of their mode */
   _flushall();
 }
+
+/* socket-safe strerror (works on WinSock errors, too */
+const char *sstrerror(int err)
+{
+  static char buf[512];
+  return win32_strerror(err, buf, sizeof(buf));
+}
 #endif  /* WIN32 */
 
 /* set by the main code to point to where the test dir is */
 const char *path = ".";
 
-FILE *test2fopen(long testno)
+FILE *test2fopen(long testno, const char *logdir)
 {
   FILE *stream;
   char filename[256];
   /* first try the alternative, preprocessed, file */
-  msnprintf(filename, sizeof(filename), ALTTEST_DATA_PATH, ".", testno);
+  msnprintf(filename, sizeof(filename), ALTTEST_DATA_PATH, logdir, testno);
   stream = fopen(filename, "rb");
   if(stream)
     return stream;
@@ -366,31 +379,6 @@ void clear_advisor_read_lock(const char *filename)
            filename, error, strerror(error));
 }
 
-
-/* Portable, consistent toupper (remember EBCDIC). Do not use toupper() because
-   its behavior is altered by the current locale. */
-static char raw_toupper(char in)
-{
-  if(in >= 'a' && in <= 'z')
-    return (char)('A' + in - 'a');
-  return in;
-}
-
-int strncasecompare(const char *first, const char *second, size_t max)
-{
-  while(*first && *second && max) {
-    if(raw_toupper(*first) != raw_toupper(*second)) {
-      break;
-    }
-    max--;
-    first++;
-    second++;
-  }
-  if(0 == max)
-    return 1; /* they are equal this far */
-
-  return raw_toupper(*first) == raw_toupper(*second);
-}
 
 #if defined(WIN32) && !defined(MSDOS)
 
@@ -844,23 +832,22 @@ int bind_unix_socket(curl_socket_t sock, const char *unix_socket,
     sau->sun_family = AF_UNIX;
     strncpy(sau->sun_path, unix_socket, sizeof(sau->sun_path) - 1);
     rc = bind(sock, (struct sockaddr*)sau, sizeof(struct sockaddr_un));
-    if(0 != rc && errno == EADDRINUSE) {
+    if(0 != rc && SOCKERRNO == EADDRINUSE) {
       struct_stat statbuf;
       /* socket already exists. Perhaps it is stale? */
       curl_socket_t unixfd = socket(AF_UNIX, SOCK_STREAM, 0);
       if(CURL_SOCKET_BAD == unixfd) {
-        error = SOCKERRNO;
-        logmsg("Error binding socket, failed to create socket at %s: (%d) %s",
-               unix_socket, error, strerror(error));
-        return rc;
+        logmsg("Failed to create socket at %s: (%d) %s",
+               unix_socket, SOCKERRNO, sstrerror(SOCKERRNO));
+        return -1;
       }
       /* check whether the server is alive */
       rc = connect(unixfd, (struct sockaddr*)sau, sizeof(struct sockaddr_un));
-      error = errno;
+      error = SOCKERRNO;
       sclose(unixfd);
-      if(ECONNREFUSED != error) {
-        logmsg("Error binding socket, failed to connect to %s: (%d) %s",
-               unix_socket, error, strerror(error));
+      if(0 != rc && ECONNREFUSED != error) {
+        logmsg("Failed to connect to %s: (%d) %s",
+               unix_socket, error, sstrerror(error));
         return rc;
       }
       /* socket server is not alive, now check if it was actually a socket. */
@@ -877,9 +864,8 @@ int bind_unix_socket(curl_socket_t sock, const char *unix_socket,
       }
 #ifdef S_IFSOCK
       if((statbuf.st_mode & S_IFSOCK) != S_IFSOCK) {
-        logmsg("Error binding socket, failed to stat %s: (%d) %s",
-               unix_socket, error, strerror(error));
-        return rc;
+        logmsg("Error binding socket, failed to stat %s", unix_socket);
+        return -1;
       }
 #endif
       /* dead socket, cleanup and retry bind */

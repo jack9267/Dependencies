@@ -5,7 +5,7 @@
 #                            | (__| |_| |  _ <| |___
 #                             \___|\___/|_| \_\_____|
 #
-# Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
+# Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
 #
 # This software is licensed as described in the file COPYING, which
 # you should have received as part of this distribution. The terms
@@ -122,6 +122,7 @@ man_MANS =                                      \
   CURLOPT_CAINFO.3                              \
   CURLOPT_CAINFO_BLOB.3                         \
   CURLOPT_CAPATH.3                              \
+  CURLOPT_CA_CACHE_TIMEOUT.3                    \
   CURLOPT_CERTINFO.3                            \
   CURLOPT_CHUNK_BGN_FUNCTION.3                  \
   CURLOPT_CHUNK_DATA.3                          \
@@ -185,6 +186,7 @@ man_MANS =                                      \
   CURLOPT_GSSAPI_DELEGATION.3                   \
   CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS.3           \
   CURLOPT_HAPROXYPROTOCOL.3                     \
+  CURLOPT_HAPROXY_CLIENT_IP.3                   \
   CURLOPT_HEADER.3                              \
   CURLOPT_HEADERDATA.3                          \
   CURLOPT_HEADERFUNCTION.3                      \
@@ -227,7 +229,7 @@ man_MANS =                                      \
   CURLOPT_MAIL_AUTH.3                           \
   CURLOPT_MAIL_FROM.3                           \
   CURLOPT_MAIL_RCPT.3                           \
-  CURLOPT_MAIL_RCPT_ALLLOWFAILS.3               \
+  CURLOPT_MAIL_RCPT_ALLOWFAILS.3                \
   CURLOPT_MAX_RECV_SPEED_LARGE.3                \
   CURLOPT_MAX_SEND_SPEED_LARGE.3                \
   CURLOPT_MAXAGE_CONN.3                         \

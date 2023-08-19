@@ -1,4 +1,4 @@
-c: Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
+c: Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
 SPDX-License-Identifier: curl
 Long: data-urlencode
 Arg: <data>
@@ -39,3 +39,4 @@ URL-encode that data and pass it on in the POST. The name part gets an equal
 sign appended, resulting in *name=urlencoded-file-content*. Note that the
 name is expected to be URL-encoded already.
 .RE
+.IP

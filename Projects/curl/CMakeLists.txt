@@ -3,6 +3,8 @@ disable_rtti()
 file(GLOB_RECURSE SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/lib/*.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/lib/vauth/*.c
+	${CMAKE_CURRENT_SOURCE_DIR}/src/lib/vquic/*.c
+	${CMAKE_CURRENT_SOURCE_DIR}/src/lib/vssh/*.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/lib/vtls/*.c)
 
 if(WIN32)
@@ -16,19 +18,13 @@ add_definitions(-DUNICODE -D_UNICODE)
 
 add_definitions(-DBUILDING_LIBCURL)
 
-# HTTP only
-add_definitions(-DCURL_DISABLE_FTP=1)
+# Strip out what we won't use
 add_definitions(-DCURL_DISABLE_LDAP=1)
 add_definitions(-DCURL_DISABLE_LDAPS=1)
-add_definitions(-DCURL_DISABLE_TELNET=1)
-add_definitions(-DCURL_DISABLE_DICT=1)
 add_definitions(-DCURL_DISABLE_FILE=1)
-add_definitions(-DCURL_DISABLE_TFTP=1)
-add_definitions(-DCURL_DISABLE_RTSP=1)
 add_definitions(-DCURL_DISABLE_POP3=1)
 add_definitions(-DCURL_DISABLE_IMAP=1)
 add_definitions(-DCURL_DISABLE_SMTP=1)
-add_definitions(-DCURL_DISABLE_GOPHER=1)
 
 if(WIN32)
 	add_definitions(-DHAVE_WINDOWS_H)

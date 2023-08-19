@@ -5,7 +5,7 @@
 #                            | (__| |_| |  _ <| |___
 #                             \___|\___/|_| \_\_____|
 #
-# Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
+# Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
 #
 # This software is licensed as described in the file COPYING, which
 # you should have received as part of this distribution. The terms
@@ -47,29 +47,6 @@ if(WIN32 AND NOT CURL_STATICLIB)
   list(APPEND CSOURCES libcurl.rc)
 endif()
 
-# SET(CSOURCES
-# #  memdebug.c -not used
-# # nwlib.c - Not used
-# # strtok.c - specify later
-# # strtoofft.c - specify later
-# )
-
-# #OPTION(CURL_MALLOC_DEBUG "Debug mallocs in Curl" OFF)
-# MARK_AS_ADVANCED(CURL_MALLOC_DEBUG)
-# IF(CURL_MALLOC_DEBUG)
-# SET(CSOURCES ${CSOURCES}
-# memdebug.c
-# )
-# ENDIF(CURL_MALLOC_DEBUG)
-
-# # only build compat strtoofft if we need to
-# IF(NOT HAVE_STRTOLL AND NOT HAVE__STRTOI64)
-# SET(CSOURCES ${CSOURCES}
-# strtoofft.c
-# )
-# ENDIF(NOT HAVE_STRTOLL AND NOT HAVE__STRTOI64)
-
-
 # The rest of the build
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/../include)
@@ -88,20 +65,63 @@ add_library(
   )
 
 add_library(
+  curlu # special libcurlu library just for unittests
+  STATIC
+  EXCLUDE_FROM_ALL
+  ${HHEADERS} ${CSOURCES}
+)
+target_compile_definitions(curlu PUBLIC UNITTESTS CURL_STATICLIB)
+
+add_library(
   ${PROJECT_NAME}::${LIB_NAME}
   ALIAS ${LIB_NAME}
   )
+
+if(ENABLE_CURLDEBUG)
+  # We must compile memdebug.c separately to avoid memdebug.h redefinitions
+  # being applied to memdebug.c itself.
+  set_source_files_properties(memdebug.c PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+endif()
 
 if(NOT BUILD_SHARED_LIBS)
     set_target_properties(${LIB_NAME} PROPERTIES INTERFACE_COMPILE_DEFINITIONS CURL_STATICLIB)
 endif()
 
 target_link_libraries(${LIB_NAME} PRIVATE ${CURL_LIBS})
+target_link_libraries(curlu PRIVATE ${CURL_LIBS})
+
+transform_makefile_inc("Makefile.soname" "${CMAKE_CURRENT_BINARY_DIR}/Makefile.soname.cmake")
+include(${CMAKE_CURRENT_BINARY_DIR}/Makefile.soname.cmake)
 
 set_target_properties(${LIB_NAME} PROPERTIES
   COMPILE_DEFINITIONS BUILDING_LIBCURL
   OUTPUT_NAME ${LIBCURL_OUTPUT_NAME}
   )
+
+if(CMAKE_SYSTEM_NAME STREQUAL "AIX" OR
+  CMAKE_SYSTEM_NAME STREQUAL "Linux" OR
+  CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR
+  CMAKE_SYSTEM_NAME STREQUAL "SunOS" OR
+  CMAKE_SYSTEM_NAME STREQUAL "GNU/kFreeBSD" OR
+
+  # FreeBSD comes with the a.out and elf flavours
+  # but a.out was supported up to version 3.x and
+  # elf from 3.x. I cannot imagine someone running
+  # CMake on those ancient systems
+  CMAKE_SYSTEM_NAME STREQUAL "FreeBSD" OR
+
+  CMAKE_SYSTEM_NAME STREQUAL "Haiku")
+
+  math(EXPR CMAKESONAME "${VERSIONCHANGE} - ${VERSIONDEL}")
+  set(CMAKEVERSION "${CMAKESONAME}.${VERSIONDEL}.${VERSIONADD}")
+
+  set_target_properties(${LIB_NAME} PROPERTIES
+    VERSION ${CMAKEVERSION}
+    SOVERSION ${CMAKESONAME}
+  )
+
+endif()
+
 
 if(HIDES_CURL_PRIVATE_SYMBOLS)
   set_property(TARGET ${LIB_NAME} APPEND PROPERTY COMPILE_DEFINITIONS "CURL_HIDDEN_SYMBOLS")
@@ -126,6 +146,17 @@ if(WIN32)
       set_target_properties(${LIB_NAME} PROPERTIES IMPORT_SUFFIX "_imp.lib")
     endif()
   endif()
+elseif(NOT CMAKE_CROSSCOMPILING)
+  # on not-Windows and not-crosscompiling, check for writable argv[]
+    include(CheckCSourceRuns)
+    check_c_source_runs("
+int main(int argc, char **argv)
+{
+  (void)argc;
+  argv[0][0] = ' ';
+  return (argv[0][0] == ' ')?0:1;
+}"
+      HAVE_WRITABLE_ARGV)
 endif()
 
 target_include_directories(${LIB_NAME} INTERFACE

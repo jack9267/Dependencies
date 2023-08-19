@@ -5,7 +5,7 @@
 #                            | (__| |_| |  _ <| |___
 #                             \___|\___/|_| \_\_____|
 #
-# Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
+# Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
 #
 # This software is licensed as described in the file COPYING, which
 # you should have received as part of this distribution. The terms
@@ -5866,11 +5866,14 @@ AC_DEFUN([CURL_RUN_IFELSE], [
       AC_RUN_IFELSE([AC_LANG_SOURCE([$1])], $2, $3, $4)
      ;;
      *)
+      oldcc=$CC
       old=$LD_LIBRARY_PATH
+      CC="sh ./run-compiler"
       LD_LIBRARY_PATH=$CURL_LIBRARY_PATH:$old
       export LD_LIBRARY_PATH
       AC_RUN_IFELSE([AC_LANG_SOURCE([$1])], $2, $3, $4)
       LD_LIBRARY_PATH=$old # restore
+      CC=$oldcc
      ;;
    esac
 ])
