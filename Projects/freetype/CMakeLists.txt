@@ -18,7 +18,6 @@ set(BASE_SRCS
   src/base/ftpfr.c
   src/base/ftstroke.c
   src/base/ftsynth.c
-  src/base/ftsystem.c
   src/base/fttype1.c
   src/base/ftwinfnt.c
   src/bdf/bdf.c
@@ -34,13 +33,23 @@ set(BASE_SRCS
   src/pshinter/pshinter.c
   src/psnames/psnames.c
   src/raster/raster.c
+  src/sdf/sdf.c
   src/sfnt/sfnt.c
   src/smooth/smooth.c
+  src/svg/svg.c
   src/truetype/truetype.c
   src/type1/type1.c
   src/type42/type42.c
   src/winfonts/winfnt.c
 )
+
+if (UNIX)
+  list(APPEND BASE_SRCS "builds/unix/ftsystem.c")
+elseif (WIN32)
+  list(APPEND BASE_SRCS "builds/windows/ftsystem.c")
+else ()
+  list(APPEND BASE_SRCS "src/base/ftsystem.c")
+endif ()
 
 if (WIN32)
   enable_language(RC)
