@@ -152,6 +152,8 @@ else()
 	set(DEFINES "")
 endif()
 new_library_shared(png "${libpng_sources};${libpng_version_sources}" "${DEFINES}")
-prefix_lib(png)
+
+set_target_properties(png PROPERTIES RUNTIME_OUTPUT_NAME_DEBUG "libpng16${RUNTIME_DEBUG_POSTFIX}")
+set_target_properties(png PROPERTIES RUNTIME_OUTPUT_NAME_RELEASE "libpng16${RUNTIME_RELEASE_POSTFIX}")
 
 target_link_libraries(png zlib)
