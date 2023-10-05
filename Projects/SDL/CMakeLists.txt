@@ -12,6 +12,9 @@ set(SDL2_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(EXTRA_LIBS "")
 set(HIDAPI ON)
 set(HIDAPI_SKIP_LIBUSB TRUE)
+set(SDL_HIDAPI ON)
+set(SDL_JOYSTICK ON)
+set(SDL_HIDAPI_JOYSTICK ON)
 
 include(CheckFunctionExists)
 include(CheckLibraryExists)
@@ -49,7 +52,9 @@ file(GLOB SOURCE_FILES
   ${SDL2_SOURCE_DIR}/src/dynapi/*.c
   ${SDL2_SOURCE_DIR}/src/events/*.c
   ${SDL2_SOURCE_DIR}/src/file/*.c
+  ${SDL2_SOURCE_DIR}/src/joystick/*.c
   ${SDL2_SOURCE_DIR}/src/haptic/*.c
+  ${SDL2_SOURCE_DIR}/src/hidapi/*.c
   ${SDL2_SOURCE_DIR}/src/libm/*.c
   ${SDL2_SOURCE_DIR}/src/locale/*.c
   ${SDL2_SOURCE_DIR}/src/misc/*.c
@@ -114,9 +119,9 @@ if(WIN32)
 	file(GLOB WIN_VIDEO_SOURCES ${SDL2_SOURCE_DIR}/src/video/windows/*.c)
 	set(SOURCE_FILES ${SOURCE_FILES} ${WIN_VIDEO_SOURCES})
 
-	set(SOURCE_FILES ${SOURCE_FILES}
+	list(APPEND SOURCE_FILES
 		${SDL2_SOURCE_DIR}/src/thread/generic/SDL_syscond.c
-		${SDL2_SOURCE_DIR}/src/thread/windows/SDL_syscond_srw.c
+		${SDL2_SOURCE_DIR}/src/thread/windows/SDL_syscond_cv.c
 		${SDL2_SOURCE_DIR}/src/thread/windows/SDL_sysmutex.c
 		${SDL2_SOURCE_DIR}/src/thread/windows/SDL_syssem.c
 		${SDL2_SOURCE_DIR}/src/thread/windows/SDL_systhread.c
@@ -143,9 +148,7 @@ if(WIN32)
 	set(SOURCE_FILES ${SOURCE_FILES} ${CORE_SOURCES})
 
 	CheckHIDAPI()
-	if(HAVE_HIDAPI)
-		set(SOURCE_FILES ${SOURCE_FILES} ${SDL2_SOURCE_DIR}/src/hidapi/windows/hid.c)
-	endif()
+
 	file(GLOB JOYSTICK_SOURCES ${SDL2_SOURCE_DIR}/src/joystick/windows/*.c)
 	set(SOURCE_FILES ${SOURCE_FILES} ${JOYSTICK_SOURCES})
 	list(APPEND EXTRA_LIBS dinput8)
