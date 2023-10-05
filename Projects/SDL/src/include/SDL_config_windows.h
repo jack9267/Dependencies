@@ -117,6 +117,7 @@ typedef unsigned int uintptr_t;
 #   define HAVE_IMMINTRIN_H 1
 # endif
 #endif
+#define HAVE_LIBC 1
 
 /* This is disabled by default to avoid C runtime dependencies and manifest requirements */
 #ifdef HAVE_LIBC
