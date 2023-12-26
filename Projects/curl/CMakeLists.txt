@@ -64,12 +64,12 @@ endif()
 
 if(CURL_STATIC_LINK_SSL)
 	target_link_libraries(curl ssl_static crypto_static)
-else
+else()
 	target_link_libraries(curl ssl crypto)
 endif()
 
 if(CURL_STATIC_LINK_ZLIB)
 	target_link_libraries(curl zlib_static)
-else
+else()
 	target_link_libraries(curl zlib)
 endif()
