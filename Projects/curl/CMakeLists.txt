@@ -1,5 +1,8 @@
 disable_rtti()
 
+option(CURL_STATIC_LINK_SSL "Static link ssl into curl" OFF)
+option(CURL_STATIC_LINK_ZLIB "Static link zlib into curl" OFF)
+
 file(GLOB_RECURSE SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/lib/*.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/lib/vauth/*.c
@@ -58,4 +61,15 @@ prefix_lib(curl)
 if(WIN32)
 	target_link_libraries(curl wldap32 ws2_32 crypt32)
 endif()
-target_link_libraries(curl ssl crypto zlib)
+
+if(CURL_STATIC_LINK_SSL)
+	target_link_libraries(curl ssl_static crypto_static)
+else
+	target_link_libraries(curl ssl crypto)
+endif()
+
+if(CURL_STATIC_LINK_ZLIB)
+	target_link_libraries(curl zlib_static)
+else
+	target_link_libraries(curl zlib)
+endif()
