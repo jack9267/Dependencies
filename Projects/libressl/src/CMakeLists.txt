@@ -29,10 +29,10 @@ string(REGEX REPLACE "\\..*" "" TLS_MAJOR_VERSION ${TLS_VERSION})
 
 option(LIBRESSL_SKIP_INSTALL "Skip installation" ${LIBRESSL_SKIP_INSTALL})
 option(LIBRESSL_APPS "Build apps" ON)
+option(LIBRESSL_TESTS "Build tests" ON)
 option(ENABLE_ASM "Enable assembly" ON)
 option(ENABLE_EXTRATESTS "Enable extra tests that may be unreliable on some platforms" OFF)
 option(ENABLE_NC "Enable installing TLS-enabled nc(1)" OFF)
-option(ENABLE_VSTEST "Enable test on Visual Studio" OFF)
 set(OPENSSLDIR ${OPENSSLDIR} CACHE PATH "Set the default openssl directory" FORCE)
 
 if(NOT LIBRESSL_SKIP_INSTALL)
@@ -262,32 +262,13 @@ if(ENABLE_ASM)
 	endif()
 endif()
 
-if(NOT (CMAKE_SYSTEM_NAME MATCHES "(Darwin|CYGWIN)"))
-	set(BUILD_SHARED true)
-endif()
+set(OPENSSL_LIBS tls ssl crypto)
 
-# USE_SHARED builds applications (e.g. openssl) using shared LibreSSL.
-# By default, applications use LibreSSL static library to avoid dependencies.
-# USE_SHARED isn't set by default; use -DUSE_SHARED=ON with CMake to enable.
-# Can be helpful for debugging; don't use for public releases.
-if(NOT BUILD_SHARED)
-	set(USE_SHARED off)
-endif()
-
-if(USE_SHARED)
-	set(OPENSSL_LIBS tls-shared ssl-shared crypto-shared)
-else()
-	set(OPENSSL_LIBS tls ssl crypto)
-endif()
-
+# Add additional required libs
 if(WIN32)
 	set(OPENSSL_LIBS ${OPENSSL_LIBS} ws2_32)
 endif()
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-	check_library_exists(rt clock_gettime "time.h" HAVE_CLOCK_GETTIME)
-	if (HAVE_CLOCK_GETTIME)
-		set(OPENSSL_LIBS ${OPENSSL_LIBS} rt)
-	endif()
 	set(OPENSSL_LIBS ${OPENSSL_LIBS} pthread)
 endif()
 if(CMAKE_SYSTEM_NAME MATCHES "HP-UX")
@@ -295,6 +276,20 @@ if(CMAKE_SYSTEM_NAME MATCHES "HP-UX")
 endif()
 if(CMAKE_SYSTEM_NAME MATCHES "SunOS")
 	set(OPENSSL_LIBS ${OPENSSL_LIBS} nsl socket)
+endif()
+
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+	# Check if we need -lrt to get clock_gettime on Linux
+	check_library_exists(rt clock_gettime "time.h" HAVE_CLOCK_GETTIME)
+	if (HAVE_CLOCK_GETTIME)
+		set(OPENSSL_LIBS ${OPENSSL_LIBS} rt)
+	endif()
+else()
+	# Otherwise, simply check if it exists
+	check_function_exists(clock_gettime HAVE_CLOCK_GETTIME)
+endif()
+if(HAVE_CLOCK_GETTIME)
+	add_definitions(-DHAVE_CLOCK_GETTIME)
 endif()
 
 check_type_size(time_t SIZEOF_TIME_T)
@@ -316,7 +311,8 @@ add_subdirectory(include)
 if(NOT MSVC)
 	add_subdirectory(man)
 endif()
-if(NOT MSVC OR ENABLE_VSTEST)
+# Tests require the openssl executable and are unavailable when building shared libraries
+if(LIBRESSL_APPS AND LIBRESSL_TESTS)
 	add_subdirectory(tests)
 endif()
 

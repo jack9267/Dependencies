@@ -1,4 +1,4 @@
-.\" $OpenBSD: EVP_EncryptInit.3,v 1.12 2018/03/21 09:03:49 schwarze Exp $
+.\" $OpenBSD: EVP_EncryptInit.3,v 1.19 2018/03/23 23:18:17 schwarze Exp $
 .\" full merge up to: OpenSSL 5211e094 Nov 11 14:39:11 2014 -0800
 .\" selective merge up to: OpenSSL 5c5eb286 Dec 5 00:36:43 2017 +0100
 .\"
@@ -51,7 +51,7 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: March 21 2018 $
+.Dd $Mdocdate: March 23 2018 $
 .Dt EVP_ENCRYPTINIT 3
 .Os
 .Sh NAME
@@ -1266,8 +1266,21 @@ All these functions have been available since
 .Ox 2.4 .
 .Pp
 .Fn EVP_rc2_64_cbc
-first appeared in SSL_eay 0.9.1 and has been available since
+first appeared in SSL_eay 0.9.1.
+.Fn EVP_CIPHER_CTX_type
+first appeared in OpenSSL 0.9.3.
+These functions and have been available since
 .Ox 2.6 .
+.Pp
+.Fn EVP_CIPHER_CTX_set_key_length ,
+.Fn EVP_CIPHER_CTX_ctrl ,
+.Fn EVP_CIPHER_flags ,
+.Fn EVP_CIPHER_mode ,
+.Fn EVP_CIPHER_CTX_flags ,
+and
+.Fn EVP_CIPHER_CTX_mode
+first appeared in OpenSSL 0.9.6 and have been available since
+.Ox 2.9 .
 .Pp
 .Fn EVP_EncryptInit_ex ,
 .Fn EVP_EncryptFinal_ex ,
@@ -1277,10 +1290,34 @@ first appeared in SSL_eay 0.9.1 and has been available since
 .Fn EVP_CipherFinal_ex ,
 and
 .Fn EVP_CIPHER_CTX_set_padding
-appeared in OpenSSL 0.9.7.
+first appeared in OpenSSL 0.9.7 and have been available since
+.Ox 3.2 .
+.Pp
+.Fn EVP_CIPHER_CTX_rand_key
+first appeared in OpenSSL 0.9.8.
+.Fn EVP_CIPHER_CTX_new
+and
+.Fn EVP_CIPHER_CTX_free
+first appeared in OpenSSL 0.9.8b.
+These functions have been available since
+.Ox 4.5 .
+.Pp
+.Fn EVP_rc4_hmac_md5 ,
+.Fn EVP_aes_128_gcm ,
+.Fn EVP_aes_192_gcm ,
+.Fn EVP_aes_256_gcm ,
+.Fn EVP_aes_128_ccm ,
+.Fn EVP_aes_192_ccm ,
+.Fn EVP_aes_256_ccm ,
+.Fn EVP_aes_128_cbc_hmac_sha1 ,
+and
+.Fn EVP_aes_256_cbc_hmac_sha1
+first appeared in OpenSSL 1.0.1 and have been available since
+.Ox 5.3 .
 .Pp
 .Fn EVP_CIPHER_CTX_reset
-first appeared in OpenSSL 1.1.0.
+first appeared in OpenSSL 1.1.0 and has been available since
+.Ox 6.3 .
 .Sh BUGS
 .Dv EVP_MAX_KEY_LENGTH
 and

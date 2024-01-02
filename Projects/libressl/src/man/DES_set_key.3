@@ -1,4 +1,4 @@
-.\" $OpenBSD: DES_set_key.3,v 1.9 2018/03/20 22:06:59 schwarze Exp $
+.\" $OpenBSD: DES_set_key.3,v 1.11 2018/03/22 21:08:22 schwarze Exp $
 .\" full merge up to:
 .\" OpenSSL man3/DES_random_key 61f805c1 Jan 16 01:01:46 2018 +0800
 .\"
@@ -115,7 +115,7 @@
 .\" copied and put under another distribution licence
 .\" [including the GNU Public Licence.]
 .\"
-.Dd $Mdocdate: March 20 2018 $
+.Dd $Mdocdate: March 22 2018 $
 .Dt DES_SET_KEY 3
 .Os
 .Sh NAME
@@ -822,20 +822,22 @@ with lower case names starting with
 appeared in SSLeay 0.8.1b or earlier and have been available since
 .Ox 2.4 .
 .Pp
-In OpenSSL 0.9.7, all
+Versions of
+.Fn DES_set_key_checked
+and
+.Fn DES_set_key_unchecked
+with lower case names starting with
+.Sy des_
+first appeared in OpenSSL 0.9.5 and have been available since
+.Ox 2.7 .
+.Pp
+In OpenSSL 0.9.7 and
+.Ox 3.2 ,
+all
 .Sy des_
 functions were renamed to
 .Sy DES_
 to avoid clashes with older versions of libdes.
-.Pp
-.Fn DES_set_key_checked
-and
-.Fn DES_set_key_unchecked
-were added in OpenSSL 0.9.5.
-.Pp
-.Fn DES_random_key
-generated cryptographically weak random data in SSLeay and in OpenSSL
-prior version 0.9.5, as well as in the original MIT library.
 .Sh AUTHORS
 .An Eric Young Aq Mt eay@cryptsoft.com
 .Sh CAVEATS

@@ -1,4 +1,4 @@
-.\" $OpenBSD: X509_STORE_CTX_new.3,v 1.12 2018/03/21 03:28:40 schwarze Exp $
+.\" $OpenBSD: X509_STORE_CTX_new.3,v 1.17 2018/03/23 23:18:17 schwarze Exp $
 .\" full merge up to: OpenSSL 186bb907 Apr 13 11:05:13 2015 -0700
 .\" selective merge up to: OpenSSL 7643a172 Apr 21 13:35:51 2017 +0200
 .\"
@@ -50,7 +50,7 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: March 21 2018 $
+.Dd $Mdocdate: March 23 2018 $
 .Dt X509_STORE_CTX_NEW 3
 .Os
 .Sh NAME
@@ -330,8 +330,33 @@ and
 appeared before SSLeay 0.8 and have been available since
 .Ox 2.4 .
 .Pp
-.Fn X509_STORE_CTX_set0_crls
-was first added to OpenSSL 1.0.0.
+.Fn X509_STORE_CTX_new
+and
+.Fn X509_STORE_CTX_free
+first appeared in OpenSSL 0.9.5 and have been available since
+.Ox 2.7 .
+.Pp
+.Fn X509_STORE_CTX_trusted_stack
+first appeared in OpenSSL 0.9.6 and has been available since
+.Ox 2.9 .
+.Pp
+.Fn X509_STORE_CTX_set0_crls ,
+.Fn X509_STORE_CTX_get0_param ,
+.Fn X509_STORE_CTX_set0_param ,
+and
+.Fn X509_STORE_CTX_set_default
+first appeared in OpenSSL 0.9.8 and have been available since
+.Ox 4.5 .
+.Pp
+.Fn X509_STORE_CTX_get0_store
+first appeared in OpenSSL 1.0.2.
+.Fn X509_STORE_CTX_set0_trusted_stack ,
+.Fn X509_STORE_CTX_get0_untrusted ,
+and
+.Fn X509_STORE_CTX_set0_untrusted
+first appeared in OpenSSL 1.1.0.
+These functions have been available since
+.Ox 6.3 .
 .Sh BUGS
 The certificates and CRLs in a context are used internally and should
 .Sy not
