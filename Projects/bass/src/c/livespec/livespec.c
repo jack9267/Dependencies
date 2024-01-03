@@ -44,7 +44,7 @@ void CALLBACK UpdateSpectrum(UINT uTimerID, UINT uMsg, DWORD_PTR dwUser, DWORD_P
 		BASS_ChannelGetData(chan, buf, sizeof(buf)); // get the sample data
 		memset(specbuf, 0, SPECWIDTH * SPECHEIGHT);
 		for (x = 0; x < SPECWIDTH; x++) {
-			int v = buf[x] * SPECHEIGHT / 65536; // scale to fit display
+			int v = (32768 + buf[x]) * SPECHEIGHT / 65536; // offset and scale to fit display
 			if (!x) y = v;
 			do { // draw line from previous sample...
 				if (y < v) y++;

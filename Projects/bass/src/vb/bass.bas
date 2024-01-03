@@ -1,6 +1,6 @@
 Attribute VB_Name = "modBass"
 ' BASS 2.4 Visual Basic module
-' Copyright (c) 1999-2021 Un4seen Developments Ltd.
+' Copyright (c) 1999-2022 Un4seen Developments Ltd.
 '
 ' See the BASS.CHM file for more detailed documentation
 
@@ -30,6 +30,7 @@ Global Const BASS_ERROR_FORMAT = 6     'unsupported sample format
 Global Const BASS_ERROR_POSITION = 7   'invalid position
 Global Const BASS_ERROR_INIT = 8       'BASS_Init has not been successfully called
 Global Const BASS_ERROR_START = 9      'BASS_Start has not been successfully called
+Global Const BASS_ERROR_SSL = 10       'SSL/HTTPS support isn't available
 Global Const BASS_ERROR_REINIT = 11    'device needs to be reinitialized
 Global Const BASS_ERROR_ALREADY = 14   'already initialized/paused/whatever
 Global Const BASS_ERROR_NOTAUDIO = 17  'file does not contain audio
@@ -43,7 +44,7 @@ Global Const BASS_ERROR_NOPLAY = 24    'not playing
 Global Const BASS_ERROR_FREQ = 25      'illegal sample rate
 Global Const BASS_ERROR_NOTFILE = 27   'the stream is not a file stream
 Global Const BASS_ERROR_NOHW = 29      'no hardware voices available
-Global Const BASS_ERROR_EMPTY = 31     'the MOD music has no sequence data
+Global Const BASS_ERROR_EMPTY = 31     'the file has no sample data
 Global Const BASS_ERROR_NONET = 32     'no internet connection could be opened
 Global Const BASS_ERROR_CREATE = 33    'couldn't create the file
 Global Const BASS_ERROR_NOFX = 34      'effects are not available
@@ -59,6 +60,7 @@ Global Const BASS_ERROR_ENDED = 45     'the channel/file has ended
 Global Const BASS_ERROR_BUSY = 46      'the device is busy
 Global Const BASS_ERROR_UNSTREAMABLE = 47 'unstreamable file
 Global Const BASS_ERROR_PROTOCOL = 48  'unsupported protocol
+Global Const BASS_ERROR_DENIED = 49    'access denied
 Global Const BASS_ERROR_UNKNOWN = -1   'some other mystery problem
 
 ' BASS_SetConfig options
@@ -95,6 +97,7 @@ Global Const BASS_CONFIG_SRC_SAMPLE = 44
 Global Const BASS_CONFIG_ASYNCFILE_BUFFER = 45
 Global Const BASS_CONFIG_OGG_PRESCAN = 47
 Global Const BASS_CONFIG_MF_VIDEO = 48
+Global Const BASS_CONFIG_DEV_NONSTOP = 50
 Global Const BASS_CONFIG_VERIFY_NET = 52
 Global Const BASS_CONFIG_DEV_PERIOD = 53
 Global Const BASS_CONFIG_FLOAT = 54
@@ -104,14 +107,16 @@ Global Const BASS_CONFIG_NET_PREBUF_WAIT = 60
 Global Const BASS_CONFIG_WASAPI_PERSIST = 65
 Global Const BASS_CONFIG_REC_WASAPI = 66
 Global Const BASS_CONFIG_SAMPLE_ONEHANDLE = 69
-Global Const BASS_CONFIG_DEV_TIMEOUT = 70
 Global Const BASS_CONFIG_NET_META = 71
 Global Const BASS_CONFIG_NET_RESTRATE = 72
+Global Const BASS_CONFIG_REC_DEFAULT = 73
+Global Const BASS_CONFIG_NORAMP = 74
 
 ' BASS_SetConfigPtr options
 Global Const BASS_CONFIG_NET_AGENT = 16
 Global Const BASS_CONFIG_NET_PROXY = 17
 Global Const BASS_CONFIG_LIBSSL = 64
+Global Const BASS_CONFIG_FILENAME = 75
 
 Global Const BASS_CONFIG_THREAD = &H40000000 'flag: thread-specific setting
 
@@ -278,9 +283,9 @@ Global Const BASS_MUSIC_NOSAMPLE = &H100000 ' don't load the samples
 
 ' Speaker assignment flags
 Global Const BASS_SPEAKER_FRONT = &H1000000 ' front speakers
-Global Const BASS_SPEAKER_REAR = &H2000000  ' rear/side speakers
+Global Const BASS_SPEAKER_REAR = &H2000000  ' rear speakers
 Global Const BASS_SPEAKER_CENLFE = &H3000000 ' center & LFE speakers (5.1)
-Global Const BASS_SPEAKER_REAR2 = &H4000000 ' rear center speakers (7.1)
+Global Const BASS_SPEAKER_SIDE = &H4000000 ' side center speakers (7.1)
 Global Const BASS_SPEAKER_LEFT = &H10000000 ' modifier: left
 Global Const BASS_SPEAKER_RIGHT = &H20000000 ' modifier: right
 Global Const BASS_SPEAKER_FRONTLEFT = BASS_SPEAKER_FRONT Or BASS_SPEAKER_LEFT
@@ -289,8 +294,11 @@ Global Const BASS_SPEAKER_REARLEFT = BASS_SPEAKER_REAR Or BASS_SPEAKER_LEFT
 Global Const BASS_SPEAKER_REARRIGHT = BASS_SPEAKER_REAR Or BASS_SPEAKER_RIGHT
 Global Const BASS_SPEAKER_CENTER = BASS_SPEAKER_CENLFE Or BASS_SPEAKER_LEFT
 Global Const BASS_SPEAKER_LFE = BASS_SPEAKER_CENLFE Or BASS_SPEAKER_RIGHT
-Global Const BASS_SPEAKER_REAR2LEFT = BASS_SPEAKER_REAR2 Or BASS_SPEAKER_LEFT
-Global Const BASS_SPEAKER_REAR2RIGHT = BASS_SPEAKER_REAR2 Or BASS_SPEAKER_RIGHT
+Global Const BASS_SPEAKER_SIDELEFT = BASS_SPEAKER_SIDE Or BASS_SPEAKER_LEFT
+Global Const BASS_SPEAKER_SIDERIGHT = BASS_SPEAKER_SIDE Or BASS_SPEAKER_RIGHT
+Global Const BASS_SPEAKER_REAR2 = BASS_SPEAKER_SIDE
+Global Const BASS_SPEAKER_REAR2LEFT = BASS_SPEAKER_SIDELEFT
+Global Const BASS_SPEAKER_REAR2RIGHT = BASS_SPEAKER_SIDERIGHT
 
 Global Const BASS_ASYNCFILE = &H40000000    ' read file asynchronously
 Global Const BASS_UNICODE = &H80000000      ' UTF-16
@@ -341,6 +349,9 @@ Global Const BASS_CTYPE_MUSIC_S3M = &H20002
 Global Const BASS_CTYPE_MUSIC_XM = &H20003
 Global Const BASS_CTYPE_MUSIC_IT = &H20004
 Global Const BASS_CTYPE_MUSIC_MO3 = &H100    ' MO3 flag
+
+' BASS_PluginLoad flags
+Global Const BASS_PLUGIN_PROC = 1
 
 Type BASS_PLUGINFORM
     ctype As Long         ' channel type
@@ -457,6 +468,9 @@ Global Const BASS_ATTRIB_GRANULE = 14
 Global Const BASS_ATTRIB_USER = 15
 Global Const BASS_ATTRIB_TAIL = 16
 Global Const BASS_ATTRIB_PUSH_LIMIT = 17
+Global Const BASS_ATTRIB_DOWNLOADPROC = 18
+Global Const BASS_ATTRIB_VOLDSP = 19
+Global Const BASS_ATTRIB_VOLDSP_PRIORITY = 20
 Global Const BASS_ATTRIB_MUSIC_AMPLIFY = &H100
 Global Const BASS_ATTRIB_MUSIC_PANSEP = &H101
 Global Const BASS_ATTRIB_MUSIC_PSCALER = &H102
@@ -473,7 +487,7 @@ Global Const BASS_SLIDE_LOG = &H1000000
 ' BASS_ChannelGetData flags
 Global Const BASS_DATA_AVAILABLE = 0         ' query how much data is buffered
 Global Const BASS_DATA_NOREMOVE = &H10000000 ' flag: don't remove data from recording buffer
-Global Const BASS_DATA_FIXED = &H20000000    ' flag: return 8.24 fixed-point data
+Global Const BASS_DATA_FIXED = &H20000000    ' unused
 Global Const BASS_DATA_FLOAT = &H40000000    ' flag: return floating-point sample data
 Global Const BASS_DATA_FFT256 = &H80000000   ' 256 sample FFT
 Global Const BASS_DATA_FFT512 = &H80000001   ' 512 FFT
@@ -787,6 +801,7 @@ Declare Function BASS_ChannelUpdate Lib "bass.dll" (ByVal handle As Long, ByVal 
 Declare Function BASS_ChannelLock Lib "bass.dll" (ByVal handle As Long, ByVal lock_ As Long) As Long
 Declare Function BASS_ChannelFree Lib "bass.dll" (ByVal handle As Long) As Long
 Declare Function BASS_ChannelPlay Lib "bass.dll" (ByVal handle As Long, ByVal restart As Long) As Long
+Declare Function BASS_ChannelStart Lib "bass.dll" (ByVal handle As Long) As Long
 Declare Function BASS_ChannelStop Lib "bass.dll" (ByVal handle As Long) As Long
 Declare Function BASS_ChannelPause Lib "bass.dll" (ByVal handle As Long) As Long
 Declare Function BASS_ChannelSetAttribute Lib "bass.dll" (ByVal handle As Long, ByVal attrib As Long, ByVal value As Single) As Long

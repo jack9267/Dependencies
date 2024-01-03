@@ -6,6 +6,8 @@ CC = gcc
 RM = del
 RES = windres
 
+.PHONY: all clean
+
 %.exe: %.c %.rc
 	$(RES) -i $*.rc -o rsrc.obj
 	$(CC) $(FLAGS) $*.c rsrc.obj $(LIBS) -o $(OUTDIR)\$@
@@ -13,5 +15,3 @@ RES = windres
 
 %.exe: %.c
 	$(CC) $(FLAGS) $*.c $(LIBS) -o $(OUTDIR)\$@
-
-.PHONY: all clean

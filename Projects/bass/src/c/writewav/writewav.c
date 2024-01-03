@@ -1,6 +1,6 @@
 /*
 	BASS console WAV writer
-	Copyright (c) 2002-2021 Un4seen Developments Ltd.
+	Copyright (c) 2002-2022 Un4seen Developments Ltd.
 */
 
 #include <stdlib.h>
@@ -9,6 +9,8 @@
 
 #ifdef _WIN32 // Windows
 #include <conio.h>
+#include <malloc.h>
+#define atoll(a) _atoi64(a)
 #else // OSX
 #include <sys/types.h>
 #include <sys/time.h>
@@ -60,8 +62,9 @@ void Error(const char *text)
 int main(int argc, char **argv)
 {
 	BASS_CHANNELINFO info;
-	DWORD chan, p;
-	QWORD len, pos;
+	DWORD chan, bpf, p;
+	QWORD pos;
+	double secs;
 	FILE *fp;
 	WAVEFORMATEX wf;
 
@@ -74,8 +77,8 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	if (argc != 2) {
-		printf("\tusage: writewav <file>\n");
+	if (argc < 2 || argc > 4) {
+		printf("\tusage: writewav <file> [start] [end]\n");
 		return 0;
 	}
 
@@ -83,44 +86,51 @@ int main(int argc, char **argv)
 	if (!BASS_Init(0, 44100, 0, 0, NULL))
 		Error("Can't initialize device");
 
-	// load plugins for additional input format support
+	{ // load plugins for additional input format support
+		const char *basspath = BASS_GetConfigPtr(BASS_CONFIG_FILENAME);
+		if (basspath) {
 #ifdef _WIN32
-	{
-		WIN32_FIND_DATA fd;
-		HANDLE fh;
-		fh = FindFirstFile("bass*.dll", &fd);
-		if (fh != INVALID_HANDLE_VALUE) {
-			int c = 0;
-			do {
-				if (BASS_PluginLoad(fd.cFileName, 0)) {
-					if (!c++) printf("plugins:");
-					printf(" %s", fd.cFileName);
-				}
-			} while (FindNextFile(fh, &fd));
-			if (c) printf("\n");
-			FindClose(fh);
-		}
-	}
-#else
-	{
-		glob_t g;
-#ifdef __APPLE__
-		if (!glob("libbass*.dylib", 0, 0, &g)) {
-#else
-		if (!glob("libbass*.so", 0, 0, &g)) {
-#endif
-			int a, c = 0;
-			for (a = 0; a < g.gl_pathc; a++) {
-				if (BASS_PluginLoad(g.gl_pathv[a], 0)) {
-					if (!c++) printf("plugins:");
-					printf(" %s", g.gl_pathv[a]);
-				}
+			WIN32_FIND_DATA fd;
+			HANDLE fh;
+			int pathlen = strrchr(basspath, '\\') + 1 - basspath;
+			char *pattern = alloca(pathlen + 10);
+			sprintf(pattern, "%.*sbass*.dll", pathlen, basspath);
+			fh = FindFirstFile(pattern, &fd);
+			if (fh != INVALID_HANDLE_VALUE) {
+				int c = 0;
+				do {
+					if (BASS_PluginLoad(fd.cFileName, 0)) {
+						if (!c++) printf("plugins:");
+						printf(" %s", fd.cFileName);
+					}
+				} while (FindNextFile(fh, &fd));
+				if (c) printf("\n");
+				FindClose(fh);
 			}
-			if (c) printf("\n");
-		}
-		globfree(&g);
-	}
+#else
+			glob_t g;
+			int pathlen = strrchr(basspath, '/') + 1 - basspath;
+#ifdef __APPLE__
+			char *pattern = alloca(pathlen + 16);
+			sprintf(pattern, "%.*slibbass?*.dylib", pathlen, basspath);
+#else
+			char *pattern = alloca(pathlen + 13);
+			sprintf(pattern, "%.*slibbass?*.so", pathlen, basspath);
 #endif
+			if (!glob(pattern, 0, 0, &g)) {
+				int a, c = 0;
+				for (a = 0; a < g.gl_pathc; a++) {
+					if (BASS_PluginLoad(g.gl_pathv[a], 0)) {
+						if (!c++) printf("plugins:");
+						printf(" %s", strrchr(g.gl_pathv[a], '/') + 1);
+					}
+				}
+				if (c) printf("\n");
+			}
+			globfree(&g);
+#endif
+		}
+	}
 
 	if (strstr(argv[1], "://")) {
 		// try streaming the URL
@@ -135,12 +145,32 @@ int main(int argc, char **argv)
 	}
 	if (!chan) Error("Can't handle the file");
 
-	len = BASS_ChannelGetLength(chan, BASS_POS_BYTE);
+	BASS_ChannelGetInfo(chan, &info);
+	printf("ctype: %x\n", info.ctype);
+	if (info.origres && info.origres != 8 && info.origres != 16)
+		printf("format: %u Hz, %d chan, %d bit (%d bit output)\n", info.freq, info.chans, LOWORD(info.origres), info.flags & BASS_SAMPLE_8BITS ? 8 : 16);
+	else
+		printf("format: %u Hz, %d chan, %d bit\n", info.freq, info.chans, info.flags & BASS_SAMPLE_8BITS ? 8 : 16);
+	bpf = info.chans * (info.flags & BASS_SAMPLE_8BITS ? 1 : 2); // bytes per sample frame
+	pos = BASS_ChannelGetLength(chan, BASS_POS_BYTE);
+	if (pos != -1) {
+		secs = BASS_ChannelBytes2Seconds(chan, pos);
+		printf("length: %u:%02u (%llu samples)\n", (int)secs / 60, (int)secs % 60, pos / bpf);
+	}
+
+	if (argc >= 3) {
+		pos = atoll(argv[2]);
+		if (!BASS_ChannelSetPosition(chan, pos * bpf, BASS_POS_BYTE))
+			Error("Can't set start position");
+		if (argc == 4) {
+			pos = atoll(argv[3]);
+			BASS_ChannelSetPosition(chan, pos * bpf, BASS_POS_END);
+		}
+	}
 
 	printf("output: bass.wav\n");
 	if (!(fp = fopen("bass.wav", "wb"))) Error("Can't create output file");
 	// write WAV header
-	BASS_ChannelGetInfo(chan, &info);
 	wf.wFormatTag = 1;
 	wf.nChannels = info.chans;
 	wf.wBitsPerSample = (info.flags & BASS_SAMPLE_8BITS ? 8 : 16);
@@ -169,10 +199,11 @@ int main(int argc, char **argv)
 #endif
 		fwrite(buf, 1, c, fp);
 		pos = BASS_ChannelGetPosition(chan, BASS_POS_BYTE);
-		printf(" (press any key to stop)\rdone: %lld / %lld", pos, len);
+		secs = BASS_ChannelBytes2Seconds(chan, pos);
+		printf("  press any key to stop\rdone: %u:%02u (%lld)", (int)secs / 60, (int)secs % 60, pos / bpf);
 		fflush(stdout);
 	}
-	printf("                         \n");
+	printf("                        \n");
 
 	// complete WAV header
 	fflush(fp);

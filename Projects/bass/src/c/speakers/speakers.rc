@@ -23,7 +23,7 @@ BEGIN
                     WS_TABSTOP,182,74,20,10
     CONTROL         "R",35,"Button",BS_AUTOCHECKBOX | WS_DISABLED | 
                     WS_TABSTOP,202,74,21,10
-    GROUPBOX        "4 - rear center",-1,5,92,220,29
+    GROUPBOX        "4 - side",-1,5,92,220,29
     PUSHBUTTON      "Open file...",13,10,102,165,14
     CONTROL         "L",36,"Button",BS_AUTOCHECKBOX | WS_DISABLED | 
                     WS_TABSTOP,182,104,20,10

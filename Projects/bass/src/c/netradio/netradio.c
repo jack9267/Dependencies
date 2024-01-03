@@ -1,6 +1,6 @@
 /*
 	BASS internet radio example
-	Copyright (c) 2002-2021 Un4seen Developments Ltd.
+	Copyright (c) 2002-2022 Un4seen Developments Ltd.
 */
 
 #include <windows.h>
@@ -126,6 +126,9 @@ DWORD WINAPI OpenURL(void *url)
 		MESS(31, WM_SETTEXT, 0, "not playing");
 		Error("Can't play the stream");
 	} else {
+		// only needed the DOWNLOADPROC to receive HTTP/ICY tags, so disable it now
+		void *proc = NULL;
+		BASS_ChannelSetAttributeEx(chan, BASS_ATTRIB_DOWNLOADPROC, &proc, sizeof(proc));
 		// set syncs for stream title updates
 		BASS_ChannelSetSync(chan, BASS_SYNC_META, 0, MetaSync, 0); // Shoutcast
 		BASS_ChannelSetSync(chan, BASS_SYNC_OGG_CHANGE, 0, MetaSync, 0); // Icecast/OGG
@@ -186,7 +189,7 @@ INT_PTR CALLBACK DialogProc(HWND h, UINT m, WPARAM w, LPARAM l)
 					if ((LOWORD(w) >= 10 && LOWORD(w) < 20) || LOWORD(w) == 21) {
 						char *url;
 						if (LOWORD(w) == 21) { // custom stream URL
-							char temp[200];
+							char temp[500];
 							MESS(20, WM_GETTEXT, sizeof(temp), temp);
 							url = strdup(temp);
 						} else // preset
@@ -213,9 +216,10 @@ INT_PTR CALLBACK DialogProc(HWND h, UINT m, WPARAM w, LPARAM l)
 				EndDialog(win, 0);
 				break;
 			}
-			BASS_PluginLoad("bass_aac.dll", 0); // load BASS_AAC (if present) for AAC support on older Windows
-			BASS_PluginLoad("bassflac.dll", 0); // load BASSFLAC (if present) for FLAC support
-			BASS_PluginLoad("basshls.dll", 0); // load BASSHLS (if present) for HLS support
+			BASS_PluginLoad("bass_aac", 0); // load BASS_AAC (if present) for AAC support on older Windows
+			BASS_PluginLoad("bassflac", 0); // load BASSFLAC (if present) for FLAC support
+			BASS_PluginLoad("bassopus", 0); // load BASSOPUS (if present) for OPUS support
+			BASS_PluginLoad("basshls", 0); // load BASSHLS (if present) for HLS support
 			InitializeCriticalSection(&lock);
 			MESS(20, WM_SETTEXT, 0, "http://");
 			return 1;

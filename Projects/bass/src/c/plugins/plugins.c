@@ -1,10 +1,11 @@
 /*
 	BASS plugins example
-	Copyright (c) 2005-2021 Un4seen Developments Ltd.
+	Copyright (c) 2005-2022 Un4seen Developments Ltd.
 */
 
 #include <windows.h>
 #include <stdio.h>
+#include <malloc.h>
 #include <math.h>
 #include <commctrl.h>
 #include "bass.h"
@@ -131,29 +132,33 @@ INT_PTR CALLBACK DialogProc(HWND h, UINT m, WPARAM w, LPARAM l)
 			ofn.Flags = OFN_HIDEREADONLY | OFN_EXPLORER;
 			ofn.lpstrFilter = filter;
 			memcpy(filter, "BASS built-in formats (*.mp3;*.mp2;*.mp1;*.ogg;*.wav;*.aif)\0*.mp3;*.mp2;*.mp1;*.ogg;*.wav;*.aif\0", 96);
-			{ // look for plugins (in the executable's directory)
-				WIN32_FIND_DATA fd;
-				HANDLE fh;
-				char path[MAX_PATH], *fp = filter + 96;
-				GetModuleFileName(0, path, sizeof(path));
-				strcpy(strrchr(path, '\\') + 1, "bass*.dll");
-				fh = FindFirstFile(path, &fd);
-				if (fh != INVALID_HANDLE_VALUE) {
-					do {
-						HPLUGIN plug = BASS_PluginLoad(fd.cFileName, 0);
-						if (plug) { // plugin loaded
-							// get plugin info to add to the file selector filter
-							const BASS_PLUGININFO *pinfo = BASS_PluginGetInfo(plug);
-							int a;
-							for (a = 0; a < pinfo->formatc; a++) {
-								fp += sprintf(fp, "%s (%s) - %s", pinfo->formats[a].name, pinfo->formats[a].exts, fd.cFileName) + 1; // format description
-								fp += sprintf(fp, "%s", pinfo->formats[a].exts) + 1; // extension filter
+			{ // look for plugins (alongside BASS library)
+				char *fp = filter + 96;
+				const char *basspath = BASS_GetConfigPtr(BASS_CONFIG_FILENAME);
+				if (basspath) {
+					WIN32_FIND_DATA fd;
+					HANDLE fh;
+					int pathlen = strrchr(basspath, '\\') + 1 - basspath;
+					char *pattern = alloca(pathlen + 10);
+					sprintf(pattern, "%.*sbass*.dll", pathlen, basspath);
+					fh = FindFirstFile(pattern, &fd);
+					if (fh != INVALID_HANDLE_VALUE) {
+						do {
+							HPLUGIN plug = BASS_PluginLoad(fd.cFileName, 0);
+							if (plug) { // plugin loaded
+								// get plugin info to add to the file selector filter
+								const BASS_PLUGININFO *pinfo = BASS_PluginGetInfo(plug);
+								int a;
+								for (a = 0; a < pinfo->formatc; a++) {
+									fp += sprintf(fp, "%s (%s) - %s", pinfo->formats[a].name, pinfo->formats[a].exts, fd.cFileName) + 1; // format description
+									fp += sprintf(fp, "%s", pinfo->formats[a].exts) + 1; // extension filter
+								}
+								// add plugin to the list
+								MESS(20, LB_ADDSTRING, 0, fd.cFileName);
 							}
-							// add plugin to the list
-							MESS(20, LB_ADDSTRING, 0, fd.cFileName);
-						}
-					} while (FindNextFile(fh, &fd));
-					FindClose(fh);
+						} while (FindNextFile(fh, &fd));
+						FindClose(fh);
+					}
 				}
 				if (!MESS(20, LB_GETCOUNT, 0, 0))
 					MESS(20, LB_ADDSTRING, 0, "no plugins - visit the BASS webpage to get some");

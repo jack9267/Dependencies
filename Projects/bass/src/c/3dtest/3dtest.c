@@ -23,7 +23,6 @@ int chan = -1;		// selected channel
 
 #define TIMERPERIOD	50		// timer period (ms)
 #define MAXDIST		50		// maximum distance of the channels (m)
-#define SPEED		12		// speed of the channels' movement (m/s)
 
 // Display error dialogs
 void Error(const char *es)
@@ -240,8 +239,6 @@ INT_PTR CALLBACK DialogProc(HWND h, UINT m, WPARAM w, LPARAM l)
 
 int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
-	MSG msg;
-
 	// check the correct BASS was loaded
 	if (HIWORD(BASS_GetVersion()) != BASSVERSION) {
 		MessageBox(0, "An incorrect version of BASS.DLL was loaded", 0, MB_ICONERROR);

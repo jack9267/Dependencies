@@ -62,7 +62,7 @@ INT_PTR CALLBACK DialogProc(HWND h, UINT m, WPARAM w, LPARAM l)
 						ofn.lpstrFilter = "Streamable files (wav/aif/mp3/mp2/mp1/ogg)\0*.wav;*.aif;*.mp3;*.mp2;*.mp1;*.ogg\0All files\0*.*\0\0";
 						ofn.lpstrFile = file;
 						if (GetOpenFileName(&ofn)) {
-							HSTREAM str = BASS_StreamCreateFile(FALSE, file, 0, 0, 0);
+							HSTREAM str = BASS_StreamCreateFile(FALSE, file, 0, 0, BASS_SAMPLE_FLOAT);
 							if (str) {
 								strc++;
 								strs = (HSTREAM*)realloc((void*)strs, strc * sizeof(*strs));
@@ -117,7 +117,7 @@ INT_PTR CALLBACK DialogProc(HWND h, UINT m, WPARAM w, LPARAM l)
 						ofn.lpstrFilter = "MOD music files (mo3/xm/mod/s3m/it/mtm/umx)\0*.mo3;*.xm;*.mod;*.s3m;*.it;*.mtm;*.umx\0All files\0*.*\0\0";
 						ofn.lpstrFile = file;
 						if (GetOpenFileName(&ofn)) {
-							HMUSIC mod = BASS_MusicLoad(FALSE, file, 0, 0, BASS_MUSIC_RAMPS, 1);
+							HMUSIC mod = BASS_MusicLoad(FALSE, file, 0, 0, BASS_MUSIC_RAMPS | BASS_SAMPLE_FLOAT, 1);
 							if (mod) {
 								modc++;
 								mods = (HMUSIC*)realloc((void*)mods, modc * sizeof(*mods));

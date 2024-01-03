@@ -1,6 +1,6 @@
 /*
 	BASS simple console player
-	Copyright (c) 1999-2021 Un4seen Developments Ltd.
+	Copyright (c) 1999-2022 Un4seen Developments Ltd.
 */
 
 #include <stdlib.h>
@@ -56,7 +56,6 @@ void ListDevices()
 int main(int argc, char **argv)
 {
 	DWORD chan, act, level;
-	BOOL ismod;
 	QWORD pos;
 	double secs;
 	int a, filep, device = -1;
@@ -93,24 +92,22 @@ int main(int argc, char **argv)
 	if (!BASS_Init(device, 48000, 0, 0, NULL))
 		Error("Can't initialize device");
 
-	ismod = FALSE;
 	if (strstr(argv[filep], "://")) {
 		// try streaming the URL
-		chan = BASS_StreamCreateURL(argv[filep], 0, BASS_SAMPLE_LOOP, 0, 0);
+		chan = BASS_StreamCreateURL(argv[filep], 0, BASS_SAMPLE_LOOP | BASS_SAMPLE_FLOAT, 0, 0);
 	} else {
 		// try streaming the file
-		chan = BASS_StreamCreateFile(FALSE, argv[filep], 0, 0, BASS_SAMPLE_LOOP);
+		chan = BASS_StreamCreateFile(FALSE, argv[filep], 0, 0, BASS_SAMPLE_LOOP | BASS_SAMPLE_FLOAT);
 		if (!chan && BASS_ErrorGetCode() == BASS_ERROR_FILEFORM) {
 			// try MOD music formats
-			chan = BASS_MusicLoad(FALSE, argv[filep], 0, 0, BASS_SAMPLE_LOOP | BASS_MUSIC_RAMPS | BASS_MUSIC_PRESCAN, 1);
-			ismod = TRUE;
+			chan = BASS_MusicLoad(FALSE, argv[filep], 0, 0, BASS_SAMPLE_LOOP | BASS_SAMPLE_FLOAT | BASS_MUSIC_RAMPS | BASS_MUSIC_PRESCAN, 1);
 		}
 	}
 	if (!chan) Error("Can't play the file");
 
 	BASS_ChannelGetInfo(chan, &info);
 	printf("ctype: %x\n", info.ctype);
-	if (!ismod) {
+	if (HIWORD(info.ctype) != 2) {
 		if (info.origres)
 			printf("format: %u Hz, %d chan, %d bit\n", info.freq, info.chans, LOWORD(info.origres));
 		else
@@ -119,11 +116,11 @@ int main(int argc, char **argv)
 	pos = BASS_ChannelGetLength(chan, BASS_POS_BYTE);
 	if (pos != -1) {
 		double secs = BASS_ChannelBytes2Seconds(chan, pos);
-		if (ismod)
+		if (HIWORD(info.ctype) == 2)
 			printf("length: %u:%02u (%llu samples), %u orders\n", (int)secs / 60, (int)secs % 60, (long long)(secs * info.freq), (DWORD)BASS_ChannelGetLength(chan, BASS_POS_MUSIC_ORDER));
 		else
 			printf("length: %u:%02u (%llu samples)\n", (int)secs / 60, (int)secs % 60, (long long)(secs * info.freq));
-	} else if (ismod)
+	} else if (HIWORD(info.ctype) == 2)
 		printf("length: %u orders\n", (DWORD)BASS_ChannelGetLength(chan, BASS_POS_MUSIC_ORDER));
 
 	BASS_ChannelPlay(chan, FALSE);
@@ -134,7 +131,7 @@ int main(int argc, char **argv)
 		pos = BASS_ChannelGetPosition(chan, BASS_POS_BYTE);
 		secs = BASS_ChannelBytes2Seconds(chan, pos);
 		printf(" %u:%02u (%08lld)", (int)secs / 60, (int)secs % 60, (long long)(secs * info.freq));
-		if (ismod) {
+		if (HIWORD(info.ctype) == 2) {
 			pos = BASS_ChannelGetPosition(chan, BASS_POS_MUSIC_ORDER);
 			printf(" | %03u:%03u", LOWORD(pos), HIWORD(pos));
 		}

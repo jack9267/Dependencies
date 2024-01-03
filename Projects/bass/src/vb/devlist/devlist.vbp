@@ -1,15 +1,10 @@
 Type=Exe
-Object={831FDD16-0C5C-11D2-A9FC-0000F8754DA1}#2.1#0; MSCOMCTL.OCX
-Module=modBass; ..\Bass.bas
-Form=frmLiveFX.frm
-Module=modLiveFX; modLiveFX.bas
-IconForm="frmLiveFX"
-Startup="frmLiveFX"
-HelpFile=""
-Title="prjLiveFX"
-ExeName32="prjLiveFX.exe"
+Module=devlist; devlist.bas
+Module=modBass; ..\bass.bas
+Startup="Sub Main"
+ExeName32="devlist.exe"
 Command32=""
-Name="prjLiveFX"
+Name="prjDevList"
 HelpContextID="0"
 CompatibleMode="0"
 MajorVer=1
@@ -18,7 +13,7 @@ RevisionVer=0
 AutoIncrementVer=0
 ServerSupportFiles=0
 CompilationType=0
-OptimizationType=1
+OptimizationType=0
 FavorPentiumPro(tm)=0
 CodeViewDebugInfo=0
 NoAliasing=0
@@ -32,7 +27,6 @@ Unattended=0
 Retained=0
 ThreadPerObject=0
 MaxNumberOfThreads=1
-DebugStartupOption=0
 
 [MS Transaction Server]
 AutoRefresh=1

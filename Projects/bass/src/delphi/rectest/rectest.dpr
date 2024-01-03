@@ -1,8 +1,8 @@
-program RecordTest;
+program rectest;
 
 uses
-  Forms,
-  Unit1 in 'Unit1.pas' {Form1},
+  Forms, 
+  Unit1 in 'Unit1.pas' {Form1};
   Bass in '..\Bass.pas';
 
 begin

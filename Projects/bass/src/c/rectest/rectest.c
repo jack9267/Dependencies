@@ -1,6 +1,6 @@
 /*
 	BASS recording example
-	Copyright (c) 2002-2021 Un4seen Developments Ltd.
+	Copyright (c) 2002-2022 Un4seen Developments Ltd.
 */
 
 #include <windows.h>
@@ -16,6 +16,7 @@ HWND win;
 
 int input;				// current input source
 int freq, chans;		// sample format
+float volume = 1;		// recording level adjustment
 BYTE *recbuf;			// recording buffer
 DWORD reclen;			// recording length
 HRECORD rchan;			// recording channel
@@ -85,14 +86,16 @@ void StartRecording()
 	wf->nSamplesPerSec = freq;
 	wf->nBlockAlign = wf->nChannels * wf->wBitsPerSample / 8;
 	wf->nAvgBytesPerSec = wf->nSamplesPerSec * wf->nBlockAlign;
-	// start recording
-	rchan = BASS_RecordStart(freq, chans, 0, RecordingCallback, NULL);
+	// start recording (paused to set VOLDSP first)
+	rchan = BASS_RecordStart(freq, chans, BASS_RECORD_PAUSE, RecordingCallback, NULL);
 	if (!rchan) {
 		Error("Can't start recording");
 		free(recbuf);
 		recbuf = 0;
 		return;
 	}
+	BASS_ChannelSetAttribute(rchan, BASS_ATTRIB_VOLDSP, volume);
+	BASS_ChannelStart(rchan); // resume recording
 	MESS(10, WM_SETTEXT, 0, "Stop");
 	EnableWindow(DLGITEM(17), FALSE);
 }
@@ -136,7 +139,6 @@ void WriteToDisk()
 
 void UpdateInputInfo()
 {
-	char *type;
 	float level;
 	int it = BASS_RecordGetInput(input, &level); // get info on the input
 	if (it == -1 || level < 0) { // failed to get level
@@ -149,47 +151,6 @@ void UpdateInputInfo()
 	} else
 		EnableWindow(DLGITEM(14), TRUE);
 	MESS(14, TBM_SETPOS, TRUE, level * 100); // set the level slider
-	switch (it & BASS_INPUT_TYPE_MASK) {
-		case BASS_INPUT_TYPE_DIGITAL:
-			type = "digital";
-			break;
-		case BASS_INPUT_TYPE_LINE:
-			type = "line-in";
-			break;
-		case BASS_INPUT_TYPE_MIC:
-			type = "microphone";
-			break;
-		case BASS_INPUT_TYPE_SYNTH:
-			type = "midi synth";
-			break;
-		case BASS_INPUT_TYPE_CD:
-			type = "analog cd";
-			break;
-		case BASS_INPUT_TYPE_PHONE:
-			type = "telephone";
-			break;
-		case BASS_INPUT_TYPE_SPEAKER:
-			type = "pc speaker";
-			break;
-		case BASS_INPUT_TYPE_WAVE:
-			type = "wave/pcm";
-			break;
-		case BASS_INPUT_TYPE_AUX:
-			type = "aux";
-			break;
-		case BASS_INPUT_TYPE_ANALOG:
-			type = "analog";
-			break;
-		default:
-			type = "undefined";
-			{
-				// check if it's a loopback device
-				BASS_DEVICEINFO info;
-				BASS_RecordGetDeviceInfo(BASS_RecordGetDevice(), &info);
-				if (info.flags & BASS_DEVICE_LOOPBACK) type = "loopback";
-			}
-	}
-	MESS(15, WM_SETTEXT, 0, type); // display the type
 }
 
 BOOL InitDevice(int device)
@@ -212,6 +173,7 @@ BOOL InitDevice(int device)
 				MESS(13, CB_SETCURSEL, input, 0);
 			}
 		}
+		EnableWindow(DLGITEM(13), c > 0);
 		UpdateInputInfo();
 	}
 	return TRUE;
@@ -225,9 +187,11 @@ INT_PTR CALLBACK DialogProc(HWND h, UINT m, WPARAM w, LPARAM l)
 				float level = 0;
 				if (rchan || pchan) {
 					BASS_ChannelGetLevelEx(rchan ? rchan : pchan, &level, 0.1, BASS_LEVEL_MONO); // get current level
+					if (rchan) level *= volume; // apply recording level adjustment
 					if (level > 0) {
 						level = 1 + 0.5 * log10(level); // convert to dB (40dB range)
 						if (level < 0) level = 0;
+						if (level > 1) level = 1;
 					}
 				}
 				MESS(21, PBM_SETPOS, level * 100, 0);
@@ -289,12 +253,14 @@ INT_PTR CALLBACK DialogProc(HWND h, UINT m, WPARAM w, LPARAM l)
 						// initialize the selected device
 						if (InitDevice(i)) {
 							if (rchan) { // continue recording on the new device...
-								HRECORD newrchan = BASS_RecordStart(freq, chans, 0, RecordingCallback, NULL);
+								HRECORD newrchan = BASS_RecordStart(freq, chans, BASS_RECORD_PAUSE, RecordingCallback, NULL);
 								if (!newrchan) {
 									Error("Can't start recording");
 									break;
 								}
 								rchan = newrchan;
+								BASS_ChannelSetAttribute(rchan, BASS_ATTRIB_VOLDSP, volume);
+								BASS_ChannelStart(rchan);
 							}
 						}
 					}
@@ -303,30 +269,42 @@ INT_PTR CALLBACK DialogProc(HWND h, UINT m, WPARAM w, LPARAM l)
 			break;
 
 		case WM_HSCROLL:
-			if (l) { // set input source level
+			if (l) {
 				float level = SendMessage((HWND)l, TBM_GETPOS, 0, 0) / 100.f;
-				if (!BASS_RecordSetInput(input, 0, level)) // failed to set input level
-					BASS_RecordSetInput(-1, 0, level); // try master level instead
+				switch (GetDlgCtrlID((HWND)l)) {
+					case 14:
+						if (!BASS_RecordSetInput(input, 0, level)) // set input source level
+							BASS_RecordSetInput(-1, 0, level); // try master level instead
+						break;
+
+					case 15:
+						BASS_ChannelSetAttribute(rchan, BASS_ATTRIB_VOLDSP, volume = level); // set recording level adjustment
+						break;
+				}
 			}
 			break;
 
 		case WM_INITDIALOG:
 			win = h;
 			MESS(14, TBM_SETRANGE, FALSE, MAKELONG(0, 100));
+			MESS(15, TBM_SETRANGE, FALSE, MAKELONG(0, 200));
+			MESS(15, TBM_SETPOS, TRUE, 100);
 			// initialize default output device
 			if (!BASS_Init(-1, 48000, 0, win, NULL))
 				Error("Can't initialize output device");
 			{ // get list of recording devices
-				int c, def;
+				int c;
 				BASS_DEVICEINFO di;
 				for (c = 0; BASS_RecordGetDeviceInfo(c, &di); c++) {
-					MESS(16, CB_ADDSTRING, 0, di.name);
-					if (di.flags & BASS_DEVICE_DEFAULT) { // got the default device
-						MESS(16, CB_SETCURSEL, c, 0);
-						def = c;
-					}
+					if (di.flags & BASS_DEVICE_LOOPBACK) {
+						char name[100];
+						_snprintf(name, sizeof(name) - 1, "loopback: %s", di.name);
+						MESS(16, CB_ADDSTRING, 0, name);
+					} else
+						MESS(16, CB_ADDSTRING, 0, di.name);
 				}
-				InitDevice(def); // initialize default recording device
+				MESS(16, CB_SETCURSEL, 0, 0);
+				InitDevice(0); // initialize "Default" recording device
 			}
 			MESS(17, CB_ADDSTRING, 0, "48000 Hz mono 16-bit");
 			MESS(17, CB_ADDSTRING, 0, "48000 Hz stereo 16-bit");

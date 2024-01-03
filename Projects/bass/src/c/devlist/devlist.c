@@ -1,6 +1,6 @@
 /*
 	BASS device list example
-	Copyright (c) 2014-2019 Un4seen Developments Ltd.
+	Copyright (c) 2014-2022 Un4seen Developments Ltd.
 */
 
 #include <stdio.h>
@@ -72,6 +72,17 @@ int main()
 	for (a = 0; BASS_RecordGetDeviceInfo(a, &di); a++) {
 		printf("%d: ", a);
 		DisplayDeviceInfo(&di);
+#ifdef _WIN32
+		if ((GetVersion() & 0xff) < 6) // only list inputs before Windows Vista (they're in device list after)
+#endif
+		{ // list inputs
+			int b;
+			const char *n;
+			BASS_RecordInit(a);
+			for (b = 0; n = BASS_RecordGetInputName(b); b++)
+				printf("\tinput %d: %s\n", b, n);
+			BASS_RecordFree();
+		}
 	}
 	return 0;
 }

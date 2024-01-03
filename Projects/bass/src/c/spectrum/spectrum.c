@@ -59,7 +59,7 @@ BOOL PlayFile()
 }
 
 // update the display
-void CALLBACK UpdateSpectrum(UINT uTimerID, UINT uMsg, DWORD dwUser, DWORD dw1, DWORD dw2)
+void CALLBACK UpdateSpectrum(UINT uTimerID, UINT uMsg, DWORD_PTR dwUser, DWORD_PTR dw1, DWORD_PTR dw2)
 {
 	HDC dc;
 	int x, y, y1;
@@ -74,7 +74,7 @@ void CALLBACK UpdateSpectrum(UINT uTimerID, UINT uMsg, DWORD dwUser, DWORD dw1, 
 		memset(specbuf, 0, SPECWIDTH * SPECHEIGHT);
 		for (c = 0; c < ci.chans; c++) {
 			for (x = 0; x < SPECWIDTH; x++) {
-				int v = (1 - buf[x * ci.chans + c]) * SPECHEIGHT / 2; // invert and scale to fit display
+				int v = (1 + buf[x * ci.chans + c]) * SPECHEIGHT / 2; // offset and scale to fit display
 				if (v < 0) v = 0;
 				else if (v >= SPECHEIGHT) v = SPECHEIGHT - 1;
 				if (!x) y = v;
@@ -157,7 +157,7 @@ LRESULT CALLBACK SpectrumWindowProc(HWND h, UINT m, WPARAM w, LPARAM l)
 
 		case WM_CREATE:
 			win = h;
-			// initialize BASS
+			// initialize default output device
 			if (!BASS_Init(-1, 44100, 0, win, NULL)) {
 				Error("Can't initialize device");
 				return -1;
