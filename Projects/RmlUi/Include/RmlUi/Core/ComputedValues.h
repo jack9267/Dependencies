@@ -32,6 +32,7 @@
 #include "Element.h"
 #include "StyleTypes.h"
 #include "Types.h"
+#include <cfloat>
 
 namespace Rml {
 namespace Style {
@@ -153,7 +154,7 @@ namespace Style {
 
 			flex_basis_type(LengthPercentageAuto::Auto), row_gap_type(LengthPercentage::Length), column_gap_type(LengthPercentage::Length),
 
-			vertical_align_type(VerticalAlign::Baseline), drag(Drag::None), tab_index(TabIndex::None)
+			vertical_align_type(VerticalAlign::Baseline), drag(Drag::None), tab_index(TabIndex::None), overscroll_behavior(OverscrollBehavior::Auto)
 		{}
 
 		LengthPercentage::Type min_width_type : 1, max_width_type : 1;
@@ -168,11 +169,12 @@ namespace Style {
 		VerticalAlign::Type vertical_align_type : 4;
 		Drag drag : 3;
 		TabIndex tab_index : 1;
+		OverscrollBehavior overscroll_behavior : 1;
 
 		Clip clip;
 
-		float min_width = 0, max_width = -1;
-		float min_height = 0, max_height = -1;
+		float min_width = 0, max_width = FLT_MAX;
+		float min_height = 0, max_height = FLT_MAX;
 		float vertical_align_length = 0;
 
 		float perspective = 0;
@@ -285,6 +287,7 @@ namespace Style {
 		Colourb           image_color()                const { return rare.image_color; }
 		LengthPercentage  row_gap()                    const { return LengthPercentage(rare.row_gap_type, rare.row_gap); }
 		LengthPercentage  column_gap()                 const { return LengthPercentage(rare.column_gap_type, rare.column_gap); }
+		OverscrollBehavior overscroll_behavior()       const { return rare.overscroll_behavior; }
 		float             scrollbar_margin()           const { return rare.scrollbar_margin; }
 		
 		// -- Assignment --
@@ -361,6 +364,7 @@ namespace Style {
 		void drag                      (Drag value)              { rare.drag                       = value; }
 		void tab_index                 (TabIndex value)          { rare.tab_index                  = value; }
 		void image_color               (Colourb value)           { rare.image_color                = value; }
+		void overscroll_behavior       (OverscrollBehavior value){ rare.overscroll_behavior        = value; }
 		void scrollbar_margin          (float value)             { rare.scrollbar_margin           = value; }
 
 		// clang-format on

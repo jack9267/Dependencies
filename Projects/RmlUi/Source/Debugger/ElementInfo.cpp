@@ -59,6 +59,9 @@ ElementInfo::ElementInfo(const String& tag) : ElementDocument(tag)
 
 ElementInfo::~ElementInfo()
 {
+	RemoveEventListener(EventId::Click, this);
+	RemoveEventListener(EventId::Mouseover, this);
+	RemoveEventListener(EventId::Mouseout, this);
 }
 
 // Initialises the info element.
@@ -596,13 +599,11 @@ void ElementInfo::UpdateSourceElement()
 				if (IsDebuggerElement(child))
 					continue;
 
-				String child_name = child->GetTagName();
-				const String child_id = child->GetId();
-				if (!child_id.empty())
-				{
-					child_name += "#";
-					child_name += child_id;
-				}
+				String child_name = child->GetAddress(false, false);
+				auto document = rmlui_dynamic_cast<ElementDocument*>(child);
+				if (document && !document->GetTitle().empty())
+					child_name += " (" + document->GetTitle() + ')';
+
 				const char* non_dom_string = (i >= num_dom_children ? " class=\"non_dom\"" : "");
 
 				children += CreateString(child_name.size() + 40, "<p id=\"c %d\"%s>%s</p>", i, non_dom_string, child_name.c_str());

@@ -36,6 +36,7 @@
 #include "ObserverPtr.h"
 #include "Property.h"
 #include "ScriptInterface.h"
+#include "ScrollTypes.h"
 #include "StyleTypes.h"
 #include "Transform.h"
 #include "Tween.h"
@@ -176,8 +177,9 @@ public:
 	virtual bool IsPointWithinElement(Vector2f point);
 
 	/// Returns the visibility of the element.
+	/// @param[in] include_ancestors Check parent elements for visibility
 	/// @return True if the element is visible, false otherwise.
-	bool IsVisible() const;
+	bool IsVisible(bool include_ancestors = false) const;
 	/// Returns the z-index of the element.
 	/// @return The element's z-index.
 	float GetZIndex() const;
@@ -301,6 +303,8 @@ public:
 	/// @param[in] name Name of the attribute to retrieve.
 	/// @return A variant representing the attribute, or nullptr if the attribute doesn't exist.
 	Variant* GetAttribute(const String& name);
+	/// Gets the specified attribute.
+	const Variant* GetAttribute(const String& name) const;
 	/// Gets the specified attribute, with default value.
 	/// @param[in] name Name of the attribute to retrieve.
 	/// @param[in] default_value Value to return if the attribute doesn't exist.
@@ -498,8 +502,16 @@ public:
 	bool DispatchEvent(EventId id, const Dictionary& parameters);
 
 	/// Scrolls the parent element's contents so that this element is visible.
+	/// @param[in] options Scroll parameters that control desired element alignment relative to the parent.
+	void ScrollIntoView(ScrollIntoViewOptions options);
+	/// Scrolls the parent element's contents so that this element is visible.
 	/// @param[in] align_with_top If true, the element will align itself to the top of the parent element's window. If false, the element will be aligned to the bottom of the parent element's window.
 	void ScrollIntoView(bool align_with_top = true);
+	/// Sets the scroll offset of this element to the given coordinates.
+	/// @param[in] position The scroll destination coordinates.
+	/// @param[in] behavior Smooth scrolling behavior.
+	/// @note Smooth scrolling can only be applied to a single element at a time, any active smooth scrolls will be cancelled.
+	void ScrollTo(Vector2f offset, ScrollBehavior behavior = ScrollBehavior::Instant);
 
 	/// Append a child to this element.
 	/// @param[in] element The element to append as a child.
@@ -561,6 +573,8 @@ public:
 	ElementDecoration* GetElementDecoration() const;
 	/// Returns the element's scrollbar functionality.
 	ElementScroll* GetElementScroll() const;
+	/// Returns the element's nearest scroll container that can be scrolled, if any.
+	Element* GetClosestScrollableContainer();
 	/// Returns the element's transform state.
 	const TransformState* GetTransformState() const noexcept;
 	/// Returns the data model of this element.
@@ -626,7 +640,6 @@ protected:
 
 	/// Forces a re-layout of this element, and any other elements required.
 	virtual void DirtyLayout();
-
 	/// Returns true if the element has been marked as needing a re-layout.
 	virtual bool IsLayoutDirty();
 
@@ -639,6 +652,10 @@ protected:
 	/// @param[in] pseudo_class The pseudo class to activate or deactivate.
 	/// @param[in] activate True if the pseudo-class is to be activated, false to be deactivated.
 	static void OverridePseudoClass(Element* target_element, const String& pseudo_class, bool activate);
+
+	enum class DirtyNodes { Self, SelfAndSiblings };
+	// Dirty the element style definition, including all descendants of the specificed nodes.
+	void DirtyDefinition(DirtyNodes dirty_nodes);
 
 	void SetOwnerDocument(ElementDocument* document);
 
@@ -661,8 +678,7 @@ private:
 	static void BuildStackingContextForTable(Vector<StackingOrderedChild>& ordered_children, Element* child);
 	void DirtyStackingContext();
 
-	void DirtyStructure();
-	void UpdateStructure();
+	void UpdateDefinition();
 
 	void DirtyTransformState(bool perspective_dirty, bool transform_dirty);
 	void UpdateTransformState();
@@ -701,7 +717,8 @@ private:
 	bool offset_fixed;
 	bool absolute_offset_dirty;
 
-	bool structure_dirty : 1;
+	bool dirty_definition : 1; // Implies dirty child definitions as well.
+	bool dirty_child_definitions : 1;
 
 	bool dirty_animation : 1;
 	bool dirty_transition : 1;

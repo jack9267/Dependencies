@@ -30,6 +30,7 @@
 #define RMLUI_CORE_STYLESHEETTYPES_H
 
 #include "PropertyDictionary.h"
+#include "Factory.h"
 #include "Types.h"
 #include "Utilities.h"
 
@@ -63,6 +64,16 @@ struct DecoratorDeclaration {
 	DecoratorInstancer* instancer;
 	PropertyDictionary properties;
 };
+
+struct DecoratorDeclarationView {
+	DecoratorDeclarationView(const DecoratorDeclaration& declaration) : type(declaration.type), instancer(declaration.instancer), properties(declaration.properties) {}
+	DecoratorDeclarationView(const DecoratorSpecification* specification) : type(specification->decorator_type), instancer(Factory::GetDecoratorInstancer(specification->decorator_type)), properties(specification->properties) {}
+
+	const String& type;
+	DecoratorInstancer* instancer;
+	const PropertyDictionary& properties;
+};
+
 struct DecoratorDeclarationList {
 	Vector<DecoratorDeclaration> list;
 	String value;
@@ -97,7 +108,7 @@ namespace std {
 // Hash specialization for the node list, so it can be used as key in UnorderedMap.
 template <>
 struct hash<::Rml::StyleSheetIndex::NodeList> {
-	std::size_t operator()(const ::Rml::StyleSheetIndex::NodeList& nodes) const
+	std::size_t operator()(const ::Rml::StyleSheetIndex::NodeList& nodes) const noexcept
 	{
 		std::size_t seed = 0;
 		for (const ::Rml::StyleSheetNode* node : nodes)

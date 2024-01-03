@@ -95,8 +95,8 @@ void LayoutDetails::BuildBox(Box& box, Vector2f containing_block, Element* eleme
 			ResolveValue(computed.min_height(), containing_block.y)
 		);
 		max_size = Vector2f(
-			(computed.max_width().value < 0.f ? FLT_MAX : ResolveValue(computed.max_width(), containing_block.x)),
-			(computed.max_height().value < 0.f ? FLT_MAX : ResolveValue(computed.max_height(), containing_block.y))
+			ResolveValue(computed.max_width(), containing_block.x),
+			ResolveValue(computed.max_height(), containing_block.y)
 		);
 
 		// Adjust sizes for the given box sizing model.
@@ -146,7 +146,7 @@ void LayoutDetails::BuildBox(Box& box, float& min_height, float& max_height, Lay
 void LayoutDetails::GetMinMaxWidth(float& min_width, float& max_width, const ComputedValues& computed, const Box& box, float containing_block_width)
 {
 	min_width = ResolveValue(computed.min_width(), containing_block_width);
-	max_width = (computed.max_width().value < 0.f ? FLT_MAX : ResolveValue(computed.max_width(), containing_block_width));
+	max_width = ResolveValue(computed.max_width(), containing_block_width);
 
 	if (computed.box_sizing() == Style::BoxSizing::BorderBox)
 	{
@@ -156,11 +156,10 @@ void LayoutDetails::GetMinMaxWidth(float& min_width, float& max_width, const Com
 	}
 }
 
-
 void LayoutDetails::GetMinMaxHeight(float& min_height, float& max_height, const ComputedValues& computed, const Box& box, float containing_block_height)
 {
 	min_height = ResolveValue(computed.min_height(), containing_block_height);
-	max_height = (computed.max_height().value < 0.f ? FLT_MAX : ResolveValue(computed.max_height(), containing_block_height));
+	max_height = ResolveValue(computed.max_height(), containing_block_height);
 
 	if (computed.box_sizing() == Style::BoxSizing::BorderBox)
 	{
@@ -198,15 +197,19 @@ Vector2f LayoutDetails::GetContainingBlock(const LayoutBlockBox* containing_box)
 	while ((containing_block.y = containing_box->GetBox().GetSize(Box::CONTENT).y) < 0)
 	{
 		containing_box = containing_box->GetParent();
-		if (containing_box == nullptr)
+		if (!containing_box)
 		{
 			RMLUI_ERROR;
 			containing_block.y = 0;
+			break;
 		}
 	}
-	if (containing_box != nullptr &&
-		containing_box->GetElement() != nullptr)
-		containing_block.y -= containing_box->GetElement()->GetElementScroll()->GetScrollbarSize(ElementScroll::HORIZONTAL);
+
+	if (containing_box)
+	{
+	    if (Element* element = containing_box->GetElement())
+	        containing_block.y -= element->GetElementScroll()->GetScrollbarSize(ElementScroll::HORIZONTAL);
+	}
 
 	containing_block.x = Math::Max(0.0f, containing_block.x);
 	containing_block.y = Math::Max(0.0f, containing_block.y);

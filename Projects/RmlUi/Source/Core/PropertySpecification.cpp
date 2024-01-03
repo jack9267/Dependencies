@@ -29,11 +29,12 @@
 #include "../../Include/RmlUi/Core/PropertySpecification.h"
 #include "../../Include/RmlUi/Core/Debug.h"
 #include "../../Include/RmlUi/Core/Log.h"
+#include "../../Include/RmlUi/Core/Profiling.h"
 #include "../../Include/RmlUi/Core/PropertyDefinition.h"
 #include "../../Include/RmlUi/Core/PropertyDictionary.h"
-#include "../../Include/RmlUi/Core/Profiling.h"
-#include "PropertyShorthandDefinition.h"
 #include "IdNameMap.h"
+#include "PropertyShorthandDefinition.h"
+#include <algorithm>
 #include <limits.h>
 #include <stdint.h>
 
@@ -108,13 +109,13 @@ const PropertyDefinition* PropertySpecification::GetProperty(const String& prope
 }
 
 // Fetches a list of the names of all registered property definitions.
-const PropertyIdSet& PropertySpecification::GetRegisteredProperties(void) const
+const PropertyIdSet& PropertySpecification::GetRegisteredProperties() const
 {
 	return property_ids;
 }
 
 // Fetches a list of the names of all registered property definitions.
-const PropertyIdSet& PropertySpecification::GetRegisteredInheritedProperties(void) const
+const PropertyIdSet& PropertySpecification::GetRegisteredInheritedProperties() const
 {
 	return property_ids_inherited;
 }
@@ -291,6 +292,7 @@ bool PropertySpecification::ParseShorthandDeclaration(PropertyDictionary& dictio
 				result &= item.property_definition->ParseValue(new_property, default_omitted_values[i]);
 				dictionary.SetProperty(item.property_id, new_property);
 			}
+			(void)result;
 			RMLUI_ASSERT(result);
 		}
 	}
@@ -431,13 +433,30 @@ void PropertySpecification::SetPropertyDefaults(PropertyDictionary& dictionary) 
 	}
 }
 
-String PropertySpecification::PropertiesToString(const PropertyDictionary& dictionary) const
+String PropertySpecification::PropertiesToString(const PropertyDictionary& dictionary, bool include_name, char delimiter) const
 {
+	const PropertyMap& properties = dictionary.GetProperties();
+
+	// For determinism we print the strings in order of increasing property ids.
+	Vector<PropertyId> ids;
+	ids.reserve(properties.size());
+	for (auto& pair : properties)
+		ids.push_back(pair.first);
+
+	std::sort(ids.begin(), ids.end());
+
 	String result;
-	for (auto& pair : dictionary.GetProperties())
+	for (PropertyId id : ids)
 	{
-		result += property_map->GetName(pair.first) + ": " + pair.second.ToString() + '\n';
+		const Property& p = properties.find(id)->second;
+		if (include_name)
+			result += property_map->GetName(id) + ": ";
+		result += p.ToString() + delimiter;
 	}
+
+	if (!result.empty())
+		result.pop_back();
+
 	return result;
 }
 
