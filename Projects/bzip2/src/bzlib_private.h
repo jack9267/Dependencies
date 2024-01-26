@@ -8,8 +8,8 @@
    This file is part of bzip2/libbzip2, a program and library for
    lossless, block-sorting data compression.
 
-   bzip2/libbzip2 version 1.0.5 of 10 December 2007
-   Copyright (C) 1996-2007 Julian Seward <jseward@bzip.org>
+   bzip2/libbzip2 version 1.0.8 of 13 July 2019
+   Copyright (C) 1996-2019 Julian Seward <jseward@acm.org>
 
    Please read the WARNING, DISCLAIMER and PATENTS sections in the 
    README file.
@@ -36,7 +36,7 @@
 
 /*-- General stuff. --*/
 
-#define BZ_VERSION  "1.0.5, 10-Dec-2007"
+#define BZ_VERSION  "1.0.8, 13-Jul-2019"
 
 typedef char            Char;
 typedef unsigned char   Bool;
@@ -340,7 +340,6 @@ BZ2_hbMakeCodeLengths ( UChar*, Int32*, Int32, Int32 );
 #define MTFA_SIZE 4096
 #define MTFL_SIZE 16
 
-#define HUFCODE_SIZE 10
 
 
 /*-- Structure holding all the decompression-side stuff. --*/
@@ -408,7 +407,6 @@ typedef
       Int32    base   [BZ_N_GROUPS][BZ_MAX_ALPHA_SIZE];
       Int32    perm   [BZ_N_GROUPS][BZ_MAX_ALPHA_SIZE];
       Int32    minLens[BZ_N_GROUPS];
-      Int16    hufcode[BZ_N_GROUPS][1 << HUFCODE_SIZE];
 
       /* save area for scalars in the main decompress code */
       Int32    save_i;
@@ -435,7 +433,6 @@ typedef
       Int32*   save_gLimit;
       Int32*   save_gBase;
       Int32*   save_gPerm;
-      Int16*   save_gHufCode;
 
    }
    DState;
@@ -491,8 +488,8 @@ extern Int32
 BZ2_decompress ( DState* );
 
 extern void 
-BZ2_hbCreateDecodeTables ( Int32*, Int32*, Int32*, Int16 *,
-                           UChar*, Int32,  Int32, Int32 );
+BZ2_hbCreateDecodeTables ( Int32*, Int32*, Int32*, UChar*,
+                           Int32,  Int32, Int32 );
 
 
 #endif

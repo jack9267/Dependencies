@@ -2,8 +2,8 @@
 # This file is part of bzip2/libbzip2, a program and library for
 # lossless, block-sorting data compression.
 #
-# bzip2/libbzip2 version 1.0.5 of 10 December 2007
-# Copyright (C) 1996-2007 Julian Seward <jseward@bzip.org>
+# bzip2/libbzip2 version 1.0.8 of 13 July 2019
+# Copyright (C) 1996-2019 Julian Seward <jseward@acm.org>
 #
 # Please read the WARNING, DISCLAIMER and PATENTS sections in the 
 # README file.
@@ -12,33 +12,19 @@
 # in the file LICENSE.
 # ------------------------------------------------------------------
 
-VERSION = 1.0.4
-MAJOR=$(shell echo $(VERSION) | sed -e "s/\..*$$//")
-MINOR=$(shell echo $(VERSION) | sed -e "s/^[^\.]*\.0*\([0-9]\+\).*$$/\1/")
-VERSADD = -Wl,--major-image-version=$(MAJOR) -Wl,--minor-image-version=$(MINOR) 
 SHELL=/bin/sh
-RESDIR=./resource
-VPATH=. $(RESDIR)
 
 # To assist in cross-compiling
 CC=gcc
 AR=ar
 RANLIB=ranlib
-LDFLAGS= -Wl,-s $(VERSADD)
-EXE_EXT=.exe
-DLL_EXT=.dll
-LN=cp -fp
-  
- # Suitably paranoid flags to avoid bugs in gcc-2.7
-BIGFILES = 
-CFLAGS = -Wall -Winline -O3 -fms-extensions -mms-bitfields \
-	-fno-exceptions -fomit-frame-pointer -march=i386 \
-	-ffast-math -fno-strength-reduce $(BIGFILES) \
-	-I. -ID:/progra~1/gnuwin32/lib 
-LIBS = -lole32 -luuid -liberty
+LDFLAGS=
+
+BIGFILES=-D_FILE_OFFSET_BITS=64
+CFLAGS=-Wall -Winline -O2 -g $(BIGFILES)
 
 # Where you want it installed when you do 'make install'
-PREFIX=c:/progra~1/Bzip2
+PREFIX=/usr/local
 
 
 OBJS= blocksort.o  \
@@ -49,24 +35,13 @@ OBJS= blocksort.o  \
       decompress.o \
       bzlib.o
 
-DLLOBJS = $(OBJS) bzip-dllversion.o
+all: libbz2.a bzip2 bzip2recover test
 
-.SUFFIXES:
-.SUFFIXES: .c .o .exe .rc .dll 
+bzip2: libbz2.a bzip2.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o bzip2 bzip2.o -L. -lbz2
 
-# Rule to make compiled resource (Windows)
-.rc.o:
-	windres --include-dir $(RESDIR) -i $< -o $@
-
-all: bzip2$(DLL_EXT) bzip2 bzip2recover test
-
-bzip2: libbz2.a bzip2.o bzip2-res.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o bzip2 bzip2.o bzip2-res.o \
-		-L. -lbz2 $(LIBS)
-
-bzip2recover: bzip2recover.o bzip2recover-res.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o bzip2recover bzip2recover.o \
-		bzip2recover-res.o $(LIBS)
+bzip2recover: bzip2recover.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o bzip2recover bzip2recover.o
 
 libbz2.a: $(OBJS)
 	rm -f libbz2.a
@@ -76,10 +51,6 @@ libbz2.a: $(OBJS)
 		echo $(RANLIB) libbz2.a ; \
 		$(RANLIB) libbz2.a ; \
 	fi
-
-bzip2$(DLL_EXT): $(DLLOBJS)
-	-rm -f bzip2.def
-	o2dll -o $@ -l libbz2 $(DLLOBJS) -version-info 0:0:0 
 
 check: test
 test: bzip2
@@ -104,30 +75,29 @@ install: bzip2 bzip2recover
 	if ( test ! -d $(PREFIX)/man ) ; then mkdir -p $(PREFIX)/man ; fi
 	if ( test ! -d $(PREFIX)/man/man1 ) ; then mkdir -p $(PREFIX)/man/man1 ; fi
 	if ( test ! -d $(PREFIX)/include ) ; then mkdir -p $(PREFIX)/include ; fi
-	cp -fp bzip2 $(PREFIX)/bin/bzip2$(EXE_EXT)
-	cp -fp bzip2 $(PREFIX)/bin/bunzip2$(EXE_EXT)
-	cp -fp bzip2 $(PREFIX)/bin/bzcat$(EXE_EXT)
-	cp -fp bzip2$(DLL_EXT) $(PREFIX)/bin/bzip2$(DLL_EXT)
-	cp -fp bzip2recover $(PREFIX)/bin/bzip2recover$(EXE_EXT)
-	chmod a+x $(PREFIX)/bin/bzip2$(EXE_EXT)
-	chmod a+x $(PREFIX)/bin/bunzip2$(EXE_EXT)
-	chmod a+x $(PREFIX)/bin/bzcat$(EXE_EXT)
-	chmod a+x $(PREFIX)/bin/bzip2recover$(EXE_EXT)
-	cp -fp bzip2.1 $(PREFIX)/man/man1
+	cp -f bzip2 $(PREFIX)/bin/bzip2
+	cp -f bzip2 $(PREFIX)/bin/bunzip2
+	cp -f bzip2 $(PREFIX)/bin/bzcat
+	cp -f bzip2recover $(PREFIX)/bin/bzip2recover
+	chmod a+x $(PREFIX)/bin/bzip2
+	chmod a+x $(PREFIX)/bin/bunzip2
+	chmod a+x $(PREFIX)/bin/bzcat
+	chmod a+x $(PREFIX)/bin/bzip2recover
+	cp -f bzip2.1 $(PREFIX)/man/man1
 	chmod a+r $(PREFIX)/man/man1/bzip2.1
-	cp -fp bzlib.h $(PREFIX)/include
+	cp -f bzlib.h $(PREFIX)/include
 	chmod a+r $(PREFIX)/include/bzlib.h
-	cp -fp libbz2.a $(PREFIX)/lib
+	cp -f libbz2.a $(PREFIX)/lib
 	chmod a+r $(PREFIX)/lib/libbz2.a
-	cp -fp bzgrep $(PREFIX)/bin/bzgrep
-	cp -fp -f $(PREFIX)/bin/bzgrep $(PREFIX)/bin/bzegrep
-	cp -fp -f $(PREFIX)/bin/bzgrep $(PREFIX)/bin/bzfgrep
+	cp -f bzgrep $(PREFIX)/bin/bzgrep
+	ln -s -f $(PREFIX)/bin/bzgrep $(PREFIX)/bin/bzegrep
+	ln -s -f $(PREFIX)/bin/bzgrep $(PREFIX)/bin/bzfgrep
 	chmod a+x $(PREFIX)/bin/bzgrep
 	cp -f bzmore $(PREFIX)/bin/bzmore
-	cp -fp -f $(PREFIX)/bin/bzmore $(PREFIX)/bin/bzless
+	ln -s -f $(PREFIX)/bin/bzmore $(PREFIX)/bin/bzless
 	chmod a+x $(PREFIX)/bin/bzmore
 	cp -f bzdiff $(PREFIX)/bin/bzdiff
-	cp -fp -f $(PREFIX)/bin/bzdiff $(PREFIX)/bin/bzcmp
+	ln -s -f $(PREFIX)/bin/bzdiff $(PREFIX)/bin/bzcmp
 	chmod a+x $(PREFIX)/bin/bzdiff
 	cp -f bzgrep.1 bzmore.1 bzdiff.1 $(PREFIX)/man/man1
 	chmod a+r $(PREFIX)/man/man1/bzgrep.1
@@ -139,10 +109,9 @@ install: bzip2 bzip2recover
 	echo ".so man1/bzdiff.1" > $(PREFIX)/man/man1/bzcmp.1
 
 clean: 
-	rm -f *.o libbz2*.a bzip2$(EXE_EXT) bzip2recover$(EXE_EXT) bzip2$(DLL_EXT) \
+	rm -f *.o libbz2.a bzip2 bzip2recover \
 	sample1.rb2 sample2.rb2 sample3.rb2 \
-	sample1.tst sample2.tst sample3.tst	 \
-	bzip2*.lib 
+	sample1.tst sample2.tst sample3.tst
 
 blocksort.o: blocksort.c
 	@cat words0
@@ -168,10 +137,10 @@ bzip2recover.o: bzip2recover.c
 distclean: clean
 	rm -f manual.ps manual.html manual.pdf
 
-DISTNAME=bzip2-1.0.5
+DISTNAME=bzip2-1.0.8
 dist: check manual
 	rm -f $(DISTNAME)
-	cp -fp -f . $(DISTNAME)
+	ln -s -f . $(DISTNAME)
 	tar cvf $(DISTNAME).tar \
 	   $(DISTNAME)/blocksort.c \
 	   $(DISTNAME)/huffman.c \
@@ -207,7 +176,7 @@ dist: check manual
 	   $(DISTNAME)/README.COMPILATION.PROBLEMS \
 	   $(DISTNAME)/README.XML.STUFF \
 	   $(DISTNAME)/CHANGES \
-	   $(DISTNAME)/bzip2.def \
+	   $(DISTNAME)/libbz2.def \
 	   $(DISTNAME)/libbz2.dsp \
 	   $(DISTNAME)/dlltest.dsp \
 	   $(DISTNAME)/makefile.msc \

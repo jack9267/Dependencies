@@ -8,8 +8,8 @@
    This file is part of bzip2/libbzip2, a program and library for
    lossless, block-sorting data compression.
 
-   bzip2/libbzip2 version 1.0.5 of 10 December 2007
-   Copyright (C) 1996-2007 Julian Seward <jseward@bzip.org>
+   bzip2/libbzip2 version 1.0.8 of 13 July 2019
+   Copyright (C) 1996-2019 Julian Seward <jseward@acm.org>
 
    Please read the WARNING, DISCLAIMER and PATENTS sections in the 
    README file.
@@ -81,52 +81,18 @@ typedef
       /* windows.h define small to char */
 #      undef small
 #   endif
-//#   ifdef BZ_EXPORT
-//#   define BZ_API(func) WINAPI func
-//#   define BZ_EXTERN extern
-//#   else
-//   /* import windows dll dynamically */
-//#   define BZ_API(func) (WINAPI * func)
-//#   define BZ_EXTERN
-//#   endif
-//#else
-//#   define BZ_API(func) func
-//#   define BZ_EXTERN extern
-#   include <stdio.h>
-#   include <io.h>
-#   include <sys/utime.h>
-#   define fdopen		_fdopen
-#   define isatty		_isatty
-#   define setmode		_setmode
-#   define utime		_utime
-#   endif
-
-#ifndef __GNUC__
-# define __DLL_IMPORT__ __declspec(dllimport)
-# define __DLL_EXPORT__ __declspec(dllexport)
+#   ifdef BZ_EXPORT
+#   define BZ_API(func) WINAPI func
+#   define BZ_EXTERN extern
 #   else
-# define __DLL_IMPORT__ __attribute__((dllimport)) extern
-# define __DLL_EXPORT__ __attribute__((dllexport)) extern
+   /* import windows dll dynamically */
+#   define BZ_API(func) (WINAPI * func)
+#   define BZ_EXTERN
 #   endif
-
-#if (defined __WIN32__) || (defined _WIN32)
-# if defined BUILD_BZIP2_DLL  || defined BZ_EXPORT
-#  define BZIP2_DLL_IMPEXP __DLL_EXPORT__
-# elif defined(BZIP2_STATIC)
-#  define BZIP2_DLL_IMPEXP  
-# elif defined (USE_BZIP2_DLL) || defined BZ_IMPORT
-#  define BZIP2_DLL_IMPEXP __DLL_IMPORT__
-# elif defined (USE_BZIP2_STATIC)
-#  define BZIP2_DLL_IMPEXP   
-# else /* assume USE_BZIP2_DLL */
-#  define BZIP2_DLL_IMPEXP __DLL_IMPORT__
+#else
+#   define BZ_API(func) func
+#   define BZ_EXTERN extern
 #endif
-#else /* __WIN32__ */
-# define BZIP2_DLL_IMPEXP  
-#endif
-
-#define BZ_API(func) func
-#define BZ_EXTERN BZIP2_DLL_IMPEXP
 
 
 /*-- Core (low-level) library functions --*/

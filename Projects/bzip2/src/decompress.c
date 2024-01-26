@@ -8,8 +8,8 @@
    This file is part of bzip2/libbzip2, a program and library for
    lossless, block-sorting data compression.
 
-   bzip2/libbzip2 version 1.0.5 of 10 December 2007
-   Copyright (C) 1996-2007 Julian Seward <jseward@bzip.org>
+   bzip2/libbzip2 version 1.0.8 of 13 July 2019
+   Copyright (C) 1996-2019 Julian Seward <jseward@acm.org>
 
    Please read the WARNING, DISCLAIMER and PATENTS sections in the 
    README file.
@@ -64,9 +64,6 @@ void makeMaps_d ( DState* s )
          s->strm->total_in_hi32++;                \
    }
 
-#define UNGET_BITS(nnn)                           \
-   s->bsLive += nnn
-
 #define GET_UCHAR(lll,uuu)                        \
    GET_BITS(lll,uuu,8)
 
@@ -86,15 +83,10 @@ void makeMaps_d ( DState* s )
       gLimit = &(s->limit[gSel][0]);              \
       gPerm = &(s->perm[gSel][0]);                \
       gBase = &(s->base[gSel][0]);                \
-      gHufCode = &(s->hufcode[gSel][0]);          \
    }                                              \
    groupPos--;                                    \
-   zn = HUFCODE_SIZE;                             \
+   zn = gMinlen;                                  \
    GET_BITS(label1, zvec, zn);                    \
-   if (gHufCode[zvec]) {                          \
-      UNGET_BITS(gHufCode[zvec] >> 10);           \
-      lval = gHufCode[zvec] & 511;                \
-   } else {                                       \
    while (1) {                                    \
       if (zn > 20 /* the longest code */)         \
          RETURN(BZ_DATA_ERROR);                   \
@@ -107,8 +99,7 @@ void makeMaps_d ( DState* s )
        || zvec - gBase[zn] >= BZ_MAX_ALPHA_SIZE)  \
       RETURN(BZ_DATA_ERROR);                      \
    lval = gPerm[zvec - gBase[zn]];                \
-   }                                              \
-}                                                 \
+}
 
 
 /*---------------------------------------------------*/
@@ -144,7 +135,6 @@ Int32 BZ2_decompress ( DState* s )
    Int32* gLimit;
    Int32* gBase;
    Int32* gPerm;
-   Int16* gHufCode;
 
    if (s->state == BZ_X_MAGIC_1) {
       /*initialise the save area*/
@@ -172,7 +162,6 @@ Int32 BZ2_decompress ( DState* s )
       s->save_gLimit      = NULL;
       s->save_gBase       = NULL;
       s->save_gPerm       = NULL;
-      s->save_gHufCode    = NULL;
    }
 
    /*restore from the save area*/
@@ -200,7 +189,6 @@ Int32 BZ2_decompress ( DState* s )
    gLimit      = s->save_gLimit;
    gBase       = s->save_gBase;
    gPerm       = s->save_gPerm;
-   gHufCode    = s->save_gHufCode;
 
    retVal = BZ_OK;
 
@@ -297,7 +285,7 @@ Int32 BZ2_decompress ( DState* s )
 
       /*--- Now the selectors ---*/
       GET_BITS(BZ_X_SELECTOR_1, nGroups, 3);
-      if (nGroups < 2 || nGroups > 6) RETURN(BZ_DATA_ERROR);
+      if (nGroups < 2 || nGroups > BZ_N_GROUPS) RETURN(BZ_DATA_ERROR);
       GET_BITS(BZ_X_SELECTOR_2, nSelectors, 15);
       if (nSelectors < 1) RETURN(BZ_DATA_ERROR);
       for (i = 0; i < nSelectors; i++) {
@@ -308,8 +296,14 @@ Int32 BZ2_decompress ( DState* s )
             j++;
             if (j >= nGroups) RETURN(BZ_DATA_ERROR);
          }
-         s->selectorMtf[i] = j;
+         /* Having more than BZ_MAX_SELECTORS doesn't make much sense
+            since they will never be used, but some implementations might
+            "round up" the number of selectors, so just ignore those. */
+         if (i < BZ_MAX_SELECTORS)
+           s->selectorMtf[i] = j;
       }
+      if (nSelectors > BZ_MAX_SELECTORS)
+        nSelectors = BZ_MAX_SELECTORS;
 
       /*--- Undo the MTF values for the selectors. ---*/
       {
@@ -352,7 +346,6 @@ Int32 BZ2_decompress ( DState* s )
             &(s->limit[t][0]), 
             &(s->base[t][0]), 
             &(s->perm[t][0]), 
-            &(s->hufcode[t][0]),
             &(s->len[t][0]),
             minLen, maxLen, alphaSize
          );
@@ -394,6 +387,13 @@ Int32 BZ2_decompress ( DState* s )
             es = -1;
             N = 1;
             do {
+               /* Check that N doesn't get too big, so that es doesn't
+                  go negative.  The maximum value that can be
+                  RUNA/RUNB encoded is equal to the block size (post
+                  the initial RLE), viz, 900k, so bounding N at 2
+                  million should guard against overflow without
+                  rejecting any legitimate inputs. */
+               if (N >= 2*1024*1024) RETURN(BZ_DATA_ERROR);
                if (nextSym == BZ_RUNA) es = es + (0+1) * N; else
                if (nextSym == BZ_RUNB) es = es + (1+1) * N;
                N = N * 2;
@@ -427,62 +427,6 @@ Int32 BZ2_decompress ( DState* s )
             if (nblock >= nblockMAX) RETURN(BZ_DATA_ERROR);
 
             /*-- uc = MTF ( nextSym-1 ) --*/
-#if MTFL_SIZE == 16
-            {
-               unsigned char *ppx = s->mtfa + s->mtfbase[0];
-               int lno = 0;
-
-               nextSym--;
-               if (nextSym >= MTFL_SIZE) {
-                  lno = nextSym / MTFL_SIZE;
-                  nextSym %= MTFL_SIZE;
-                  ppx = s->mtfa + s->mtfbase[lno];
-               }
-               uc = ppx[nextSym];
-               switch(nextSym) {
-                  case 9:  ppx[9]  = ppx[10];
-                  case 10: ppx[10] = ppx[11];
-                  case 11: ppx[11] = ppx[12];
-                  case 12: ppx[12] = ppx[13];
-                  case 13: ppx[13] = ppx[14];
-                  case 14: ppx[14] = ppx[15];
-                  case 15: goto copy;
-
-                  case 8: ppx[8] = ppx[7];
-                  case 7: ppx[7] = ppx[6];
-                  case 6: ppx[6] = ppx[5];
-                  case 5: ppx[5] = ppx[4];
-                  case 4: ppx[4] = ppx[3];
-                  case 3: ppx[3] = ppx[2];
-                  case 2: ppx[2] = ppx[1];
-                  case 1: ppx[1] = ppx[0];
-                  default: break;
-               }
-               if (lno) {
-                  s->mtfbase[lno]++;
-               copy:
-                  while (lno > 0) {
-                     s->mtfbase[lno]--;
-                     s->mtfa[s->mtfbase[lno]] = s->mtfa[s->mtfbase[lno-1] + MTFL_SIZE - 1];
-                     lno--;
-                  }
-                  s->mtfbase[0]--;
-                  if (s->mtfbase[0] == 0) {
-                     int ii, jj, kk;
-                     s->mtfa[0] = uc;
-                     kk = MTFA_SIZE-1;
-                     for (ii = 256 / MTFL_SIZE-1; ii >= 0; ii--) {
-                        for (jj = MTFL_SIZE-1; jj >= 0; jj--) {
-                           s->mtfa[kk] = s->mtfa[s->mtfbase[ii] + jj];
-                           kk--;
-                        }
-                        s->mtfbase[ii] = kk + 1;
-                     }
-                  }
-               }
-               s->mtfa[s->mtfbase[0]] = uc;
-            }
-#else
             {
                Int32 ii, jj, kk, pp, lno, off;
                UInt32 nn;
@@ -534,7 +478,6 @@ Int32 BZ2_decompress ( DState* s )
                   }
                }
             }
-#endif
             /*-- end uc = MTF ( nextSym-1 ) --*/
 
             s->unzftab[s->seqToUnseq[uc]]++;
@@ -555,12 +498,25 @@ Int32 BZ2_decompress ( DState* s )
          RETURN(BZ_DATA_ERROR);
 
       /*-- Set up cftab to facilitate generation of T^(-1) --*/
+      /* Check: unzftab entries in range. */
+      for (i = 0; i <= 255; i++) {
+         if (s->unzftab[i] < 0 || s->unzftab[i] > nblock)
+            RETURN(BZ_DATA_ERROR);
+      }
+      /* Actually generate cftab. */
       s->cftab[0] = 0;
       for (i = 1; i <= 256; i++) s->cftab[i] = s->unzftab[i-1];
       for (i = 1; i <= 256; i++) s->cftab[i] += s->cftab[i-1];
+      /* Check: cftab entries in range. */
       for (i = 0; i <= 256; i++) {
          if (s->cftab[i] < 0 || s->cftab[i] > nblock) {
             /* s->cftab[i] can legitimately be == nblock */
+            RETURN(BZ_DATA_ERROR);
+         }
+      }
+      /* Check: cftab entries non-descending. */
+      for (i = 1; i <= 256; i++) {
+         if (s->cftab[i-1] > s->cftab[i]) {
             RETURN(BZ_DATA_ERROR);
          }
       }
@@ -686,7 +642,6 @@ Int32 BZ2_decompress ( DState* s )
    s->save_gLimit      = gLimit;
    s->save_gBase       = gBase;
    s->save_gPerm       = gPerm;
-   s->save_gHufCode    = gHufCode;
 
    return retVal;   
 }
