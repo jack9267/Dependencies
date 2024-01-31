@@ -1,129 +1,158 @@
-bsdiff/bspatch
-==============
-bsdiff and bspatch are libraries for building and applying patches to binary
-files.
+# bsdiff
 
-The original algorithm and implementation was developed by Colin Percival.  The
-algorithm is detailed in his paper, [Naïve Differences of Executable Code](http://www.daemonology.net/papers/bsdiff.pdf).  For more information, visit his
-website at <http://www.daemonology.net/bsdiff/>.
+[bsdiff](https://github.com/zhuyie/bsdiff) is a library for building and applying patches to binary files.
 
-I maintain this project separately from Colin's work, with the goal of making
-the core functionality easily embeddable in existing projects.
+The original algorithm and implementation was developed by Colin Percival. The algorithm is described in his (unpublished) [paper](https://www.daemonology.net/papers/bsdiff.pdf). For more information visit his website at <http://www.daemonology.net/bsdiff/>.
 
-Contact
--------
-[@MatthewEndsley](https://twitter.com/#!/MatthewEndsley)  
-<https://github.com/mendsley/bsdiff>
+I maintain this project separately from Colin's work, with the following goals:
+* Ability to easily embed the routines as a library instead of an external binary.
+* Compatible with the original patch format and can easily adapt to new patch format.
+* Support memory-based input/output stream.
+* Self-contained 3rd-party libraries, build on Windows/Linux/OSX.
 
-License
--------
-Copyright 2003-2005 Colin Percival  
-Copyright 2012 Matthew Endsley
+## API
+```c
+/**
+ * @brief
+ *    Generate a patch between two binary files.
+ * @param ctx
+ *    The context.
+ * @param oldfile
+ *    The stream of the old file.
+ * @param newfile
+ *    The stream of the new file.
+ * @param packer
+ *    The packer.
+ * @return
+ *    BSDIFF_SUCCESS if no error.
+ */
+BSDIFF_API
+int bsdiff(
+	struct bsdiff_ctx *ctx,
+	struct bsdiff_stream *oldfile, 
+	struct bsdiff_stream *newfile, 
+	struct bsdiff_patch_packer *packer);
 
-This project is governed by the BSD 2-clause license. For details see the file
-titled LICENSE in the project root folder.
+/**
+ * @brief
+ *    Apply the patch to the old file, re-create the new file.
+ * @param ctx
+ *    The context.
+ * @param oldfile
+ *    The stream of the old file.
+ * @param newfile
+ *    The stream of the new file.
+ * @param packer
+ *    The packer.
+ * @return
+ *    BSDIFF_SUCCESS if no error.
+ */
+BSDIFF_API
+int bspatch(
+	struct bsdiff_ctx *ctx,
+	struct bsdiff_stream *oldfile, 
+	struct bsdiff_stream *newfile,
+	struct bsdiff_patch_packer *packer);
+```
 
-Overview
---------
-There are two separate libraries in the project, bsdiff and bspatch. Each are
-self contained in bsdiff.c and bspatch.c The easiest way to integrate is to
-simply copy the c file to your source folder and build it.
+## Demo Usage
+```c
+#include <stdio.h>
+#include "bsdiff.h"
 
-The overarching goal was to modify the original bsdiff/bspatch code from Colin
-and eliminate external dependencies and provide a simple interface to the core
-functionality.
+static void log_error(void *opaque, const char *errmsg)
+{
+	(void)opaque;
+	fprintf(stderr, "%s", errmsg);
+}
 
-I've exposed relevant functions via the `_stream` classes. The only external
-dependency not exposed is `memcmp` in `bsdiff`.
+int generate_patch(const char *oldname, const char *newname, const char *patchname)
+{
+	int ret = 1;
+	struct bsdiff_stream oldfile = { 0 }, newfile = { 0 }, patchfile = { 0 };
+	struct bsdiff_ctx ctx = { 0 };
+	struct bsdiff_patch_packer packer = { 0 };
 
-This library generates patches that are not compatible with the original bsdiff
-tool. The incompatibilities were motivated by the patching needs for the game
-AirMech <https://www.carbongames.com> and the following requirements:
+	ret = bsdiff_open_file_stream(BSDIFF_MODE_READ, oldname, &oldfile);
+	if (ret != BSDIFF_SUCCESS) {
+		fprintf(stderr, "can't open oldfile: %s\n", oldname);
+		goto cleanup;
+	}
+	ret = bsdiff_open_file_stream(BSDIFF_MODE_READ, newname, &newfile);
+	if (ret != BSDIFF_SUCCESS) {
+		fprintf(stderr, "can't open newfile: %s\n", newname);
+		goto cleanup;
+	}
+	ret = bsdiff_open_file_stream(BSDIFF_MODE_WRITE, patchname, &patchfile);
+	if (ret != BSDIFF_SUCCESS) {
+		fprintf(stderr, "can't open patchfile: %s\n", patchname);
+		goto cleanup;
+	}
+	ret = bsdiff_open_bz2_patch_packer(BSDIFF_MODE_WRITE, &patchfile, &packer);
+	if (ret != BSDIFF_SUCCESS) {
+		fprintf(stderr, "can't create BZ2 patch packer\n");
+		goto cleanup;
+	}
 
-* Eliminate/minimize any seek operations when applying patches
-* Eliminate any required disk I/O and support embedded streams
-* Ability to easily embed the routines as a library instead of an external binary
-* Compile+run on all platforms we use to build the game (Windows, Linux, NaCl, OSX)
+	ctx.log_error = log_error;
 
-Compiling
----------
-The libraries should compile warning free in any moderately recent version of
-gcc. The project uses `<stdint.h>` which is technically a C99 file and not
-available in Microsoft Visual Studio. The easiest solution here is to use the
-msinttypes version of stdint.h from <https://code.google.com/p/msinttypes/>.
-The direct link for the lazy people is:
-<https://msinttypes.googlecode.com/svn/trunk/stdint.h>.
+	ret = bsdiff(&ctx, &oldfile, &newfile, &packer);
+	if (ret != BSDIFF_SUCCESS) {
+		fprintf(stderr, "bsdiff failed: %d\n", ret);
+		goto cleanup;
+	}
 
-If your compiler does not provide an implementation of `<stdint.h>` you can
-remove the header from the bsdiff/bspatch files and provide your own typedefs
-for the following symbols: `uint8_t`, `uint64_t` and `int64_t`.
+cleanup:
+	bsdiff_close_patch_packer(&packer);
+	bsdiff_close_stream(&patchfile);
+	bsdiff_close_stream(&newfile);
+	bsdiff_close_stream(&oldfile);
 
-Examples
---------
-Each project has an optional main function that serves as an example for using
-the library. Simply defined `BSDIFF_EXECUTABLE` or `BSPATCH_EXECUTABLE` to
-enable building the standalone tools.
+	return ret;
+}
 
-Reference
----------
-### bsdiff
+int apply_patch(const char *oldname, const char *newname, const char *patchname)
+{
+	int ret = 1;
+	struct bsdiff_stream oldfile = { 0 }, newfile = { 0 }, patchfile = { 0 };
+	struct bsdiff_ctx ctx = { 0 };
+	struct bsdiff_patch_packer packer = { 0 };
 
-	struct bsdiff_stream
-	{
-		void* opaque;
-		void* (*malloc)(size_t size);
-		void  (*free)(void* ptr);
-		int   (*write)(struct bsdiff_stream* stream,
-					   const void* buffer, int size);
-	};
+	ret = bsdiff_open_file_stream(BSDIFF_MODE_READ, oldname, &oldfile);
+	if (ret != BSDIFF_SUCCESS) {
+		fprintf(stderr, "can't open oldfile: %s\n", oldname);
+		goto cleanup;
+	}
+	ret = bsdiff_open_file_stream(BSDIFF_MODE_WRITE, newname, &newfile);
+	if (ret != BSDIFF_SUCCESS) {
+		fprintf(stderr, "can't open newfile: %s\n", newname);
+		goto cleanup;
+	}
+	ret = bsdiff_open_file_stream(BSDIFF_MODE_READ, patchname, &patchfile);
+	if (ret != BSDIFF_SUCCESS) {
+		fprintf(stderr, "can't open patchfile: %s\n", patchname);
+		goto cleanup;
+	}
+	ret = bsdiff_open_bz2_patch_packer(BSDIFF_MODE_READ, &patchfile, &packer);
+	if (ret != BSDIFF_SUCCESS) {
+		fprintf(stderr, "can't create BZ2 patch packer\n");
+		goto cleanup;
+	}
 
-	int bsdiff(const uint8_t* old, int64_t oldsize, const uint8_t* new,
-	           int64_t newsize, struct bsdiff_stream* stream);
-		
+	ctx.log_error = log_error;
+	
+	ret = bspatch(&ctx, &oldfile, &newfile, &packer);
+	if (ret != BSDIFF_SUCCESS) {
+		fprintf(stderr, "bspatch failed: %d\n", ret);
+		goto cleanup;
+	}
 
-In order to use `bsdiff`, you need to define functions for allocating memory and
-writing binary data. This behavior is controlled by the `stream` parameter
-passed to to `bsdiff(...)`.
+cleanup:
+	bsdiff_close_patch_packer(&packer);
+	bsdiff_close_stream(&patchfile);
+	bsdiff_close_stream(&newfile);
+	bsdiff_close_stream(&oldfile);
 
-The `opaque` field is never read or modified from within the `bsdiff` function.
-The caller can use this field to store custom state data needed for the callback
-functions.
-
-The `malloc` and `free` members should point to functions that behave like the
-standard `malloc` and `free` C functions.
-
-The `write` function is called by bsdiff to write a block of binary data to the
-stream. The return value for `write` should be `0` on success and non-zero if
-the callback failed to write all data. In the default example, bzip2 is used to
-compress output data.
-
-`bsdiff` returns `0` on success and `-1` on failure.
-
-### bspatch
-
-	struct bspatch_stream
-	{
-		void* opaque;
-		int (*read)(const struct bspatch_stream* stream,
-		            void* buffer, int length);
-	};
-
-	int bspatch(const uint8_t* old, int64_t oldsize, uint8_t* new,
-	            int64_t newsize, struct bspatch_stream* stream);
-
-The `bspatch` function transforms the data for a file using data generated from
-`bsdiff`. The caller takes care of loading the old file and allocating space for
-new file data.  The `stream` parameter controls the process for reading binary
-patch data.
-
-The `opaque` field is never read or modified from within the bspatch function.
-The caller can use this field to store custom state data needed for the read
-function.
-
-The `read` function is called by `bspatch` to read a block of binary data from
-the stream.  The return value for `read` should be `0` on success and non-zero
-if the callback failed to read the requested amount of data. In the default
-example, bzip2 is used to decompress input data.
-
-`bspatch` returns `0` on success and `-1` on failure. On success, `new` contains
-the data for the patched file.
+	return ret;
+}
+```
