@@ -25,21 +25,24 @@
  * Pass in a custom socket for libcurl to use.
  * </DESC>
  */
+#ifdef _WIN32
+#ifndef _WINSOCK_DEPRECATED_NO_WARNINGS
+#define _WINSOCK_DEPRECATED_NO_WARNINGS  /* for inet_addr() */
+#endif
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <curl/curl.h>
 
 #ifdef _WIN32
-#include <windows.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
 #define close closesocket
 #else
 #include <sys/types.h>        /*  socket types              */
 #include <sys/socket.h>       /*  socket definitions        */
 #include <netinet/in.h>
-#include <arpa/inet.h>        /*  inet (3) functions         */
+#include <arpa/inet.h>        /*  inet (3) functions        */
 #include <unistd.h>           /*  misc. Unix functions      */
 #endif
 
@@ -108,8 +111,8 @@ int main(void)
   curl = curl_easy_init();
   if(curl) {
     /*
-     * Note that libcurl will internally think that you connect to the host
-     * and port that you specify in the URL option.
+     * Note that libcurl internally thinks that you connect to the host and
+     * port that you specify in the URL option.
      */
     curl_easy_setopt(curl, CURLOPT_URL, "http://99.99.99.99:9999");
 

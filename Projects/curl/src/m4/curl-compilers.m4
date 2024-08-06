@@ -48,8 +48,12 @@ AC_DEFUN([CURL_CHECK_COMPILER], [
   CURL_CHECK_COMPILER_INTEL_C
   CURL_CHECK_COMPILER_CLANG
   CURL_CHECK_COMPILER_GNU_C
-  CURL_CHECK_COMPILER_SGI_MIPSPRO_C
-  CURL_CHECK_COMPILER_SGI_MIPS_C
+  case $host in
+    mips-sgi-irix*)
+      CURL_CHECK_COMPILER_SGI_MIPSPRO_C
+      CURL_CHECK_COMPILER_SGI_MIPS_C
+    ;;
+  esac
   CURL_CHECK_COMPILER_SUNPRO_C
   CURL_CHECK_COMPILER_TINY_C
   #
@@ -194,7 +198,6 @@ AC_DEFUN([CURL_CHECK_COMPILER_GNU_C], [
     flags_opt_all="-O -O0 -O1 -O2 -O3 -Os -Og -Ofast"
     flags_opt_yes="-O2"
     flags_opt_off="-O0"
-    CURL_CHECK_DEF([_WIN32], [], [silent])
   else
     AC_MSG_RESULT([no])
   fi
@@ -516,6 +519,7 @@ AC_DEFUN([CURL_SET_COMPILER_BASIC_OPTS], [
         dnl warn about compile-time arguments used during link-time, like
         dnl -O and -g and -pedantic.
         tmp_CFLAGS="$tmp_CFLAGS -Qunused-arguments"
+        tmp_CFLAGS="$tmp_CFLAGS -Werror-implicit-function-declaration"
         ;;
         #
       DEC_C)
@@ -831,7 +835,8 @@ AC_DEFUN([CURL_SET_COMPILER_WARNING_OPTS], [
           #
           dnl Only clang 2.9 or later
           if test "$compiler_num" -ge "209"; then
-            tmp_CFLAGS="$tmp_CFLAGS -Wno-sign-conversion"
+            CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [sign-conversion])
+            tmp_CFLAGS="$tmp_CFLAGS -Wno-error=sign-conversion"          # FIXME
             CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [shift-sign-overflow])
           # CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [padded])  # Not used because we cannot change public structs
           fi
@@ -839,6 +844,7 @@ AC_DEFUN([CURL_SET_COMPILER_WARNING_OPTS], [
           dnl Only clang 3.0 or later
           if test "$compiler_num" -ge "300"; then
             CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [language-extension-token])
+            tmp_CFLAGS="$tmp_CFLAGS -Wformat=2"
           fi
           #
           dnl Only clang 3.2 or later
@@ -887,11 +893,11 @@ AC_DEFUN([CURL_SET_COMPILER_WARNING_OPTS], [
             CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [assign-enum])
             CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [extra-semi-stmt])
           fi
+          dnl clang 10 or later
+          if test "$compiler_num" -ge "1000"; then
+            tmp_CFLAGS="$tmp_CFLAGS -Wimplicit-fallthrough"  # we have silencing markup for clang 10.0 and above only
+          fi
         fi
-        dnl Disable pointer to bool conversion warnings since they cause
-        dnl lib/securetransp.c cause several warnings for checks we want.
-        dnl This option should be placed after -Wconversion.
-        tmp_CFLAGS="$tmp_CFLAGS -Wno-pointer-bool-conversion"
         ;;
         #
       DEC_C)
@@ -1016,8 +1022,9 @@ AC_DEFUN([CURL_SET_COMPILER_WARNING_OPTS], [
             CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [type-limits old-style-declaration])
             CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [missing-parameter-type empty-body])
             CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [clobbered ignored-qualifiers])
-            CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [conversion])
-            tmp_CFLAGS="$tmp_CFLAGS -Wno-sign-conversion"
+            CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [conversion trampolines])
+            CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [sign-conversion])
+            tmp_CFLAGS="$tmp_CFLAGS -Wno-error=sign-conversion"          # FIXME
             CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [vla])
             dnl required for -Warray-bounds, included in -Wall
             tmp_CFLAGS="$tmp_CFLAGS -ftree-vrp"
@@ -1026,7 +1033,7 @@ AC_DEFUN([CURL_SET_COMPILER_WARNING_OPTS], [
           dnl Only gcc 4.5 or later
           if test "$compiler_num" -ge "405"; then
             dnl Only windows targets
-            if test "$curl_cv_have_def__WIN32" = "yes"; then
+            if test "$curl_cv_native_windows" = "yes"; then
               tmp_CFLAGS="$tmp_CFLAGS -Wno-pedantic-ms-format"
             fi
           fi
@@ -1063,10 +1070,7 @@ AC_DEFUN([CURL_SET_COMPILER_WARNING_OPTS], [
             CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [alloc-zero])
             tmp_CFLAGS="$tmp_CFLAGS -Wformat-overflow=2"
             tmp_CFLAGS="$tmp_CFLAGS -Wformat-truncation=2"
-            if test "$compiler_num" -lt "1200"; then
-              dnl gcc 12 doesn't acknowledge our comment markups
-              tmp_CFLAGS="$tmp_CFLAGS -Wimplicit-fallthrough=4"
-            fi
+            tmp_CFLAGS="$tmp_CFLAGS -Wimplicit-fallthrough"
           fi
           #
           dnl Only gcc 10 or later
@@ -1239,52 +1243,6 @@ squeeze() {
   return 0
 }
 ])
-
-
-dnl CURL_CHECK_CURLDEBUG
-dnl -------------------------------------------------
-dnl Settings which depend on configure's curldebug given
-dnl option, and other additional configure pre-requisites.
-dnl Actually the curl debug memory tracking feature can
-dnl only be used/enabled when libcurl is built as a static
-dnl library or as a shared one on those systems on which
-dnl shared libraries support undefined symbols.
-
-AC_DEFUN([CURL_CHECK_CURLDEBUG], [
-  AC_REQUIRE([XC_LIBTOOL])dnl
-  AC_REQUIRE([CURL_SHFUNC_SQUEEZE])dnl
-  supports_curldebug="unknown"
-  if test "$want_curldebug" = "yes"; then
-    if test "x$enable_shared" != "xno" &&
-      test "x$enable_shared" != "xyes"; then
-      AC_MSG_WARN([unknown enable_shared setting.])
-      supports_curldebug="no"
-    fi
-    if test "x$enable_static" != "xno" &&
-      test "x$enable_static" != "xyes"; then
-      AC_MSG_WARN([unknown enable_static setting.])
-      supports_curldebug="no"
-    fi
-    if test "$supports_curldebug" != "no"; then
-      if test "$enable_shared" = "yes" &&
-        test "x$xc_lt_shlib_use_no_undefined" = 'xyes'; then
-        supports_curldebug="no"
-        AC_MSG_WARN([shared library does not support undefined symbols.])
-      fi
-    fi
-  fi
-  #
-  if test "$want_curldebug" = "yes"; then
-    AC_MSG_CHECKING([if curl debug memory tracking can be enabled])
-    test "$supports_curldebug" = "no" || supports_curldebug="yes"
-    AC_MSG_RESULT([$supports_curldebug])
-    if test "$supports_curldebug" = "no"; then
-      AC_MSG_WARN([cannot enable curl debug memory tracking.])
-      want_curldebug="no"
-    fi
-  fi
-])
-
 
 
 dnl CURL_CHECK_COMPILER_HALT_ON_ERROR

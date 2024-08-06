@@ -164,14 +164,11 @@ int main(void) { ; return 0; }
 
 #ifdef HAVE_IOCTLSOCKET
 /* includes start */
-#ifdef HAVE_WINDOWS_H
+#ifdef _WIN32
 #  ifndef WIN32_LEAN_AND_MEAN
 #    define WIN32_LEAN_AND_MEAN
 #  endif
-#  ifdef HAVE_WINSOCK2_H
-#    include <winsock2.h>
-#  endif
-#  include <windows.h>
+#  include <winsock2.h>
 #endif
 int main(void)
 {
@@ -186,14 +183,11 @@ int main(void)
 
 #ifdef HAVE_IOCTLSOCKET_CAMEL
 /* includes start */
-#ifdef HAVE_WINDOWS_H
+#ifdef _WIN32
 #  ifndef WIN32_LEAN_AND_MEAN
 #    define WIN32_LEAN_AND_MEAN
 #  endif
-#  ifdef HAVE_WINSOCK2_H
-#    include <winsock2.h>
-#  endif
-#  include <windows.h>
+#  include <winsock2.h>
 #endif
 int main(void)
 {
@@ -207,14 +201,11 @@ int main(void)
 
 #ifdef HAVE_IOCTLSOCKET_CAMEL_FIONBIO
 /* includes start */
-#ifdef HAVE_WINDOWS_H
+#ifdef _WIN32
 #  ifndef WIN32_LEAN_AND_MEAN
 #    define WIN32_LEAN_AND_MEAN
 #  endif
-#  ifdef HAVE_WINSOCK2_H
-#    include <winsock2.h>
-#  endif
-#  include <windows.h>
+#  include <winsock2.h>
 #endif
 int main(void)
 {
@@ -229,18 +220,15 @@ int main(void)
 
 #ifdef HAVE_IOCTLSOCKET_FIONBIO
 /* includes start */
-#ifdef HAVE_WINDOWS_H
+#ifdef _WIN32
 #  ifndef WIN32_LEAN_AND_MEAN
 #    define WIN32_LEAN_AND_MEAN
 #  endif
-#  ifdef HAVE_WINSOCK2_H
-#    include <winsock2.h>
-#  endif
-#  include <windows.h>
+#  include <winsock2.h>
 #endif
 int main(void)
 {
-  int flags = 0;
+  unsigned long flags = 0;
   if(0 != ioctlsocket(0, FIONBIO, &flags))
     return 1;
   ;
@@ -307,14 +295,11 @@ int main(void)
 
 #ifdef HAVE_SETSOCKOPT_SO_NONBLOCK
 /* includes start */
-#ifdef HAVE_WINDOWS_H
+#ifdef _WIN32
 #  ifndef WIN32_LEAN_AND_MEAN
 #    define WIN32_LEAN_AND_MEAN
 #  endif
-#  ifdef HAVE_WINSOCK2_H
-#    include <winsock2.h>
-#  endif
-#  include <windows.h>
+#  include <winsock2.h>
 #endif
 /* includes start */
 #ifdef HAVE_SYS_TYPES_H
@@ -395,7 +380,7 @@ int main(void)
 #ifdef HAVE_BUILTIN_AVAILABLE
 int main(void)
 {
-  if(__builtin_available(macOS 10.12, *)) {}
+  if(__builtin_available(macOS 10.12, iOS 5.0, *)) {}
   return 0;
 }
 #endif

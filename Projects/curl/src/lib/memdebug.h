@@ -72,7 +72,7 @@ CURL_EXTERN ALLOC_FUNC wchar_t *curl_dbg_wcsdup(const wchar_t *str,
 
 CURL_EXTERN void curl_dbg_memdebug(const char *logname);
 CURL_EXTERN void curl_dbg_memlimit(long limit);
-CURL_EXTERN void curl_dbg_log(const char *format, ...);
+CURL_EXTERN void curl_dbg_log(const char *format, ...) CURL_PRINTF(1, 2);
 
 /* file descriptor manipulators */
 CURL_EXTERN curl_socket_t curl_dbg_socket(int domain, int type, int protocol,
@@ -137,13 +137,14 @@ CURL_EXTERN int curl_dbg_fclose(FILE *file, int line, const char *source);
 
 #undef socket
 #define socket(domain,type,protocol)\
- curl_dbg_socket(domain, type, protocol, __LINE__, __FILE__)
+ curl_dbg_socket((int)domain, type, protocol, __LINE__, __FILE__)
 #undef accept /* for those with accept as a macro */
 #define accept(sock,addr,len)\
  curl_dbg_accept(sock, addr, len, __LINE__, __FILE__)
 #ifdef HAVE_SOCKETPAIR
 #define socketpair(domain,type,protocol,socket_vector)\
- curl_dbg_socketpair(domain, type, protocol, socket_vector, __LINE__, __FILE__)
+ curl_dbg_socketpair((int)domain, type, protocol, socket_vector, \
+                     __LINE__, __FILE__)
 #endif
 
 #ifdef HAVE_GETADDRINFO
