@@ -29,6 +29,8 @@ add_definitions(-DCURL_DISABLE_POP3=1)
 add_definitions(-DCURL_DISABLE_IMAP=1)
 add_definitions(-DCURL_DISABLE_SMTP=1)
 
+add_definitions(-DUSE_WEBSOCKETS=1)
+
 # Disable auto load of /etc/ssl/openssl.cnf
 add_definitions(-DCURL_DISABLE_OPENSSL_AUTO_LOAD_CONFIG)
 
