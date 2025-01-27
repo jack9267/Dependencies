@@ -17,6 +17,12 @@ if(MSVC)
 	# no deprecated warnings for winsock
 	add_definitions(-D_WINSOCK_DEPRECATED_NO_WARNINGS)
 
+	# no warnings for insecure functions
+	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+
+	# disable POSIX-related deprecation warnings
+	add_definitions(-D_CRT_NONSTDC_NO_WARNINGS)
+
 	# macro redefinition
 	disable_warning(4005)
 
