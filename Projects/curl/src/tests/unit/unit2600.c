@@ -49,7 +49,7 @@
 #include "multiif.h"
 #include "select.h"
 #include "curl_trc.h"
-
+#include "memdebug.h"
 
 static CURL *easy;
 
@@ -234,7 +234,7 @@ static CURLcode cf_test_create(struct Curl_cfilter **pcf,
   Curl_expire(data, ctx->fail_delay_ms, EXPIRE_RUN_NOW);
 
 out:
-  *pcf = (!result)? cf : NULL;
+  *pcf = (!result) ? cf : NULL;
   if(result) {
     free(cf);
     free(ctx);
@@ -284,9 +284,9 @@ static void check_result(struct test_case *tc,
   if(tr->cf6.creations && tr->cf4.creations && tc->pref_family) {
     /* did ipv4 and ipv6 both, expect the preferred family to start right arway
      * with the other being delayed by the happy_eyeball_timeout */
-    struct ai_family_stats *stats1 = !strcmp(tc->pref_family, "v6")?
+    struct ai_family_stats *stats1 = !strcmp(tc->pref_family, "v6") ?
                                      &tr->cf6 : &tr->cf4;
-    struct ai_family_stats *stats2 = !strcmp(tc->pref_family, "v6")?
+    struct ai_family_stats *stats2 = !strcmp(tc->pref_family, "v6") ?
                                      &tr->cf4 : &tr->cf6;
 
     if(stats1->first_created > 100) {
@@ -377,8 +377,8 @@ static struct test_case TEST_CASES[] = {
   /* 2 ipv6, fails after ~400ms, reports COULDNT_CONNECT   */
 
   { 5, TURL, "test.com:123:192.0.2.1,::1", CURL_IPRESOLVE_WHATEVER,
-    CNCT_TMOT, 150, 200, 200,     1,  1,      350,  TC_TMOT,  R_FAIL, "v4" },
-  /* mixed ip4+6, v4 starts, v6 kicks in on HE, fails after ~350ms */
+    CNCT_TMOT, 150, 200, 200,     1,  1,      350,  TC_TMOT,  R_FAIL, "v6" },
+  /* mixed ip4+6, v6 always first, v4 kicks in on HE, fails after ~350ms */
   { 6, TURL, "test.com:123:::1,192.0.2.1", CURL_IPRESOLVE_WHATEVER,
     CNCT_TMOT, 150, 200, 200,     1,  1,      350,  TC_TMOT,  R_FAIL, "v6" },
   /* mixed ip6+4, v6 starts, v4 never starts due to high HE, TIMEOUT */

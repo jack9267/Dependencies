@@ -112,6 +112,11 @@ curl_easy_header(3) instead. See CURLINFO_CONTENT_TYPE(3)
 
 List of all known cookies. See CURLINFO_COOKIELIST(3)
 
+## CURLINFO_EARLYDATA_SENT_T
+
+Amount of TLS early data sent (in number of bytes) when
+CURLSSLOPT_EARLYDATA is enabled.
+
 ## CURLINFO_EFFECTIVE_METHOD
 
 Last used HTTP method. See CURLINFO_EFFECTIVE_METHOD(3)
@@ -179,6 +184,11 @@ See CURLINFO_NUM_CONNECTS(3)
 ## CURLINFO_OS_ERRNO
 
 The errno from the last failure to connect. See CURLINFO_OS_ERRNO(3)
+
+## CURLINFO_POSTTRANSFER_TIME_T
+
+The time it took from the start until the last byte is sent by libcurl.
+In microseconds. (Added in 8.10.0) See CURLINFO_POSTTRANSFER_TIME_T(3)
 
 ## CURLINFO_PRETRANSFER_TIME
 
@@ -341,7 +351,7 @@ In microseconds. See CURLINFO_STARTTRANSFER_TIME_T(3)
 ## CURLINFO_TLS_SESSION
 
 (**Deprecated**) TLS session info that can be used for further processing. See
-CURLINFO_TLS_SESSION(3). Use CURLINFO_TLS_SSL_PTR(3) instead!
+CURLINFO_TLS_SESSION(3). Use CURLINFO_TLS_SSL_PTR(3) instead.
 
 ## CURLINFO_TLS_SSL_PTR
 
@@ -375,15 +385,17 @@ An overview of the time values available from curl_easy_getinfo(3)
         |--|--|--CONNECT
         |--|--|--|--APPCONNECT
         |--|--|--|--|--PRETRANSFER
-        |--|--|--|--|--|--STARTTRANSFER
-        |--|--|--|--|--|--|--TOTAL
-        |--|--|--|--|--|--|--REDIRECT
+        |--|--|--|--|--|--POSTTRANSFER
+        |--|--|--|--|--|--|--STARTTRANSFER
+        |--|--|--|--|--|--|--|--TOTAL
+        |--|--|--|--|--|--|--|--REDIRECT
 
 
  CURLINFO_QUEUE_TIME_T(3), CURLINFO_NAMELOOKUP_TIME_T(3),
  CURLINFO_CONNECT_TIME_T(3), CURLINFO_APPCONNECT_TIME_T(3),
- CURLINFO_PRETRANSFER_TIME_T(3), CURLINFO_STARTTRANSFER_TIME_T(3),
- CURLINFO_TOTAL_TIME_T(3), CURLINFO_REDIRECT_TIME_T(3)
+ CURLINFO_PRETRANSFER_TIME_T(3), CURLINFO_POSTTRANSFER_TIME_T(3),
+ CURLINFO_STARTTRANSFER_TIME_T(3), CURLINFO_TOTAL_TIME_T(3),
+ CURLINFO_REDIRECT_TIME_T(3)
 
 # %PROTOCOLS%
 
