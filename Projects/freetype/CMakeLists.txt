@@ -1,5 +1,3 @@
-disable_rtti()
-
 set(BASE_SRCS
   src/autofit/autofit.c
   src/base/ftbase.c

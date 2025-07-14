@@ -1,5 +1,3 @@
-disable_rtti()
-
 if(WIN32)
 	add_definitions(-DUNICODE)
 	add_definitions(-D_UNICODE)

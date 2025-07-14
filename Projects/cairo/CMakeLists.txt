@@ -1,5 +1,3 @@
-disable_rtti()
-
 if(MSVC)
 	# unreferenced local variable
 	disable_warning(4101)

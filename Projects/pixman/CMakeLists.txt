@@ -1,5 +1,3 @@
-disable_rtti()
-
 set(SOURCES
 	src/pixman/pixman.c
 	src/pixman/pixman-access.c

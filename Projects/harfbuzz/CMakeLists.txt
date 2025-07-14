@@ -1,5 +1,3 @@
-disable_rtti()
-
 add_definitions(-DHAVE_FREETYPE=1)
 
 ## Functions and headers

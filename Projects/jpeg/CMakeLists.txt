@@ -1,5 +1,3 @@
-disable_rtti()
-
 set(JPEG_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/jcapimin.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/jcapistd.c

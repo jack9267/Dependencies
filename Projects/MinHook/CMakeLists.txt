@@ -1,5 +1,3 @@
-disable_rtti()
-
 file(GLOB_RECURSE SOURCES src/*.c include/*.h)
 file(GLOB_RECURSE DLL_SOURCES dll_resources/*.rc dll_resources/*.def)
 

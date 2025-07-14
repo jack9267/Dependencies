@@ -1,5 +1,3 @@
-disable_rtti()
-
 # libdivsufsort
 function(add_libdivsufsort)
     set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)

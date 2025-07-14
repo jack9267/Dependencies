@@ -1,5 +1,3 @@
-disable_rtti()
-
 set(SOURCES src/sqlite3.c)
 
 if(WIN32)

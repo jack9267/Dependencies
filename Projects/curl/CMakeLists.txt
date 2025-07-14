@@ -1,5 +1,3 @@
-disable_rtti()
-
 option(CURL_STATIC_LINK_SSL "Static link ssl into curl" OFF)
 option(CURL_STATIC_LINK_ZLIB "Static link zlib into curl" OFF)
 
