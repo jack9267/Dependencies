@@ -1,5 +1,5 @@
-libpng 1.6.45 - January 7, 2025
-===============================
+libpng 1.6.50 - July 1, 2025
+============================
 
 This is a public release of libpng, intended for use in production code.
 
@@ -9,13 +9,13 @@ Files available for download
 
 Source files with LF line endings (for Unix/Linux):
 
- * libpng-1.6.45.tar.xz (LZMA-compressed, recommended)
- * libpng-1.6.45.tar.gz (deflate-compressed)
+ * libpng-1.6.50.tar.xz (LZMA-compressed, recommended)
+ * libpng-1.6.50.tar.gz (deflate-compressed)
 
 Source files with CRLF line endings (for Windows):
 
- * lpng1645.7z (LZMA-compressed, recommended)
- * lpng1645.zip (deflate-compressed)
+ * lpng1650.7z (LZMA-compressed, recommended)
+ * lpng1650.zip (deflate-compressed)
 
 Other information:
 
@@ -25,18 +25,18 @@ Other information:
  * TRADEMARK.md
 
 
-Changes from version 1.6.44 to version 1.6.45
+Changes from version 1.6.49 to version 1.6.50
 ---------------------------------------------
 
- * Added support for the cICP chunk.
-   (Contributed by Lucas Chollet and John Bowler)
- * Adjusted and improved various checks in colorspace calculations.
+ * Improved the detection of the RVV Extension on the RISC-V platform.
+   (Contributed by Filip Wasil)
+ * Replaced inline ASM with C intrinsics in the RVV code.
+   (Contributed by Filip Wasil)
+ * Fixed a decoder defect in which unknown chunks trailing IDAT, set
+   to go through the unknown chunk handler, incorrectly triggered
+   out-of-place IEND errors.
    (Contributed by John Bowler)
- * Rearranged the write order of colorspace chunks for better conformance
-   with the PNG v3 draft specification.
-   (Contributed by John Bowler)
- * Raised the minimum required CMake version from 3.6 to 3.14.
- * Forked off a development branch for libpng version 1.8.
+ * Fixed the CMake file for cross-platform builds that require `libm`.
 
 
 Send comments/corrections/commendations to png-mng-implement at lists.sf.net.
