@@ -1,39 +1,9 @@
-/*
- * This source file is part of RmlUi, the HTML/CSS Interface Middleware
- *
- * For the latest information, see http://github.com/mikke89/RmlUi
- *
- * Copyright (c) 2018 Michael R. P. Ragazzon
- * Copyright (c) 2019 The RmlUi Team, and contributors
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- */
-
-
 #include "PropertyParserAnimation.h"
-#include "PropertyShorthandDefinition.h"
 #include "../../Include/RmlUi/Core/PropertyDefinition.h"
 #include "../../Include/RmlUi/Core/PropertyIdSet.h"
 #include "../../Include/RmlUi/Core/StringUtilities.h"
 #include "../../Include/RmlUi/Core/StyleSheetSpecification.h"
-
+#include "PropertyShorthandDefinition.h"
 
 namespace Rml {
 
@@ -53,9 +23,9 @@ struct Keyword {
 	}
 };
 
-
-static const UnorderedMap<String, Keyword> keywords = {
-		{"none", {KeywordType::None} },
+struct PropertyParserAnimationData {
+	const UnorderedMap<String, Keyword> keywords = {
+		{"none", {KeywordType::None}},
 		{"all", {KeywordType::All}},
 		{"alternate", {KeywordType::Alternate}},
 		{"infinite", {KeywordType::Infinite}},
@@ -104,17 +74,42 @@ static const UnorderedMap<String, Keyword> keywords = {
 		{"sine-in", {Tween{Tween::Sine, Tween::In}}},
 		{"sine-out", {Tween{Tween::Sine, Tween::Out}}},
 		{"sine-in-out", {Tween{Tween::Sine, Tween::InOut}}},
+	};
 };
 
+ControlledLifetimeResource<PropertyParserAnimationData> PropertyParserAnimation::parser_data;
 
-
-
-PropertyParserAnimation::PropertyParserAnimation(Type type) : type(type)
+void PropertyParserAnimation::Initialize()
 {
+	parser_data.Initialize();
 }
 
+void PropertyParserAnimation::Shutdown()
+{
+	parser_data.Shutdown();
+}
 
-static bool ParseAnimation(Property & property, const StringList& animation_values)
+PropertyParserAnimation::PropertyParserAnimation(Type type) : type(type) {}
+
+bool PropertyParserAnimation::ParseValue(Property& property, const String& value, const ParameterMap& /*parameters*/) const
+{
+	StringList list_of_values;
+	StringUtilities::ExpandString(list_of_values, value, ',');
+
+	bool result = false;
+	if (type == ANIMATION_PARSER)
+	{
+		result = ParseAnimation(property, list_of_values);
+	}
+	else if (type == TRANSITION_PARSER)
+	{
+		result = ParseTransition(property, list_of_values);
+	}
+
+	return result;
+}
+
+bool PropertyParserAnimation::ParseAnimation(Property& property, const StringList& animation_values)
 {
 	AnimationList animation_list;
 
@@ -135,8 +130,8 @@ static bool ParseAnimation(Property & property, const StringList& animation_valu
 				continue;
 
 			// See if we have a <keyword> or <tween> specifier as defined in keywords
-			auto it = keywords.find(argument); 
-			if (it != keywords.end() && it->second.ValidAnimation())
+			auto it = parser_data->keywords.find(StringUtilities::ToLower(argument));
+			if (it != parser_data->keywords.end() && it->second.ValidAnimation())
 			{
 				switch (it->second.type)
 				{
@@ -144,27 +139,20 @@ static bool ParseAnimation(Property & property, const StringList& animation_valu
 				{
 					if (animation_list.size() > 0) // The none keyword can not be part of multiple definitions
 						return false;
-					property = Property{ AnimationList{}, Property::ANIMATION };
+					property = Property{AnimationList{}, Unit::ANIMATION};
 					return true;
 				}
 				break;
-				case KeywordType::Tween:
-					animation.tween = it->second.tween;
-					break;
-				case KeywordType::Alternate:
-					animation.alternate = true;
-					break;
+				case KeywordType::Tween: animation.tween = it->second.tween; break;
+				case KeywordType::Alternate: animation.alternate = true; break;
 				case KeywordType::Infinite:
 					if (num_iterations_found)
 						return false;
 					animation.num_iterations = -1;
 					num_iterations_found = true;
 					break;
-				case KeywordType::Paused:
-					animation.paused = true;
-					break;
-				default:
-					break;
+				case KeywordType::Paused: animation.paused = true; break;
+				default: break;
 				}
 			}
 			else
@@ -222,25 +210,22 @@ static bool ParseAnimation(Property & property, const StringList& animation_valu
 	}
 
 	property.value = std::move(animation_list);
-	property.unit = Property::ANIMATION;
+	property.unit = Unit::ANIMATION;
 
 	return true;
 }
 
-
-static bool ParseTransition(Property & property, const StringList& transition_values)
+bool PropertyParserAnimation::ParseTransition(Property& property, const StringList& transition_values)
 {
-	TransitionList transition_list{ false, false, {} };
+	TransitionList transition_list{false, false, {}};
 
 	for (const String& single_transition_value : transition_values)
 	{
-
 		Transition transition;
 		PropertyIdSet target_property_ids;
 
 		StringList arguments;
 		StringUtilities::ExpandString(arguments, single_transition_value, ' ');
-
 
 		bool duration_found = false;
 		bool delay_found = false;
@@ -252,14 +237,14 @@ static bool ParseTransition(Property & property, const StringList& transition_va
 				continue;
 
 			// See if we have a <keyword> or <tween> specifier as defined in keywords
-			auto it = keywords.find(argument);
-			if (it != keywords.end() && it->second.ValidTransition())
+			auto it = parser_data->keywords.find(argument);
+			if (it != parser_data->keywords.end() && it->second.ValidTransition())
 			{
 				if (it->second.type == KeywordType::None)
 				{
 					if (transition_list.transitions.size() > 0) // The none keyword can not be part of multiple definitions
 						return false;
-					property = Property{ TransitionList{true, false, {}}, Property::TRANSITION };
+					property = Property{TransitionList{true, false, {}}, Unit::TRANSITION};
 					return true;
 				}
 				else if (it->second.type == KeywordType::All)
@@ -333,12 +318,12 @@ static bool ParseTransition(Property & property, const StringList& transition_va
 		}
 
 		// Validate the parsed transition
-		if ((transition_list.all && !target_property_ids.Empty())
-			|| (!transition_list.all && target_property_ids.Empty())
-			|| transition.duration <= 0.0f
-			|| transition.reverse_adjustment_factor < 0.0f
-			|| transition.reverse_adjustment_factor > 1.0f
-			)
+		if ((transition_list.all && !target_property_ids.Empty())    //
+			|| (!transition_list.all && target_property_ids.Empty()) //
+			|| transition.duration <= 0.0f                           //
+			|| transition.reverse_adjustment_factor < 0.0f           //
+			|| transition.reverse_adjustment_factor > 1.0f           //
+		)
 		{
 			return false;
 		}
@@ -359,32 +344,9 @@ static bool ParseTransition(Property & property, const StringList& transition_va
 	}
 
 	property.value = std::move(transition_list);
-	property.unit = Property::TRANSITION;
+	property.unit = Unit::TRANSITION;
 
 	return true;
-}
-
-
-bool PropertyParserAnimation::ParseValue(Property & property, const String & value, const ParameterMap & /*parameters*/) const
-{
-	StringList list_of_values;
-	{
-		auto lowercase_value = StringUtilities::ToLower(value);
-		StringUtilities::ExpandString(list_of_values, lowercase_value, ',');
-	}
-
-	bool result = false;
-
-	if (type == ANIMATION_PARSER)
-	{
-		result = ParseAnimation(property, list_of_values);
-	}
-	else if (type == TRANSITION_PARSER)
-	{
-		result = ParseTransition(property, list_of_values);
-	}
-
-	return result;
 }
 
 } // namespace Rml

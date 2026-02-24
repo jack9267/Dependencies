@@ -1,32 +1,4 @@
-/*
- * This source file is part of RmlUi, the HTML/CSS Interface Middleware
- *
- * For the latest information, see http://github.com/mikke89/RmlUi
- *
- * Copyright (c) 2019 The RmlUi Team, and contributors
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- */
-
-#ifndef RMLUI_CORE_STYLETYPES_H
-#define RMLUI_CORE_STYLETYPES_H
+#pragma once
 
 #include "Types.h"
 
@@ -56,7 +28,22 @@ namespace Style {
 	using Margin = LengthPercentageAuto;
 	using Padding = LengthPercentage;
 
-	enum class Display : uint8_t { None, Block, Inline, InlineBlock, Flex, Table, TableRow, TableRowGroup, TableColumn, TableColumnGroup, TableCell };
+	enum class Display : uint8_t {
+		None,
+		Block,
+		Inline,
+		InlineBlock,
+		FlowRoot,
+		Flex,
+		InlineFlex,
+		Table,
+		InlineTable,
+		TableRow,
+		TableRowGroup,
+		TableColumn,
+		TableColumnGroup,
+		TableCell
+	};
 	enum class Position : uint8_t { Static, Relative, Absolute, Fixed };
 
 	using Top = LengthPercentageAuto;
@@ -89,7 +76,7 @@ namespace Style {
 		{}
 	};
 	struct VerticalAlign {
-		enum Type : uint8_t { Baseline, Middle, Sub, Super, TextTop, TextBottom, Top, Bottom, Length } type;
+		enum Type : uint8_t { Baseline, Middle, Sub, Super, TextTop, TextBottom, Top, Center, Bottom, Length } type;
 		float value; // For length type
 		VerticalAlign(Type type = Baseline) : type(type), value(0) {}
 		VerticalAlign(float value) : type(Length), value(value) {}
@@ -113,9 +100,11 @@ namespace Style {
 	};
 
 	enum class Visibility : uint8_t { Visible, Hidden };
+	enum class TextOverflow : uint8_t { Clip, Ellipsis, String };
 
 	enum class FontStyle : uint8_t { Normal, Italic };
 	enum class FontWeight : uint16_t { Auto = 0, Normal = 400, Bold = 700 }; // Any definite value in the range [1,1000] is valid.
+	enum class FontKerning : uint8_t { Auto, Normal, None };
 
 	enum class TextAlign : uint8_t { Left, Right, Center, Justify };
 	enum class TextDecoration : uint8_t { None, Underline, Overline, LineThrough };
@@ -135,13 +124,17 @@ namespace Style {
 	enum class OriginX : uint8_t { Left, Center, Right };
 	enum class OriginY : uint8_t { Top, Center, Bottom };
 
-	enum class AlignContent : uint8_t { FlexStart, FlexEnd, Center, SpaceBetween, SpaceAround, Stretch };
+	enum class AlignContent : uint8_t { FlexStart, FlexEnd, Center, SpaceBetween, SpaceAround, SpaceEvenly, Stretch };
 	enum class AlignItems : uint8_t { FlexStart, FlexEnd, Center, Baseline, Stretch };
 	enum class AlignSelf : uint8_t { Auto, FlexStart, FlexEnd, Center, Baseline, Stretch };
 	using FlexBasis = LengthPercentageAuto;
 	enum class FlexDirection : uint8_t { Row, RowReverse, Column, ColumnReverse };
 	enum class FlexWrap : uint8_t { Nowrap, Wrap, WrapReverse };
-	enum class JustifyContent : uint8_t { FlexStart, FlexEnd, Center, SpaceBetween, SpaceAround };
+	enum class JustifyContent : uint8_t { FlexStart, FlexEnd, Center, SpaceBetween, SpaceAround, SpaceEvenly };
+
+	enum class Nav : uint8_t { None, Auto, Horizontal, Vertical };
+
+	enum class Direction : uint8_t { Auto, Ltr, Rtl };
 
 	class ComputedValues;
 
@@ -150,4 +143,3 @@ namespace Style {
 using ComputedValues = Style::ComputedValues;
 
 } // namespace Rml
-#endif

@@ -1,44 +1,17 @@
-/*
- * This source file is part of RmlUi, the HTML/CSS Interface Middleware
- *
- * For the latest information, see http://github.com/mikke89/RmlUi
- *
- * Copyright (c) 2008-2010 CodePoint Ltd, Shift Technology Ltd
- * Copyright (c) 2019 The RmlUi Team, and contributors
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- */
-
-#include "RmlUi/Core/Debug.h"
 #include "RmlUi_Backend.h"
 #include "RmlUi_Include_Xlib.h"
 #include "RmlUi_Platform_X11.h"
 #include "RmlUi_Renderer_GL2.h"
 #include <RmlUi/Core/Context.h>
+#include <RmlUi/Core/Debug.h>
+#include <RmlUi/Core/Log.h>
 #include <GL/gl.h>
 #include <GL/glext.h>
-#include <GL/glu.h>
 #include <GL/glx.h>
 #include <X11/Xlib.h>
 #include <X11/cursorfont.h>
 #include <X11/extensions/xf86vmode.h>
+#include <cmath>
 #include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -48,7 +21,6 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
-#include <cmath>
 
 // Attach the OpenGL context to the window.
 static bool AttachToNative(GLXContext& out_gl_context, Display* display, Window window, XVisualInfo* visual_info)
@@ -61,7 +33,7 @@ static bool AttachToNative(GLXContext& out_gl_context, Display* display, Window 
 		return false;
 
 	if (!glXIsDirect(display, gl_context))
-		puts("OpenGL context does not support direct rendering; performance is likely to be poor.");
+		Rml::Log::Message(Rml::Log::LT_INFO, "OpenGL context does not support direct rendering; performance is likely to be poor.");
 
 	out_gl_context = gl_context;
 
@@ -142,7 +114,7 @@ bool Backend::Initialize(const char* window_name, int width, int height, bool al
 		XSizeHints* win_size_hints = XAllocSizeHints(); // Allocate a size hint structure
 		if (!win_size_hints)
 		{
-			fprintf(stderr, "XAllocSizeHints - out of memory\n");
+			Rml::Log::Message(Rml::Log::LT_ERROR, "XAllocSizeHints - out of memory");
 		}
 		else
 		{
@@ -215,24 +187,26 @@ bool Backend::ProcessEvents(Rml::Context* context, KeyDownCallback key_down_call
 	bool result = data->running;
 	data->running = true;
 
-	if(power_save && XPending(display) == 0) {
+	if (power_save && XPending(display) == 0)
+	{
 		int display_fd = ConnectionNumber(display);
 		fd_set fds{};
 		FD_ZERO(&fds);
-        FD_SET(display_fd, &fds);
+		FD_SET(display_fd, &fds);
 
 		double timeout = Rml::Math::Min(context->GetNextUpdateDelay(), 10.0);
-		struct timeval tv{};
+		struct timeval tv {};
 		double seconds;
-        tv.tv_usec = std::modf(timeout, &seconds)*1000000.0;
-        tv.tv_sec = seconds;
+		tv.tv_usec = std::modf(timeout, &seconds) * 1000000.0;
+		tv.tv_sec = seconds;
 
 		int ready_fd_count;
-		do {
+		do
+		{
 			ready_fd_count = select(display_fd + 1, &fds, NULL, NULL, &tv);
 			// We don't care about the return value as long as select didn't error out
 			RMLUI_ASSERT(ready_fd_count >= 0);
-		} while(XPending(display) == 0 && ready_fd_count != 0);
+		} while (XPending(display) == 0 && ready_fd_count != 0);
 	}
 
 	while (XPending(display) > 0)

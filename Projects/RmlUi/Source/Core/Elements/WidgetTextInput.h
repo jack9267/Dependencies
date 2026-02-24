@@ -1,33 +1,4 @@
-/*
- * This source file is part of RmlUi, the HTML/CSS Interface Middleware
- *
- * For the latest information, see http://github.com/mikke89/RmlUi
- *
- * Copyright (c) 2008-2010 CodePoint Ltd, Shift Technology Ltd
- * Copyright (c) 2019 The RmlUi Team, and contributors
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- */
-
-#ifndef RMLUI_CORE_ELEMENTS_WIDGETTEXTINPUT_H
-#define RMLUI_CORE_ELEMENTS_WIDGETTEXTINPUT_H
+#pragma once
 
 #include "../../../Include/RmlUi/Core/EventListener.h"
 #include "../../../Include/RmlUi/Core/Geometry.h"
@@ -38,15 +9,14 @@ namespace Rml {
 
 class ElementText;
 class ElementFormControl;
+class TextInputHandler;
+class WidgetTextInputContext;
 
 /**
-	An abstract widget for editing and navigating around a text field.
-
-	@author Peter Curry
+    An abstract widget for editing and navigating around a text field.
  */
 
-class WidgetTextInput : public EventListener
-{
+class WidgetTextInput : public EventListener {
 public:
 	WidgetTextInput(ElementFormControl* parent);
 	virtual ~WidgetTextInput();
@@ -55,6 +25,8 @@ public:
 	/// @param[in] value The new value to set on the text field.
 	/// @note The value will be sanitized and synchronized with the element's value attribute.
 	void SetValue(String value);
+	/// Returns the underlying text from the element's value attribute.
+	String GetAttributeValue() const;
 
 	/// Sets the maximum length (in characters) of this text field.
 	/// @param[in] max_length The new maximum length of the text field. A number lower than zero will mean infinite characters.
@@ -76,6 +48,13 @@ public:
 	/// @param[out] selection_end The first character *after* the selection.
 	/// @param[out] selected_text The selected text.
 	void GetSelection(int* selection_start, int* selection_end, String* selected_text) const;
+
+	/// Sets visual feedback used for the IME composition in the range.
+	/// @param[in] range_start The first character to be selected.
+	/// @param[in] range_end The first character *after* the selection.
+	void SetCompositionRange(int range_start, int range_end);
+	/// Obtains the IME composition byte range relative to the current value.
+	void GetCompositionRange(int& range_start, int& range_end) const;
 
 	/// Update the colours of the selected text.
 	void UpdateSelectionColours();
@@ -114,32 +93,60 @@ protected:
 	/// Transforms the displayed value of the text box, typically used for password fields.
 	/// @note Only use this for transforming characters, do not modify the length of the string.
 	virtual void TransformValue(String& value);
+	/// Converts a display index to an attribute index.
+	/// @param[in] display_index Absolute index into the displayed value (see GetValue).
+	/// @param[in] attribute_value The attribute value to be considered.
+	/// @return Absolute index into the attribute value (see GetAttributeValue).
+	/// @note All indices stored in this class refer to the displayed value, unless otherwise specified. The display and
+	/// attribute indices are typically identical, but may differ when the transformed value (see TransformValue) has
+	/// modified the contents to be displayed.
+	virtual int DisplayIndexToAttributeIndex(int display_index, const String& attribute_value);
+	/// Converts an attribute index to a display index.
+	/// @param[in] attribute_index Absolute index into the attribute value (see GetAttributeValue).
+	/// @param[in] attribute_value The attribute value to be considered.
+	/// @return Absolute index into the displayed value (see GetValue).
+	virtual int AttributeIndexToDisplayIndex(int attribute_index, const String& attribute_value);
 	/// Called when the user pressed enter.
 	virtual void LineBreak() = 0;
 
 	/// Gets the parent element containing the widget.
 	Element* GetElement() const;
 
+	/// Obtains the text input handler of the parent element's context.
+	TextInputHandler* GetTextInputHandler() const;
+
+	/// Returns true if the text input element is currently focused.
+	bool IsFocused() const;
+
 	/// Dispatches a change event to the widget's element.
 	void DispatchChangeEvent(bool linebreak = false);
 
 private:
+	struct Line {
+		// Offset into the text field's value.
+		int value_offset;
+		// The size of the contents of the line (including the trailing endline, if that terminated the line).
+		int size;
+		// The length of the editable characters on the line (excluding any trailing endline).
+		int editable_length;
+	};
+
 	/// Returns the displayed value of the text field.
 	/// @note For password fields this would only return the displayed asterisks '****', while the attribute value below contains the underlying text.
 	const String& GetValue() const;
-	/// Returns the underlying text from the element's value attribute.
-	String GetAttributeValue() const;
 
 	/// Moves the cursor along the current line.
 	/// @param[in] movement Cursor movement operation.
 	/// @param[in] select True if the movement will also move the selection cursor, false if not.
+	/// @param[out] out_of_bounds Set to true if the resulting line position is out of bounds, false if not.
 	/// @return True if selection was changed.
-	bool MoveCursorHorizontal(CursorMovement movement, bool select);
+	bool MoveCursorHorizontal(CursorMovement movement, bool select, bool& out_of_bounds);
 	/// Moves the cursor up and down the text field.
-	/// @param[in] x How far to move the cursor.
+	/// @param[in] distance How far to move the cursor.
 	/// @param[in] select True if the movement will also move the selection cursor, false if not.
+	/// @param[out] out_of_bounds Set to true if the resulting line position is out of bounds, false if not.
 	/// @return True if selection was changed.
-	bool MoveCursorVertical(int distance, bool select);
+	bool MoveCursorVertical(int distance, bool select, bool& out_of_bounds);
 	// Move the cursor to utf-8 boundaries, in case it was moved into the middle of a multibyte character.
 	/// @param[in] forward True to seek forward, else back.
 	void MoveCursorToCharacterBoundaries(bool forward);
@@ -158,7 +165,6 @@ private:
 	/// Calculates the character index along a line under a specific horizontal position.
 	/// @param[in] line_index The line to query.
 	/// @param[in] position The position to query.
-	/// @param[out] on_right_side True if position is on the right side of the returned character, else left side.
 	/// @return The index of the character under the mouse cursor.
 	int CalculateCharacterIndex(int line_index, float position);
 
@@ -179,7 +185,8 @@ private:
 	void UpdateCursorPosition(bool update_ideal_cursor_position);
 
 	/// Expand or shrink the text selection to the position of the cursor.
-	/// @param[in] selecting True if the new position of the cursor should expand / contract the selection area, false if it should only set the anchor for future selections.
+	/// @param[in] selecting True if the new position of the cursor should expand / contract the selection area, false if it should only set the
+	/// anchor for future selections.
 	/// @return True if selection was changed.
 	bool UpdateSelection(bool selecting);
 	/// Removes the selection of text.
@@ -193,27 +200,34 @@ private:
 	/// Split one line of text into three parts, based on the current selection.
 	/// @param[out] pre_selection The section of unselected text before any selected text on the line.
 	/// @param[out] selection The section of selected text on the line.
-	/// @param[out] post_selection The section of unselected text after any selected text on the line. If there is no selection on the line, then this will be empty.
+	/// @param[out] post_selection The section of unselected text after any selected text on the line. If there is no selection on the line, then this
+	/// will be empty.
 	/// @param[in] line The text making up the line.
 	/// @param[in] line_begin The absolute index at the beginning of the line.
-	void GetLineSelection(String& pre_selection, String& selection, String& post_selection, const String& line, int line_begin) const;
+	/// @lifetime The returned string views are tied to the lifetime of the line's data.
+	void GetLineSelection(StringView& pre_selection, StringView& selection, StringView& post_selection, const String& line, int line_begin) const;
+	/// Fetch the IME composition range on the line.
+	/// @param[out] pre_composition The section of text before the IME composition string on the line.
+	/// @param[out] ime_composition The IME composition string on the line.
+	/// @param[in] line The text making up the line.
+	/// @param[in] line_begin The absolute index at the beginning of the line.
+	void GetLineIMEComposition(StringView& pre_composition, StringView& ime_composition, const String& line, int line_begin) const;
 
-	struct Line
-	{
-		// Offset into the text field's value.
-		int value_offset;
-		// The size of the contents of the line (including the trailing endline, if that terminated the line).
-		int size;
-		// The length of the editable characters on the line (excluding any trailing endline).
-		int editable_length;
-	};
+	/// Returns the offset that aligns the contents of the line according to the 'text-align' property.
+	float GetAlignmentSpecificTextOffset(const Line& line) const;
+
+	/// Returns the used line height.
+	float GetLineHeight() const;
+	/// Returns the width available for the text contents without overflowing, that is, the content area subtracted by any scrollbar.
+	float GetAvailableWidth() const;
+	/// Returns the height available for the text contents without overflowing, that is, the content area subtracted by any scrollbar.
+	float GetAvailableHeight() const;
 
 	ElementFormControl* parent;
 
 	ElementText* text_element;
 	ElementText* selected_text_element;
 	Vector2f internal_dimensions;
-	Vector2f scroll_offset;
 
 	using LineList = Vector<Line>;
 	LineList lines;
@@ -240,9 +254,16 @@ private:
 	int selection_length;
 
 	// The colour of the background of selected text.
-	Colourb selection_colour;
+	ColourbPremultiplied selection_colour;
 	// The selection background.
-	Geometry selection_geometry;
+	Geometry selection_composition_geometry;
+
+	// IME composition range. The start and end indices are in absolute coordinates.
+	int ime_composition_begin_index;
+	int ime_composition_end_index;
+
+	// The IME context for this widget.
+	UniquePtr<WidgetTextInputContext> text_input_context;
 
 	// Cursor visibility and timings.
 	float cursor_timer;
@@ -251,6 +272,8 @@ private:
 	/// Activate or deactivate keyboard (for touchscreen devices)
 	/// @param[in] active True if need activate keyboard, false if need deactivate.
 	void SetKeyboardActive(bool active);
+
+	bool ink_overflow;
 
 	double last_update_time;
 
@@ -262,4 +285,3 @@ private:
 };
 
 } // namespace Rml
-#endif

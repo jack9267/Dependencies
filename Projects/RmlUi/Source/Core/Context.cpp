@@ -1,53 +1,25 @@
-/*
- * This source file is part of RmlUi, the HTML/CSS Interface Middleware
- *
- * For the latest information, see http://github.com/mikke89/RmlUi
- *
- * Copyright (c) 2008-2010 CodePoint Ltd, Shift Technology Ltd
- * Copyright (c) 2019 The RmlUi Team, and contributors
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- */
-
 #include "../../Include/RmlUi/Core/Context.h"
 #include "../../Include/RmlUi/Core/ComputedValues.h"
 #include "../../Include/RmlUi/Core/ContextInstancer.h"
 #include "../../Include/RmlUi/Core/Core.h"
 #include "../../Include/RmlUi/Core/DataModelHandle.h"
+#include "../../Include/RmlUi/Core/Debug.h"
 #include "../../Include/RmlUi/Core/ElementDocument.h"
 #include "../../Include/RmlUi/Core/ElementUtilities.h"
 #include "../../Include/RmlUi/Core/Factory.h"
 #include "../../Include/RmlUi/Core/Profiling.h"
-#include "../../Include/RmlUi/Core/RenderInterface.h"
+#include "../../Include/RmlUi/Core/RenderManager.h"
 #include "../../Include/RmlUi/Core/StreamMemory.h"
 #include "../../Include/RmlUi/Core/SystemInterface.h"
 #include "DataModel.h"
 #include "EventDispatcher.h"
 #include "PluginRegistry.h"
-#include "RmlUi/Core/Debug.h"
 #include "ScrollController.h"
 #include "StreamFile.h"
 #include <algorithm>
+#include <clocale>
 #include <iterator>
 #include <limits>
-
 
 namespace Rml {
 
@@ -55,31 +27,58 @@ static constexpr float DOUBLE_CLICK_TIME = 0.5f;    // [s]
 static constexpr float DOUBLE_CLICK_MAX_DIST = 3.f; // [dp]
 static constexpr float UNIT_SCROLL_LENGTH = 80.f;   // [dp]
 
-Context::Context(const String& name) : name(name), dimensions(0, 0), density_independent_pixel_ratio(1.0f), mouse_position(0, 0), clip_origin(-1, -1), clip_dimensions(-1, -1), next_update_timeout(0)
+// If the user stops scrolling for this amount of time in seconds before touch/click release, don't apply inertia.
+static constexpr float SCROLL_INERTIA_DELAY = 0.1f;
+static constexpr float TOUCH_MOVEMENT_DECAY_RATE = 5.0f;
+static constexpr float TOUCH_CLICK_MAX_DISTANCE = DOUBLE_CLICK_MAX_DIST; // [dp]
+
+static void DebugVerifyLocaleSetting()
+{
+#ifdef RMLUI_DEBUG
+	constexpr float expected_value = 1000.5f;
+	const Rml::String expected_string = "1000.5";
+	const Rml::String formatted_string = Rml::ToString(expected_value);
+	const float parsed_value = Rml::FromString<float>(expected_string);
+
+	const char* description = "RmlUi expects the global locale to be set to the default minimal \"C\" locale, please see `std::setlocale`.";
+	if (formatted_string != expected_string)
+	{
+		Rml::Log::Message(Rml::Log::LT_ERROR,
+			"Incompatible locale setting detected while formatting %f. Formatted: \"%s\". Expected: \"%s\". Current locale: %s. %s", expected_value,
+			formatted_string.c_str(), expected_string.c_str(), std::setlocale(LC_ALL, nullptr), description);
+	}
+	if (parsed_value != expected_value)
+	{
+		Rml::Log::Message(Rml::Log::LT_ERROR,
+			"Incompatible locale setting detected while parsing \"%s\". Parsed: %f. Expected: %f. Current locale: %s. %s", expected_string.c_str(),
+			parsed_value, expected_value, std::setlocale(LC_ALL, nullptr), description);
+	}
+#endif
+}
+
+Context::Context(const String& name, RenderManager* render_manager, TextInputHandler* text_input_handler) :
+	name(name), render_manager(render_manager), text_input_handler(text_input_handler)
 {
 	instancer = nullptr;
-
-	// Initialise this to nullptr; this will be set in Rml::CreateContext().
-	render_interface = nullptr;
 
 	root = Factory::InstanceElement(nullptr, "*", "#root", XMLAttributes());
 	root->SetId(name);
 	root->SetOffset(Vector2f(0, 0), nullptr);
-	root->SetProperty(PropertyId::ZIndex, Property(0, Property::NUMBER));
+	root->SetProperty(PropertyId::ZIndex, Property(0, Unit::NUMBER));
 
 	cursor_proxy = Factory::InstanceElement(nullptr, documents_base_tag, documents_base_tag, XMLAttributes());
-	ElementDocument* cursor_proxy_document = rmlui_dynamic_cast< ElementDocument* >(cursor_proxy.get());
+	ElementDocument* cursor_proxy_document = rmlui_dynamic_cast<ElementDocument*>(cursor_proxy.get());
 	RMLUI_ASSERT(cursor_proxy_document);
 	cursor_proxy_document->context = this;
 
 	// The cursor proxy takes the style from its cloned element's document. The latter may define style rules for `<body>` which we don't want on the
 	// proxy. Thus, we override some properties here that we in particular don't want to inherit from the client document, especially those that
 	// result in decoration of the body element.
-	cursor_proxy_document->SetProperty(PropertyId::BackgroundColor, Property(Colourb(255, 255, 255, 0), Property::COLOUR));
-	cursor_proxy_document->SetProperty(PropertyId::BorderTopWidth, Property(0, Property::PX));
-	cursor_proxy_document->SetProperty(PropertyId::BorderRightWidth, Property(0, Property::PX));
-	cursor_proxy_document->SetProperty(PropertyId::BorderBottomWidth, Property(0, Property::PX));
-	cursor_proxy_document->SetProperty(PropertyId::BorderLeftWidth, Property(0, Property::PX));
+	cursor_proxy_document->SetProperty(PropertyId::BackgroundColor, Property(Colourb(255, 255, 255, 0), Unit::COLOUR));
+	cursor_proxy_document->SetProperty(PropertyId::BorderTopWidth, Property(0, Unit::PX));
+	cursor_proxy_document->SetProperty(PropertyId::BorderRightWidth, Property(0, Unit::PX));
+	cursor_proxy_document->SetProperty(PropertyId::BorderBottomWidth, Property(0, Unit::PX));
+	cursor_proxy_document->SetProperty(PropertyId::BorderLeftWidth, Property(0, Unit::PX));
 	cursor_proxy_document->SetProperty(PropertyId::Decorator, Property());
 	cursor_proxy_document->SetProperty(PropertyId::OverflowX, Property(Style::Overflow::Visible));
 	cursor_proxy_document->SetProperty(PropertyId::OverflowY, Property(Style::Overflow::Visible));
@@ -116,22 +115,19 @@ Context::~Context()
 	cursor_proxy.reset();
 
 	instancer = nullptr;
-
-	render_interface = nullptr;
 }
 
-// Returns the name of the context.
 const String& Context::GetName() const
 {
 	return name;
 }
 
-// Changes the dimensions of the screen.
 void Context::SetDimensions(const Vector2i _dimensions)
 {
 	if (dimensions != _dimensions)
 	{
 		dimensions = _dimensions;
+		render_manager->SetViewport(dimensions);
 		root->SetBox(Box(Vector2f(dimensions)));
 		root->DirtyLayout();
 
@@ -147,22 +143,19 @@ void Context::SetDimensions(const Vector2i _dimensions)
 				document->DispatchEvent(EventId::Resize, Dictionary());
 			}
 		}
-		
-		clip_dimensions = dimensions;
 	}
 }
 
-// Returns the dimensions of the screen.
 Vector2i Context::GetDimensions() const
 {
 	return dimensions;
 }
 
-void Context::SetDensityIndependentPixelRatio(float _density_independent_pixel_ratio)
+void Context::SetDensityIndependentPixelRatio(float dp_ratio)
 {
-	if (density_independent_pixel_ratio != _density_independent_pixel_ratio)
+	if (density_independent_pixel_ratio != dp_ratio)
 	{
-		density_independent_pixel_ratio = _density_independent_pixel_ratio;
+		density_independent_pixel_ratio = dp_ratio;
 
 		for (int i = 0; i < root->GetNumChildren(true); ++i)
 		{
@@ -184,10 +177,11 @@ float Context::GetDensityIndependentPixelRatio() const
 bool Context::Update()
 {
 	RMLUI_ZoneScoped;
+	DebugVerifyLocaleSetting();
 
 	next_update_timeout = std::numeric_limits<double>::infinity();
 
-	if(scroll_controller->Update(mouse_position, density_independent_pixel_ratio))
+	if (scroll_controller->Update(mouse_position, density_independent_pixel_ratio))
 		RequestNextUpdate(0);
 
 	// Update the hover chain to detect any new or moved elements under the mouse.
@@ -221,38 +215,28 @@ bool Context::Update()
 	return true;
 }
 
-// Renders all visible elements in the element tree.
 bool Context::Render()
 {
 	RMLUI_ZoneScoped;
 
-	RenderInterface* render_interface = GetRenderInterface();
-	if (render_interface == nullptr)
-		return false;
-
-	render_interface->context = this;
-	ElementUtilities::ApplyActiveClipRegion(this, render_interface);
+	render_manager->PrepareRender(dimensions);
 
 	root->Render();
-
-	ElementUtilities::SetClippingRegion(nullptr, this);
 
 	// Render the cursor proxy so that any attached drag clone will be rendered below the cursor.
 	if (drag_clone)
 	{
 		static_cast<ElementDocument&>(*cursor_proxy).UpdateDocument();
-		cursor_proxy->SetOffset(Vector2f((float)Math::Clamp(mouse_position.x, 0, dimensions.x),
-			(float)Math::Clamp(mouse_position.y, 0, dimensions.y)),
-			nullptr);
+		cursor_proxy->SetOffset(
+			Vector2f((float)Math::Clamp(mouse_position.x, 0, dimensions.x), (float)Math::Clamp(mouse_position.y, 0, dimensions.y)), nullptr);
 		cursor_proxy->Render();
 	}
 
-	render_interface->context = nullptr;
+	render_manager->ResetState();
 
 	return true;
 }
 
-// Creates a new, empty document and places it into this context. 
 ElementDocument* Context::CreateDocument(const String& instancer_name)
 {
 	ElementPtr element = Factory::InstanceElement(nullptr, instancer_name, documents_base_tag, XMLAttributes());
@@ -262,10 +246,12 @@ ElementDocument* Context::CreateDocument(const String& instancer_name)
 		return nullptr;
 	}
 
-	ElementDocument* document = rmlui_dynamic_cast< ElementDocument* >(element.get());
+	ElementDocument* document = rmlui_dynamic_cast<ElementDocument*>(element.get());
 	if (!document)
 	{
-		Log::Message(Log::LT_ERROR, "Failed to instance document on instancer_name '%s', Found type '%s', was expecting derivative of ElementDocument.", instancer_name.c_str(), rmlui_type_name(*element));
+		Log::Message(Log::LT_ERROR,
+			"Failed to instance document on instancer_name '%s', Found type '%s', was expecting derivative of ElementDocument.",
+			instancer_name.c_str(), rmlui_type_name(*element));
 		return nullptr;
 	}
 
@@ -277,9 +263,8 @@ ElementDocument* Context::CreateDocument(const String& instancer_name)
 	return document;
 }
 
-// Load a document into the context.
 ElementDocument* Context::LoadDocument(const String& document_path)
-{	
+{
 	auto stream = MakeUnique<StreamFile>();
 
 	if (!stream->Open(document_path))
@@ -290,17 +275,17 @@ ElementDocument* Context::LoadDocument(const String& document_path)
 	return document;
 }
 
-// Load a document into the context.
 ElementDocument* Context::LoadDocument(Stream* stream)
 {
+	DebugVerifyLocaleSetting();
 	PluginRegistry::NotifyDocumentOpen(this, stream->GetSourceURL().GetURL());
 
 	ElementPtr element = Factory::InstanceDocumentStream(this, stream, GetDocumentsBaseTag());
 	if (!element)
 		return nullptr;
 
-	ElementDocument* document = static_cast<ElementDocument*>(element.get());
-	
+	ElementDocument* document = rmlui_static_cast<ElementDocument*>(element.get());
+
 	root->AppendChild(std::move(element));
 
 	// The 'load' event is fired before updating the document, because the user might
@@ -321,13 +306,12 @@ ElementDocument* Context::LoadDocument(Stream* stream)
 	return document;
 }
 
-// Load a document into the context.
 ElementDocument* Context::LoadDocumentFromMemory(const String& string, const String& source_url)
 {
 	// Open the stream based on the string contents.
 	auto stream = MakeUnique<StreamMemory>(reinterpret_cast<const byte*>(string.c_str()), string.size());
 
-	stream->SetSourceURL( source_url );
+	stream->SetSourceURL(source_url);
 
 	// Load the document from the stream.
 	ElementDocument* document = LoadDocument(stream.get());
@@ -335,7 +319,6 @@ ElementDocument* Context::LoadDocumentFromMemory(const String& string, const Str
 	return document;
 }
 
-// Unload the given document
 void Context::UnloadDocument(ElementDocument* _document)
 {
 	// Has this document already been unloaded?
@@ -354,7 +337,7 @@ void Context::UnloadDocument(ElementDocument* _document)
 		PluginRegistry::NotifyDocumentUnload(document);
 
 		// Move document to a temporary location to be released later.
-		unloaded_documents.push_back( root->RemoveChild(document) );
+		unloaded_documents.push_back(root->RemoveChild(document));
 	}
 
 	// Remove the item from the focus history.
@@ -391,7 +374,6 @@ void Context::UnloadDocument(ElementDocument* _document)
 	UpdateHoverChain(mouse_position);
 }
 
-// Unload all the currently loaded documents
 void Context::UnloadAllDocuments()
 {
 	// Unload all children.
@@ -404,7 +386,6 @@ void Context::UnloadAllDocuments()
 	drag_hover_chain.clear();
 }
 
-// Enables or disables the mouse cursor.
 void Context::EnableMouseCursor(bool enable)
 {
 	// The cursor is set to an invalid name so that it is forced to update in the next update loop.
@@ -436,7 +417,6 @@ bool Context::IsThemeActive(const String& theme_name) const
 	return active_themes.count(theme_name);
 }
 
-// Returns the first document found in the root with the given id.
 ElementDocument* Context::GetDocument(const String& id)
 {
 	for (int i = 0; i < root->GetNumChildren(); i++)
@@ -452,7 +432,6 @@ ElementDocument* Context::GetDocument(const String& id)
 	return nullptr;
 }
 
-// Returns a document in the context by index.
 ElementDocument* Context::GetDocument(int index)
 {
 	Element* element = root->GetChild(index);
@@ -462,31 +441,26 @@ ElementDocument* Context::GetDocument(int index)
 	return element->GetOwnerDocument();
 }
 
-// Returns the number of documents in the context.
 int Context::GetNumDocuments() const
 {
 	return root->GetNumChildren();
 }
 
-// Returns the hover element.
 Element* Context::GetHoverElement()
 {
 	return hover;
 }
 
-// Returns the focus element.
 Element* Context::GetFocusElement()
 {
 	return focus;
 }
 
-// Returns the root element.
 Element* Context::GetRootElement()
 {
 	return root.get();
 }
 
-// Brings the document to the front of the document stack.
 void Context::PullDocumentToFront(ElementDocument* document)
 {
 	if (document != root->GetLastChild())
@@ -507,7 +481,6 @@ void Context::PullDocumentToFront(ElementDocument* document)
 	}
 }
 
-// Sends the document to the back of the document stack.
 void Context::PushDocumentToBack(ElementDocument* document)
 {
 	if (document != root->GetFirstChild())
@@ -537,19 +510,16 @@ void Context::UnfocusDocument(ElementDocument* document)
 		document_focus_history.back()->GetFocusLeafNode()->Focus();
 }
 
-// Adds an event listener to the root element.
 void Context::AddEventListener(const String& event, EventListener* listener, bool in_capture_phase)
 {
 	root->AddEventListener(event, listener, in_capture_phase);
 }
 
-// Removes an event listener from the root element.
 void Context::RemoveEventListener(const String& event, EventListener* listener, bool in_capture_phase)
 {
 	root->RemoveEventListener(event, listener, in_capture_phase);
 }
 
-// Sends a key down event into RmlUi.
 bool Context::ProcessKeyDown(Input::KeyIdentifier key_identifier, int key_modifier_state)
 {
 	// Generate the parameters for the key event.
@@ -563,7 +533,6 @@ bool Context::ProcessKeyDown(Input::KeyIdentifier key_identifier, int key_modifi
 		return root->DispatchEvent(EventId::Keydown, parameters);
 }
 
-// Sends a key up event into RmlUi.
 bool Context::ProcessKeyUp(Input::KeyIdentifier key_identifier, int key_modifier_state)
 {
 	// Generate the parameters for the key event.
@@ -585,7 +554,6 @@ bool Context::ProcessTextInput(char character)
 	return ProcessTextInput(static_cast<Character>(character));
 }
 
-// Sends a single character of text as text input into RmlUi.
 bool Context::ProcessTextInput(Character character)
 {
 	// Generate the parameters for the key event.
@@ -593,7 +561,6 @@ bool Context::ProcessTextInput(Character character)
 	return ProcessTextInput(text);
 }
 
-// Sends a string of text as text input into RmlUi.
 bool Context::ProcessTextInput(const String& string)
 {
 	Element* target = (focus ? focus : root.get());
@@ -606,7 +573,6 @@ bool Context::ProcessTextInput(const String& string)
 	return consumed;
 }
 
-// Sends a mouse movement event into RmlUi.
 bool Context::ProcessMouseMove(int x, int y, int key_modifier_state)
 {
 	// Check whether the mouse moved since the last event came through.
@@ -639,16 +605,15 @@ static Element* FindFocusElement(Element* element)
 	ElementDocument* owner_document = element->GetOwnerDocument();
 	if (!owner_document || owner_document->GetComputedValues().focus() == Style::Focus::None)
 		return nullptr;
-	
+
 	while (element && element->GetComputedValues().focus() == Style::Focus::None)
 	{
 		element = element->GetParentNode();
 	}
-	
+
 	return element;
 }
 
-// Sends a mouse-button down event into RmlUi.
 bool Context::ProcessMouseButtonDown(int button_index, int key_modifier_state)
 {
 	Dictionary parameters;
@@ -660,7 +625,7 @@ bool Context::ProcessMouseButtonDown(int button_index, int key_modifier_state)
 	if (button_index == 0)
 	{
 		Element* new_focus = hover;
-		
+
 		// Set the currently hovered element to focus if it isn't already the focus.
 		if (hover)
 		{
@@ -688,8 +653,7 @@ bool Context::ProcessMouseButtonDown(int button_index, int key_modifier_state)
 
 			double click_time = GetSystemInterface()->GetElapsedTime();
 
-			if (active == last_click_element &&
-				float(click_time - last_click_time) < DOUBLE_CLICK_TIME &&
+			if (active == last_click_element && float(click_time - last_click_time) < DOUBLE_CLICK_TIME &&
 				mouse_distance_squared < max_mouse_distance * max_mouse_distance)
 			{
 				if (hover)
@@ -719,8 +683,8 @@ bool Context::ProcessMouseButtonDown(int button_index, int key_modifier_state)
 				Style::Drag drag_style = drag->GetComputedValues().drag();
 				switch (drag_style)
 				{
-				case Style::Drag::None:		drag = drag->GetParentNode(); continue;
-				case Style::Drag::Block:	drag = nullptr; continue;
+				case Style::Drag::None: drag = drag->GetParentNode(); continue;
+				case Style::Drag::Block: drag = nullptr; continue;
 				default: drag_verbose = (drag_style == Style::Drag::DragDrop || drag_style == Style::Drag::Clone);
 				}
 
@@ -754,14 +718,14 @@ bool Context::ProcessMouseButtonDown(int button_index, int key_modifier_state)
 	return !IsMouseInteracting();
 }
 
-// Sends a mouse-button up event into RmlUi.
 bool Context::ProcessMouseButtonUp(int button_index, int key_modifier_state)
 {
 	Dictionary parameters;
 	GenerateMouseEventParameters(parameters, button_index);
 	GenerateKeyModifierEventParameters(parameters, key_modifier_state);
 
-	// We want to return the interaction state before handling the mouse up events, so that any active element that is released is considered to capture the event.
+	// We want to return the interaction state before handling the mouse up events, so that any active element that is released is considered to
+	// capture the event.
 	const bool result = !IsMouseInteracting();
 
 	// Process primary click.
@@ -778,12 +742,7 @@ bool Context::ProcessMouseButtonUp(int button_index, int key_modifier_state)
 			active->DispatchEvent(EventId::Click, parameters);
 		}
 
-		// Unset the 'active' pseudo-class on all the elements in the active chain; because they may not necessarily
-		// have had 'onmouseup' called on them, we can't guarantee this has happened already.
-		for (Element* element : active_chain)
-			element->SetPseudoClass("active", false);
-		active_chain.clear();
-		active = nullptr;
+		ResetActiveChain();
 
 		if (drag)
 		{
@@ -800,12 +759,12 @@ bool Context::ProcessMouseButtonUp(int button_index, int key_modifier_state)
 					{
 						drag_hover->DispatchEvent(EventId::Dragdrop, drag_parameters);
 						// User may have removed the element, do an extra check.
-						if(drag_hover) 
+						if (drag_hover)
 							drag_hover->DispatchEvent(EventId::Dragout, drag_parameters);
 					}
 				}
 
-				if(drag)
+				if (drag)
 					drag->DispatchEvent(EventId::Dragend, drag_parameters);
 
 				ReleaseDragClone();
@@ -876,10 +835,10 @@ bool Context::ProcessMouseWheel(Vector2f wheel_delta, int key_modifier_state)
 bool Context::ProcessMouseLeave()
 {
 	mouse_active = false;
-	
+
 	// Update the hover chain. Now that 'mouse_active' is disabled this will remove the hover state from all elements.
 	UpdateHoverChain(mouse_position);
-	
+
 	return !IsMouseInteracting();
 }
 
@@ -888,37 +847,203 @@ bool Context::IsMouseInteracting() const
 	return (hover && hover != root.get()) || (active && active != root.get()) || scroll_controller->GetMode() == ScrollController::Mode::Autoscroll;
 }
 
+Context::TouchState* Context::LookupTouch(TouchId identifier)
+{
+	auto touch_it = touch_states.find(identifier);
+	return touch_it != touch_states.end() ? &touch_it->second : nullptr;
+}
+
+bool Context::ProcessTouchStart(const TouchList& touches, int key_modifier_state)
+{
+	bool result = true;
+	for (const auto& touch : touches)
+		result &= ProcessTouchStart(touch, key_modifier_state);
+	return result;
+}
+
+bool Context::ProcessTouchMove(const TouchList& touches, int key_modifier_state)
+{
+	bool result = true;
+	for (const auto& touch : touches)
+		result &= ProcessTouchMove(touch, key_modifier_state);
+	return result;
+}
+
+bool Context::ProcessTouchEnd(const TouchList& touches, int key_modifier_state)
+{
+	bool result = true;
+	for (const auto& touch : touches)
+		result &= ProcessTouchEnd(touch, key_modifier_state);
+	return result;
+}
+
+bool Context::ProcessTouchCancel(const TouchList& touches)
+{
+	bool result = true;
+	for (const auto& touch : touches)
+		result &= ProcessTouchCancel(touch);
+	return result;
+}
+
+bool Context::ProcessTouchStart(const Touch& touch, int key_modifier_state)
+{
+	TouchState* state = LookupTouch(touch.identifier);
+	RMLUI_ASSERTMSG(state == nullptr, "Receiving touch start event for an already started touch.");
+	if (!state)
+	{
+		auto it_inserted = touch_states.emplace(touch.identifier, TouchState()).first;
+		state = &it_inserted->second;
+	}
+
+	state->start_position = touch.position;
+	state->inertia_position = touch.position;
+	state->last_position = touch.position;
+	state->scrolling_start_time_x = 0;
+	state->scrolling_start_time_y = 0;
+	state->scrolling_last_time = GetSystemInterface()->GetElapsedTime();
+
+	Element* touch_element = GetElementAtPoint(touch.position);
+	state->scroll_container = touch_element ? touch_element->GetClosestScrollableContainer() : nullptr;
+
+	// reset any scrolling when we touch the element
+	if (state->scroll_container && scroll_controller->GetTarget() == state->scroll_container)
+		scroll_controller->Reset();
+
+	ProcessMouseMove(static_cast<int>(touch.position.x), static_cast<int>(touch.position.y), key_modifier_state);
+
+	// always assume touch press/release events are handled as left mouse button
+	return ProcessMouseButtonDown(0, key_modifier_state);
+}
+
+bool Context::ProcessTouchMove(const Touch& touch, int key_modifier_state)
+{
+	TouchState* state = LookupTouch(touch.identifier);
+	if (!state)
+		return true;
+
+	state->scrolling_last_time = GetSystemInterface()->GetElapsedTime();
+
+	if (state->scroll_container)
+	{
+		const Vector2f delta = touch.position - state->last_position;
+
+		if (drag)
+		{
+			// Don't scroll and reset scrolling state when dragging any element (scrollbars and others)
+			state->inertia_position = touch.position;
+			state->last_position = touch.position;
+			state->scrolling_start_time_x = 0;
+			state->scrolling_start_time_y = 0;
+		}
+		else if (delta.x != 0 || delta.y != 0)
+		{
+			// Use instant scrolling when touch is pressed even when default scroll behavior is smooth.
+			scroll_controller->InstantScrollOnTarget(state->scroll_container, -delta);
+
+			const double current_time = GetSystemInterface()->GetElapsedTime();
+
+			enum { Horizontal = 0, Vertical = 1 };
+			for (int axis : {Horizontal, Vertical})
+			{
+				bool& state_scrolling_positive = (axis == Horizontal ? state->scrolling_right : state->scrolling_down);
+				double& state_scrolling_start_time = (axis == Horizontal ? state->scrolling_start_time_x : state->scrolling_start_time_y);
+
+				// Time set to 0 means no touch move events happened before and direction is unclear.
+				const bool scroll_start = (state_scrolling_start_time == 0);
+
+				// If the user changes direction, reset the start time and position.
+				const bool going_positive = (delta[axis] > 0);
+				if (delta[axis] != 0 && (going_positive != state_scrolling_positive || scroll_start))
+				{
+					state->inertia_position[axis] = touch.position[axis];
+					state_scrolling_positive = going_positive;
+					state_scrolling_start_time = state->scrolling_last_time;
+				}
+				else
+				{
+					// Move inertia position towards end position with a weight of e^-kt to better capture and
+					// calculate velocity of the very last touch movements before touch release.
+					const float elapsed_time = static_cast<float>(current_time - state_scrolling_start_time);
+					const float weight = Math::Exp(-elapsed_time * TOUCH_MOVEMENT_DECAY_RATE);
+
+					state->inertia_position[axis] = touch.position[axis] - (touch.position[axis] - state->inertia_position[axis]) * weight;
+					state_scrolling_start_time = current_time - (current_time - state_scrolling_start_time) * weight;
+				}
+			}
+
+			const float touch_max_distance = TOUCH_CLICK_MAX_DISTANCE * density_independent_pixel_ratio;
+			const Vector2f delta_from_start = touch.position - state->start_position;
+			if (delta_from_start.SquaredMagnitude() >= touch_max_distance * touch_max_distance)
+				ResetActiveChain();
+		}
+	}
+
+	state->last_position = touch.position;
+
+	return ProcessMouseMove(static_cast<int>(touch.position.x), static_cast<int>(touch.position.y), key_modifier_state);
+}
+
+bool Context::ProcessTouchEnd(const Touch& touch, int key_modifier_state)
+{
+	TouchState* state = LookupTouch(touch.identifier);
+	if (!state)
+		return true;
+
+	if (state->scroll_container)
+	{
+		double current_time = GetSystemInterface()->GetElapsedTime();
+		double time_since_last_move = current_time - state->scrolling_last_time;
+		if (time_since_last_move < SCROLL_INERTIA_DELAY)
+		{
+			// apply scrolling inertia
+			Vector2f delta = touch.position - state->inertia_position;
+
+			Vector2f velocity = -delta;
+			float elapsed_time_x = static_cast<float>(current_time - state->scrolling_start_time_x);
+			float elapsed_time_y = static_cast<float>(current_time - state->scrolling_start_time_y);
+			if (elapsed_time_x > 0)
+				velocity.x /= elapsed_time_x;
+			if (elapsed_time_y > 0)
+				velocity.y /= elapsed_time_y;
+
+			scroll_controller->ActivateInertia(state->scroll_container, velocity);
+		}
+	}
+
+	touch_states.erase(touch.identifier);
+
+	ProcessMouseMove(static_cast<int>(touch.position.x), static_cast<int>(touch.position.y), key_modifier_state);
+
+	// always assume touch press/release events are handled as left mouse button
+	return ProcessMouseButtonUp(0, key_modifier_state);
+}
+
+bool Context::ProcessTouchCancel(const Touch& touch)
+{
+	TouchState* state = LookupTouch(touch.identifier);
+	if (!state)
+		return false;
+
+	touch_states.erase(touch.identifier);
+
+	return ProcessMouseButtonUp(0, 0);
+}
+
 void Context::SetDefaultScrollBehavior(ScrollBehavior scroll_behavior, float speed_factor)
 {
 	scroll_controller->SetDefaultScrollBehavior(scroll_behavior, speed_factor);
 }
 
-// Gets the context's render interface.
-RenderInterface* Context::GetRenderInterface() const
+RenderManager& Context::GetRenderManager()
 {
-	return render_interface;
-}
-	
-// Gets the current clipping region for the render traversal
-bool Context::GetActiveClipRegion(Vector2i& origin, Vector2i& dimensions) const
-{
-	if (clip_dimensions.x < 0 || clip_dimensions.y < 0)
-		return false;
-	
-	origin = clip_origin;
-	dimensions = clip_dimensions;
-	
-	return true;
-}
-	
-// Sets the current clipping region for the render traversal
-void Context::SetActiveClipRegion(const Vector2i origin, const Vector2i dimensions)
-{
-	clip_origin = origin;
-	clip_dimensions = dimensions;
+	return *render_manager;
 }
 
-// Sets the instancer to use for releasing this object.
+TextInputHandler* Context::GetTextInputHandler() const
+{
+	return text_input_handler;
+}
+
 void Context::SetInstancer(ContextInstancer* _instancer)
 {
 	RMLUI_ASSERT(instancer == nullptr);
@@ -952,6 +1077,15 @@ DataModelConstructor Context::GetDataModel(const String& name)
 	return DataModelConstructor();
 }
 
+UnorderedMap<String, DataModelConstructor> Context::GetDataModels() const
+{
+	UnorderedMap<String, DataModelConstructor> result;
+	result.reserve(data_models.size());
+	for (const auto& pair : data_models)
+		result.emplace(pair.first, DataModelConstructor(pair.second.get()));
+	return result;
+}
+
 bool Context::RemoveDataModel(const String& name)
 {
 	auto it = data_models.find(name);
@@ -969,7 +1103,6 @@ bool Context::RemoveDataModel(const String& name)
 	return true;
 }
 
-// Internal callback for when an element is removed from the hierarchy.
 void Context::OnElementDetach(Element* element)
 {
 	auto it_hover = hover_chain.find(element);
@@ -1018,7 +1151,7 @@ void Context::OnElementDetach(Element* element)
 	}
 
 	// Focus normally cleared and set by parent during Element::RemoveChild.
-	// However, there are some exceptions, such as when an there are multiple 
+	// However, there are some exceptions, such as when an there are multiple
 	// ElementDocuments in the hierarchy above the current element.
 	if (element == focus)
 		focus = nullptr;
@@ -1033,10 +1166,18 @@ void Context::OnElementDetach(Element* element)
 
 	if (scroll_controller->GetTarget() == element)
 		scroll_controller->Reset();
+
+	// Clear TouchState if we're touching element
+	for (auto touch_it = touch_states.begin(); touch_it != touch_states.end();)
+	{
+		if (touch_it->second.scroll_container == element)
+			touch_it = touch_states.erase(touch_it);
+		else
+			++touch_it;
+	}
 }
 
-// Internal callback for when a new element gains focus
-bool Context::OnFocusChange(Element* new_focus)
+bool Context::OnFocusChange(Element* new_focus, bool focus_visible)
 {
 	RMLUI_ASSERT(new_focus);
 
@@ -1047,9 +1188,16 @@ bool Context::OnFocusChange(Element* new_focus)
 	ElementDocument* old_document = old_focus ? old_focus->GetOwnerDocument() : nullptr;
 	ElementDocument* new_document = new_focus->GetOwnerDocument();
 
-	// If the current focus is modal and the new focus is not modal, deny the request
-	if (old_document && old_document->IsModal() && (!new_document || !new_document->GetOwnerDocument()->IsModal()))
+	// If the current focus is modal and the new focus is cannot receive focus from modal, deny the request.
+	if (old_document && old_document->IsModal() && (!new_document || !(new_document->IsModal() || new_document->IsFocusableFromModal())))
 		return false;
+
+	// If the document of the new focus has been closed, deny the request.
+	if (std::find_if(unloaded_documents.begin(), unloaded_documents.end(),
+			[&](const auto& unloaded_document) { return unloaded_document.get() == new_document; }) != unloaded_documents.end())
+	{
+		return false;
+	}
 
 	// Build the old chains
 	Element* element = old_focus;
@@ -1067,10 +1215,13 @@ bool Context::OnFocusChange(Element* new_focus)
 		element = element->GetParentNode();
 	}
 
-	Dictionary parameters;
-
 	// Send out blur/focus events.
+	Dictionary parameters;
 	SendEvents(old_chain, new_chain, EventId::Blur, parameters);
+
+	if (focus_visible)
+		parameters["focus_visible"] = true;
+
 	SendEvents(new_chain, old_chain, EventId::Focus, parameters);
 
 	focus = new_focus;
@@ -1099,7 +1250,6 @@ bool Context::OnFocusChange(Element* new_focus)
 	return true;
 }
 
-// Generates an event for faking clicks on an element.
 void Context::GenerateClickEvent(Element* element)
 {
 	Dictionary parameters;
@@ -1108,7 +1258,6 @@ void Context::GenerateClickEvent(Element* element)
 	element->DispatchEvent(EventId::Click, parameters);
 }
 
-// Updates the current hover elements, sending required events.
 void Context::UpdateHoverChain(Vector2i old_mouse_position, int key_modifier_state, Dictionary* out_parameters, Dictionary* out_drag_parameters)
 {
 	const Vector2f position(mouse_position);
@@ -1120,7 +1269,7 @@ void Context::UpdateHoverChain(Vector2i old_mouse_position, int key_modifier_sta
 	// Generate the parameters for the mouse events (there could be a few!).
 	GenerateMouseEventParameters(parameters);
 	GenerateKeyModifierEventParameters(parameters, key_modifier_state);
-	
+
 	GenerateMouseEventParameters(drag_parameters);
 	GenerateDragEventParameters(drag_parameters);
 	GenerateKeyModifierEventParameters(drag_parameters, key_modifier_state);
@@ -1151,18 +1300,18 @@ void Context::UpdateHoverChain(Vector2i old_mouse_position, int key_modifier_sta
 
 	hover = mouse_active ? GetElementAtPoint(position) : nullptr;
 
-	if(enable_cursor)
+	if (enable_cursor)
 	{
 		String new_cursor_name;
 
 		if (scroll_controller->GetMode() == ScrollController::Mode::Autoscroll)
 			new_cursor_name = scroll_controller->GetAutoscrollCursor(mouse_position, density_independent_pixel_ratio);
-		else if(drag)
+		else if (drag)
 			new_cursor_name = drag->GetComputedValues().cursor();
 		else if (hover)
 			new_cursor_name = hover->GetComputedValues().cursor();
 
-		if(new_cursor_name != cursor_name)
+		if (new_cursor_name != cursor_name)
 		{
 			GetSystemInterface()->SetMouseCursor(new_cursor_name);
 			cursor_name = new_cursor_name;
@@ -1195,8 +1344,7 @@ void Context::UpdateHoverChain(Vector2i old_mouse_position, int key_modifier_sta
 			element = element->GetParentNode();
 		}
 
-		if (drag_started &&
-			drag_verbose)
+		if (drag_started && drag_verbose)
 		{
 			// Send out ondragover and ondragout events as appropriate.
 			SendEvents(drag_hover_chain, new_drag_hover_chain, EventId::Dragout, drag_parameters);
@@ -1210,10 +1358,20 @@ void Context::UpdateHoverChain(Vector2i old_mouse_position, int key_modifier_sta
 	hover_chain.swap(new_hover_chain);
 }
 
-// Returns the youngest descendent of the given element which is under the given point in screen coodinates.
+void Context::ResetActiveChain()
+{
+	// Unset the 'active' pseudo-class on all the elements in the active chain; because they may not necessarily
+	// have had 'onmouseup' called on them, we can't guarantee this has happened already.
+	for (Element* element : active_chain)
+		element->SetPseudoClass("active", false);
+
+	active_chain.clear();
+	active = nullptr;
+}
+
 Element* Context::GetElementAtPoint(Vector2f point, const Element* ignore_element, Element* element) const
 {
-	if (element == nullptr)
+	if (!element)
 	{
 		if (ignore_element == root.get())
 			return nullptr;
@@ -1221,20 +1379,16 @@ Element* Context::GetElementAtPoint(Vector2f point, const Element* ignore_elemen
 		element = root.get();
 	}
 
-	// Check if any documents have modal focus; if so, only check down than document.
-	if (element == root.get())
-	{
-		if (focus)
-		{
-			ElementDocument* focus_document = focus->GetOwnerDocument();
-			if (focus_document != nullptr &&
-				focus_document->IsModal())
-			{
-				element = focus_document;
-			}
-		}
-	}
+	bool is_modal = false;
+	ElementDocument* focus_document = nullptr;
 
+	// If we have modal focus, only check down documents that can receive focus from modals.
+	if (element == root.get() && focus)
+	{
+		focus_document = focus->GetOwnerDocument();
+		if (focus_document && focus_document->IsModal())
+			is_modal = true;
+	}
 
 	// Check any elements within our stacking context. We want to return the lowest-down element
 	// that is under the cursor.
@@ -1243,12 +1397,14 @@ Element* Context::GetElementAtPoint(Vector2f point, const Element* ignore_elemen
 		if (element->stacking_context_dirty)
 			element->BuildLocalStackingContext();
 
-		for (int i = (int) element->stacking_context.size() - 1; i >= 0; --i)
+		for (int i = (int)element->stacking_context.size() - 1; i >= 0; --i)
 		{
-			if (ignore_element != nullptr)
+			Element* stacking_child = element->stacking_context[i];
+			if (ignore_element)
 			{
-				Element* element_hierarchy = element->stacking_context[i];
-				while (element_hierarchy != nullptr)
+				// Check if the element is a descendant of the element we're ignoring.
+				Element* element_hierarchy = stacking_child;
+				while (element_hierarchy)
 				{
 					if (element_hierarchy == ignore_element)
 						break;
@@ -1256,12 +1412,19 @@ Element* Context::GetElementAtPoint(Vector2f point, const Element* ignore_elemen
 					element_hierarchy = element_hierarchy->GetParentNode();
 				}
 
-				if (element_hierarchy != nullptr)
+				if (element_hierarchy)
 					continue;
 			}
 
-			Element* child_element = GetElementAtPoint(point, ignore_element, element->stacking_context[i]);
-			if (child_element != nullptr)
+			if (is_modal)
+			{
+				ElementDocument* child_document = stacking_child->GetOwnerDocument();
+				if (!child_document || !(child_document == focus_document || child_document->IsFocusableFromModal()))
+					continue;
+			}
+
+			Element* child_element = GetElementAtPoint(point, ignore_element, stacking_child);
+			if (child_element)
 				return child_element;
 		}
 	}
@@ -1277,14 +1440,10 @@ Element* Context::GetElementAtPoint(Vector2f point, const Element* ignore_elemen
 	bool within_element = (projection_result && element->IsPointWithinElement(point));
 	if (within_element)
 	{
-		Vector2i clip_origin, clip_dimensions;
-		if (ElementUtilities::GetClippingRegion(clip_origin, clip_dimensions, element))
-		{
-			within_element = point.x >= clip_origin.x &&
-							 point.y >= clip_origin.y &&
-							 point.x <= (clip_origin.x + clip_dimensions.x) &&
-							 point.y <= (clip_origin.y + clip_dimensions.y);
-		}
+		// The element may have been clipped out of view if it overflows an ancestor, so check its clipping region.
+		Rectanglei clip_region;
+		if (ElementUtilities::GetClippingRegion(element, clip_region))
+			within_element = clip_region.Contains(Vector2i(point));
 	}
 
 	if (within_element)
@@ -1293,7 +1452,6 @@ Element* Context::GetElementAtPoint(Vector2f point, const Element* ignore_elemen
 	return nullptr;
 }
 
-// Creates the drag clone from the given element.
 void Context::CreateDragClone(Element* element)
 {
 	RMLUI_ASSERTMSG(cursor_proxy, "Unable to create drag clone, no cursor proxy document.");
@@ -1322,21 +1480,20 @@ void Context::CreateDragClone(Element* element)
 	cursor_proxy->AppendChild(std::move(element_drag_clone));
 
 	// Position the clone. Use projected mouse coordinates to handle any ancestor transforms.
-	const Vector2f absolute_pos = element->GetAbsoluteOffset(Box::BORDER);
+	const Vector2f absolute_pos = element->GetAbsoluteOffset(BoxArea::Border);
 	Vector2f projected_mouse_position = Vector2f(mouse_position);
 	if (Element* parent = element->GetParentNode())
 		parent->Project(projected_mouse_position);
 
 	drag_clone->SetProperty(PropertyId::Position, Property(Style::Position::Absolute));
-	drag_clone->SetProperty(PropertyId::Left, Property(absolute_pos.x - projected_mouse_position.x, Property::PX));
-	drag_clone->SetProperty(PropertyId::Top, Property(absolute_pos.y - projected_mouse_position.y, Property::PX));
+	drag_clone->SetProperty(PropertyId::Left, Property(absolute_pos.x - projected_mouse_position.x, Unit::PX));
+	drag_clone->SetProperty(PropertyId::Top, Property(absolute_pos.y - projected_mouse_position.y, Unit::PX));
 	// We remove margins so that percentage- and auto-margins are evaluated correctly.
-	drag_clone->SetProperty(PropertyId::MarginLeft, Property(0.f, Property::PX));
-	drag_clone->SetProperty(PropertyId::MarginTop, Property(0.f, Property::PX));
+	drag_clone->SetProperty(PropertyId::MarginLeft, Property(0.f, Unit::PX));
+	drag_clone->SetProperty(PropertyId::MarginTop, Property(0.f, Unit::PX));
 	drag_clone->SetPseudoClass("drag", true);
 }
 
-// Releases the drag clone, if one exists.
 void Context::ReleaseDragClone()
 {
 	if (drag_clone)
@@ -1360,13 +1517,11 @@ DataModel* Context::GetDataModelPtr(const String& name) const
 	return nullptr;
 }
 
-// Builds the parameters for a generic key event.
 void Context::GenerateKeyEventParameters(Dictionary& parameters, Input::KeyIdentifier key_identifier)
 {
 	parameters["key_identifier"] = (int)key_identifier;
 }
 
-// Builds the parameters for a generic mouse event.
 void Context::GenerateMouseEventParameters(Dictionary& parameters, int button_index)
 {
 	parameters.reserve(3);
@@ -1376,30 +1531,19 @@ void Context::GenerateMouseEventParameters(Dictionary& parameters, int button_in
 		parameters["button"] = button_index;
 }
 
-// Builds the parameters for the key modifier state.
 void Context::GenerateKeyModifierEventParameters(Dictionary& parameters, int key_modifier_state)
 {
-	static const String property_names[] = {
-		"ctrl_key",
-		"shift_key",
-		"alt_key",
-		"meta_key",
-		"caps_lock_key",
-		"num_lock_key",
-		"scroll_lock_key"
-	};
+	static const String property_names[] = {"ctrl_key", "shift_key", "alt_key", "meta_key", "caps_lock_key", "num_lock_key", "scroll_lock_key"};
 
 	for (int i = 0; i < 7; i++)
 		parameters[property_names[i]] = (int)((key_modifier_state & (1 << i)) > 0);
 }
 
-// Builds the parameters for a drag event.
 void Context::GenerateDragEventParameters(Dictionary& parameters)
-{	
+{
 	parameters["drag_element"] = (void*)drag;
 }
 
-// Releases all unloaded documents pending destruction.
 void Context::ReleaseUnloadedDocuments()
 {
 	if (!unloaded_documents.empty())
@@ -1414,7 +1558,7 @@ void Context::ReleaseUnloadedDocuments()
 	}
 }
 
-using ElementObserverList = Vector< ObserverPtr<Element> >;
+using ElementObserverList = Vector<ObserverPtr<Element>>;
 
 class ElementObserverListBackInserter {
 public:
@@ -1426,7 +1570,8 @@ public:
 	using container_type = ElementObserverList;
 
 	ElementObserverListBackInserter(ElementObserverList& elements) : elements(&elements) {}
-	ElementObserverListBackInserter& operator=(Element* element) {
+	ElementObserverListBackInserter& operator=(Element* element)
+	{
 		elements->push_back(element->GetObserverPtr());
 		return *this;
 	}
@@ -1438,7 +1583,6 @@ private:
 	ElementObserverList* elements;
 };
 
-// Sends the specified event to all elements in new_items that don't appear in old_items.
 void Context::SendEvents(const ElementSet& old_items, const ElementSet& new_items, EventId id, const Dictionary& parameters)
 {
 	// We put our elements in observer pointers in case some of them are deleted during dispatch.
@@ -1469,12 +1613,14 @@ const String& Context::GetDocumentsBaseTag()
 	return documents_base_tag;
 }
 
-void Context::RequestNextUpdate(double delay) {
+void Context::RequestNextUpdate(double delay)
+{
 	RMLUI_ASSERT(delay >= 0.0);
 	next_update_timeout = Math::Min(next_update_timeout, delay);
 }
 
-double Context::GetNextUpdateDelay() const {
+double Context::GetNextUpdateDelay() const
+{
 	return next_update_timeout;
 }
 

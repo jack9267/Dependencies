@@ -1,46 +1,28 @@
-/*
- * This source file is part of RmlUi, the HTML/CSS Interface Middleware
- *
- * For the latest information, see http://github.com/mikke89/RmlUi
- *
- * Copyright (c) 2018 Michael R. P. Ragazzon
- * Copyright (c) 2019 The RmlUi Team, and contributors
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- */
-
 #include "ElementAnimation.h"
-#include "../../Include/RmlUi/Core/DecoratorInstancer.h"
-#include "../../Include/RmlUi/Core/Factory.h"
+#include "../../Include/RmlUi/Core/DecorationTypes.h"
+#include "../../Include/RmlUi/Core/Decorator.h"
 #include "../../Include/RmlUi/Core/Element.h"
+#include "../../Include/RmlUi/Core/Filter.h"
 #include "../../Include/RmlUi/Core/PropertyDefinition.h"
 #include "../../Include/RmlUi/Core/PropertySpecification.h"
+#include "../../Include/RmlUi/Core/StyleSheet.h"
 #include "../../Include/RmlUi/Core/StyleSheetSpecification.h"
 #include "../../Include/RmlUi/Core/StyleSheetTypes.h"
-#include "../../Include/RmlUi/Core/StyleSheet.h"
 #include "../../Include/RmlUi/Core/Transform.h"
 #include "../../Include/RmlUi/Core/TransformPrimitive.h"
+#include "ComputeProperty.h"
 #include "ElementStyle.h"
 #include "TransformUtilities.h"
 
 namespace Rml {
+
+static Property InterpolateProperties(const Property& p0, const Property& p1, float alpha, Element& element, const PropertyDefinition* definition);
+
+template <typename T>
+static T Mix(const T& v0, const T& v1, float alpha)
+{
+	return v0 * (1.0f - alpha) + v1 * alpha;
+}
 
 static Colourf ColourToLinearSpace(Colourb c)
 {
@@ -59,11 +41,19 @@ static Colourf ColourToLinearSpace(Colourb c)
 static Colourb ColourFromLinearSpace(Colourf c)
 {
 	Colourb result;
-	result.red = (byte)Math::Clamp(Math::SquareRoot(c.red)*255.f, 0.0f, 255.f);
-	result.green = (byte)Math::Clamp(Math::SquareRoot(c.green)*255.f, 0.0f, 255.f);
-	result.blue = (byte)Math::Clamp(Math::SquareRoot(c.blue)*255.f, 0.0f, 255.f);
-	result.alpha = (byte)Math::Clamp(c.alpha*255.f, 0.0f, 255.f);
+	result.red = (byte)Math::Clamp(Math::SquareRoot(c.red) * 255.f, 0.0f, 255.f);
+	result.green = (byte)Math::Clamp(Math::SquareRoot(c.green) * 255.f, 0.0f, 255.f);
+	result.blue = (byte)Math::Clamp(Math::SquareRoot(c.blue) * 255.f, 0.0f, 255.f);
+	result.alpha = (byte)Math::Clamp(c.alpha * 255.f, 0.0f, 255.f);
 	return result;
+}
+
+static Colourb InterpolateColour(Colourb c0, Colourb c1, float alpha)
+{
+	Colourf c0f = ColourToLinearSpace(c0);
+	Colourf c1f = ColourToLinearSpace(c1);
+	Colourf c = Mix(c0f, c1f, alpha);
+	return ColourFromLinearSpace(c);
 }
 
 // Merges all the primitives to a single DecomposedMatrix4 primitive
@@ -88,35 +78,140 @@ static bool CombineAndDecompose(Transform& t, Element& e)
 	return true;
 }
 
+/**
+    An abstraction for decorator and filter declarations.
+ */
+struct EffectDeclarationView {
+	EffectDeclarationView() = default;
+	EffectDeclarationView(const DecoratorDeclaration& declaration) :
+		instancer(declaration.instancer), type(&declaration.type), properties(&declaration.properties), paint_area(declaration.paint_area)
+	{}
+	EffectDeclarationView(const NamedDecorator* named_decorator) :
+		instancer(named_decorator->instancer), type(&named_decorator->type), properties(&named_decorator->properties)
+	{}
+	EffectDeclarationView(const FilterDeclaration& declaration) :
+		instancer(declaration.instancer), type(&declaration.type), properties(&declaration.properties)
+	{}
 
-static Property InterpolateProperties(const Property & p0, const Property& p1, float alpha, Element& element, const PropertyDefinition* definition)
+	EffectSpecification* instancer = nullptr;
+	const String* type = nullptr;
+	const PropertyDictionary* properties = nullptr;
+	BoxArea paint_area = BoxArea::Auto;
+
+	explicit operator bool() const { return instancer != nullptr; }
+};
+
+// Interpolate two effect declarations. One of them can be empty, in which case the empty one is replaced by default values.
+static bool InterpolateEffectProperties(PropertyDictionary& properties, const EffectDeclarationView& d0, const EffectDeclarationView& d1, float alpha,
+	Element& element)
 {
-	if ((p0.unit & Property::NUMBER_LENGTH_PERCENT) && (p1.unit & Property::NUMBER_LENGTH_PERCENT))
+	if (d0 && d1)
 	{
-		if (p0.unit == p1.unit || !definition)
+		// Both declarations are specified, check if they are compatible for interpolation.
+		if (!d0.instancer || d0.instancer != d1.instancer || *d0.type != *d1.type ||
+			d0.properties->GetNumProperties() != d1.properties->GetNumProperties() || d0.paint_area != d1.paint_area)
+			return false;
+
+		const auto& properties0 = d0.properties->GetProperties();
+		const auto& properties1 = d1.properties->GetProperties();
+
+		for (const auto& pair0 : properties0)
 		{
-			// If we have the same units, we can just interpolate regardless of what the value represents.
-			// Or if we have distinct units but no definition, all bets are off. This shouldn't occur, just interpolate values.
-			float f0 = p0.value.Get<float>();
-			float f1 = p1.value.Get<float>();
-			float f = (1.0f - alpha) * f0 + alpha * f1;
-			return Property{ f, p0.unit };
+			const PropertyId id = pair0.first;
+			const Property& prop0 = pair0.second;
+
+			auto it = properties1.find(id);
+			if (it == properties1.end())
+			{
+				RMLUI_ERRORMSG("Incompatible decorator properties.");
+				return false;
+			}
+			const Property& prop1 = it->second;
+
+			Property p = InterpolateProperties(prop0, prop1, alpha, element, prop0.definition);
+			p.definition = prop0.definition;
+			properties.SetProperty(id, p);
 		}
-		else
+		return true;
+	}
+	else if ((d0 && !d1) || (!d0 && d1))
+	{
+		// One of the declarations is empty, interpolate against the default values of its type.
+		const auto& d_filled = (d0 ? d0 : d1);
+
+		const PropertySpecification& specification = d_filled.instancer->GetPropertySpecification();
+		const PropertyMap& properties_filled = d_filled.properties->GetProperties();
+
+		for (const auto& pair_filled : properties_filled)
 		{
-			// Otherwise, convert units to pixels.
-			float f0 = element.GetStyle()->ResolveLength(&p0, definition->GetRelativeTarget());
-			float f1 = element.GetStyle()->ResolveLength(&p1, definition->GetRelativeTarget());
-			float f = (1.0f - alpha) * f0 + alpha * f1;
-			return Property{ f, Property::PX };
+			const PropertyId id = pair_filled.first;
+			const PropertyDefinition* underlying_definition = specification.GetProperty(id);
+			if (!underlying_definition)
+				return false;
+
+			const Property& p_filled = pair_filled.second;
+			const Property& p_default = *underlying_definition->GetDefaultValue();
+			const Property& p_interp0 = (d0 ? p_filled : p_default);
+			const Property& p_interp1 = (d1 ? p_filled : p_default);
+
+			Property p = InterpolateProperties(p_interp0, p_interp1, alpha, element, p_filled.definition);
+			p.definition = p_filled.definition;
+			properties.SetProperty(id, p);
 		}
+		return true;
 	}
 
-	if (p0.unit == Property::KEYWORD && p1.unit == Property::KEYWORD)
+	return false;
+}
+
+static NumericValue InterpolateNumericValue(NumericValue v0, NumericValue v1, float alpha, Element& element, const PropertyDefinition* definition)
+{
+	// If we have the same units, we can simply interpolate regardless of what the value represents.
+	if (v0.unit == v1.unit)
+		return NumericValue{Mix(v0.number, v1.number, alpha), v0.unit};
+
+	// When mixing lengths or relative sizes, resolve them to pixel lengths and interpolate. This only works if we have a definition.
+	if (Any(v0.unit & Unit::NUMBER_LENGTH_PERCENT) && Any(v1.unit & Unit::NUMBER_LENGTH_PERCENT) && definition)
+	{
+		float f0 = element.GetStyle()->ResolveRelativeLength(v0, definition->GetRelativeTarget());
+		float f1 = element.GetStyle()->ResolveRelativeLength(v1, definition->GetRelativeTarget());
+		return NumericValue{Mix(f0, f1, alpha), Unit::PX};
+	}
+
+	// As long as we don't mix lengths and percentages, we can still resolve lengths without a definition.
+	if (Any(v0.unit & Unit::LENGTH) && Any(v1.unit & Unit::LENGTH))
+	{
+		float f0 = element.ResolveLength(v0);
+		float f1 = element.ResolveLength(v0);
+		return NumericValue{Mix(f0, f1, alpha), Unit::PX};
+	}
+
+	if (Any(v0.unit & Unit::ANGLE) && Any(v1.unit & Unit::ANGLE))
+	{
+		float f = Mix(ComputeAngle(v0), ComputeAngle(v1), alpha);
+		return NumericValue{f, Unit::RAD};
+	}
+
+	// Fall back to discrete interpolation for incompatible units.
+	return alpha < 0.5f ? v0 : v1;
+}
+
+static Property InterpolateProperties(const Property& p0, const Property& p1, float alpha, Element& element, const PropertyDefinition* definition)
+{
+	const Property& p_discrete = (alpha < 0.5f ? p0 : p1);
+
+	if (Any(p0.unit & Unit::NUMERIC) && Any(p1.unit & Unit::NUMERIC))
+	{
+		NumericValue v = InterpolateNumericValue(p0.GetNumericValue(), p1.GetNumericValue(), alpha, element, definition);
+		return Property{v.number, v.unit};
+	}
+
+	if (p0.unit == Unit::KEYWORD && p1.unit == Unit::KEYWORD)
 	{
 		// Discrete interpolation, swap at alpha = 0.5.
-		// Special case for the 'visibility' property as in the CSS specs: 
-		//   Apply the visible property if present during the entire transition period, ie. alpha (0,1).
+		// Special case for the 'visibility' and 'display' properties as in the CSS specs:
+		//   If present, apply the 'visible' / non-'none' keyword during the entire transition period, i.e. alpha (0,1).
+		// See: https://www.w3.org/TR/css-display-4/#display-animation
 		if (definition && definition->GetId() == PropertyId::Visibility)
 		{
 			if (p0.Get<int>() == (int)Style::Visibility::Visible)
@@ -124,21 +219,24 @@ static Property InterpolateProperties(const Property & p0, const Property& p1, f
 			else if (p1.Get<int>() == (int)Style::Visibility::Visible)
 				return alpha <= 0.f ? p0 : p1;
 		}
+		if (definition && definition->GetId() == PropertyId::Display)
+		{
+			if (p0.Get<int>() == (int)Style::Display::None)
+				return alpha <= 0.f ? p0 : p1;
+			else if (p1.Get<int>() == (int)Style::Display::None)
+				return alpha < 1.f ? p0 : p1;
+		}
 
-		return alpha < 0.5f ? p0 : p1;
+		return p_discrete;
 	}
 
-	if (p0.unit == Property::COLOUR && p1.unit == Property::COLOUR)
+	if (p0.unit == Unit::COLOUR && p1.unit == Unit::COLOUR)
 	{
-		Colourf c0 = ColourToLinearSpace(p0.value.Get<Colourb>());
-		Colourf c1 = ColourToLinearSpace(p1.value.Get<Colourb>());
-
-		Colourf c = c0 * (1.0f - alpha) + c1 * alpha;
-
-		return Property{ ColourFromLinearSpace(c), Property::COLOUR };
+		Colourb c = InterpolateColour(p0.value.Get<Colourb>(), p1.value.Get<Colourb>(), alpha);
+		return Property{c, Unit::COLOUR};
 	}
 
-	if (p0.unit == Property::TRANSFORM && p1.unit == Property::TRANSFORM)
+	if (p0.unit == Unit::TRANSFORM && p1.unit == Unit::TRANSFORM)
 	{
 		auto& t0 = p0.value.GetReference<TransformPtr>();
 		auto& t1 = p1.value.GetReference<TransformPtr>();
@@ -149,7 +247,7 @@ static Property InterpolateProperties(const Property & p0, const Property& p1, f
 		if (prim0.size() != prim1.size())
 		{
 			RMLUI_ERRORMSG("Transform primitives not of same size during interpolation. Were the transforms properly prepared for interpolation?");
-			return Property{ t0, Property::TRANSFORM };
+			return Property{t0, Unit::TRANSFORM};
 		}
 
 		// Build the new, interpolating transform
@@ -162,38 +260,37 @@ static Property InterpolateProperties(const Property & p0, const Property& p1, f
 			if (!TransformUtilities::InterpolateWith(p, prim1[i], alpha))
 			{
 				RMLUI_ERRORMSG("Transform primitives can not be interpolated. Were the transforms properly prepared for interpolation?");
-				return Property{ t0, Property::TRANSFORM };
+				return Property{t0, Unit::TRANSFORM};
 			}
 			t->AddPrimitive(p);
 		}
 
-		return Property{ TransformPtr(std::move(t)), Property::TRANSFORM };
+		return Property{TransformPtr(std::move(t)), Unit::TRANSFORM};
 	}
 
-	if (p0.unit == Property::DECORATOR && p1.unit == Property::DECORATOR)
+	if (p0.unit == Unit::DECORATOR && p1.unit == Unit::DECORATOR)
 	{
-		auto DiscreteInterpolation = [&]() { return alpha < 0.5f ? p0 : p1; };
-		
-		// We construct DecoratorDeclarationView from declaration if it has instancer, otherwise we look for DecoratorSpecification and return DecoratorDeclarationView from it
-		auto GetDecoratorDeclarationView = [&](const DecoratorDeclaration& declaration) -> DecoratorDeclarationView {
-			if (declaration.instancer)
-				return DecoratorDeclarationView{ declaration };
+		auto GetEffectDeclarationView = [](const Vector<DecoratorDeclaration>& declarations, size_t i, Element& element) -> EffectDeclarationView {
+			if (i >= declarations.size())
+				return EffectDeclarationView();
 
+			const DecoratorDeclaration& declaration = declarations[i];
+			if (declaration.instancer)
+				return EffectDeclarationView(declaration);
+
+			// If we don't have a decorator instancer, then this should be a named @decorator, look for one now.
 			const StyleSheet* style_sheet = element.GetStyleSheet();
 			if (!style_sheet)
+				return EffectDeclarationView();
+
+			const NamedDecorator* named_decorator = style_sheet->GetNamedDecorator(declaration.type);
+			if (!named_decorator)
 			{
-				Log::Message(Log::LT_WARNING, "Failed to get element stylesheet for '%s' decorator rule.", declaration.type.c_str());
-				return DecoratorDeclarationView{ declaration };
+				Log::Message(Log::LT_WARNING, "Could not find a named @decorator '%s'.", declaration.type.c_str());
+				return EffectDeclarationView();
 			}
 
-			const DecoratorSpecification* specification = style_sheet->GetDecoratorSpecification(declaration.type);
-			if (!specification)
-			{
-				Log::Message(Log::LT_WARNING, "Could not find DecoratorSpecification for '%s' decorator rule.", declaration.type.c_str());
-				return DecoratorDeclarationView{ declaration };
-			}
-
-			return DecoratorDeclarationView{ specification };
+			return EffectDeclarationView(named_decorator);
 		};
 
 		auto& ptr0 = p0.value.GetReference<DecoratorsPtr>();
@@ -201,99 +298,99 @@ static Property InterpolateProperties(const Property & p0, const Property& p1, f
 		if (!ptr0 || !ptr1)
 		{
 			RMLUI_ERRORMSG("Invalid decorator pointer, were the decorator keys properly prepared?");
-			return DiscreteInterpolation();
+			return p_discrete;
 		}
 
-		const bool p0_smaller = (ptr0->list.size() < ptr1->list.size());
-		auto& small = (p0_smaller ? ptr0->list : ptr1->list);
-		auto& big = (p0_smaller ? ptr1->list : ptr0->list);
+		// Build the new, interpolated decorator list.
+		const bool p0_bigger = ptr0->list.size() > ptr1->list.size();
+		auto& big_list = (p0_bigger ? ptr0->list : ptr1->list);
+		auto decorator = MakeUnique<DecoratorDeclarationList>();
+		auto& list = decorator->list;
+		list.reserve(big_list.size());
 
-		// Build the new, interpolated decorator.
-		UniquePtr<DecoratorDeclarationList> decorator(new DecoratorDeclarationList);
-		decorator->list.reserve(ptr0->list.size());
-
-		// Interpolate decorators that have common types.
-		for (size_t i = 0; i < small.size(); i++)
+		for (size_t i = 0; i < big_list.size(); i++)
 		{
-			DecoratorDeclarationView d0_view{ GetDecoratorDeclarationView(ptr0->list[i]) };
-			DecoratorDeclarationView d1_view{ GetDecoratorDeclarationView(ptr1->list[i]) };
+			EffectDeclarationView d0 = GetEffectDeclarationView(ptr0->list, i, element);
+			EffectDeclarationView d1 = GetEffectDeclarationView(ptr1->list, i, element);
 
-			if (!d0_view.instancer || !d1_view.instancer)
-				return DiscreteInterpolation();
+			const EffectDeclarationView& declaration = (p0_bigger ? d0 : d1);
+			list.push_back(DecoratorDeclaration{*declaration.type, static_cast<DecoratorInstancer*>(declaration.instancer), PropertyDictionary(),
+				declaration.paint_area});
 
-			if (d0_view.instancer != d1_view.instancer || d0_view.type != d1_view.type ||
-				d0_view.properties.GetNumProperties() != d1_view.properties.GetNumProperties())
-			{
-				// Incompatible decorators, fall back to discrete interpolation.
-				return DiscreteInterpolation();
-			}
-
-			decorator->list.push_back(DecoratorDeclaration{ d0_view.type, d0_view.instancer, PropertyDictionary() });
-			PropertyDictionary& props = decorator->list.back().properties;
-
-			const auto& props0 = d0_view.properties.GetProperties();
-			const auto& props1 = d1_view.properties.GetProperties();
-
-			for (const auto& pair0 : props0)
-			{
-				const PropertyId id = pair0.first;
-				const Property& prop0 = pair0.second;
-
-				auto it = props1.find(id);
-				if (it == props1.end())
-				{
-					RMLUI_ERRORMSG("Incompatible decorator properties.");
-					return DiscreteInterpolation();
-				}
-				const Property& prop1 = it->second;
-
-				Property p = InterpolateProperties(prop0, prop1, alpha, element, prop0.definition);
-				p.definition = prop0.definition;
-				props.SetProperty(id, p);
-			}
+			if (!InterpolateEffectProperties(list.back().properties, d0, d1, alpha, element))
+				return p_discrete;
 		}
 
-		// Append any trailing decorators from the largest list and interpolate against the default values of its type.
-		for (size_t i = small.size(); i < big.size(); i++)
+		return Property{DecoratorsPtr(std::move(decorator)), Unit::DECORATOR};
+	}
+
+	if (p0.unit == Unit::FILTER && p1.unit == Unit::FILTER)
+	{
+		auto GetEffectDeclarationView = [](const Vector<FilterDeclaration>& declarations, size_t i) -> EffectDeclarationView {
+			if (i >= declarations.size())
+				return EffectDeclarationView();
+			return EffectDeclarationView(declarations[i]);
+		};
+
+		auto& ptr0 = p0.value.GetReference<FiltersPtr>();
+		auto& ptr1 = p1.value.GetReference<FiltersPtr>();
+		if (!ptr0 || !ptr1)
 		{
-			DecoratorDeclarationView dbig_view{ GetDecoratorDeclarationView(big[i]) };
-
-			if (!dbig_view.instancer)
-				return DiscreteInterpolation();
-
-			decorator->list.push_back(DecoratorDeclaration{ dbig_view.type, dbig_view.instancer, PropertyDictionary() });
-			DecoratorDeclaration& d_new = decorator->list.back();
-
-			const PropertySpecification& specification = d_new.instancer->GetPropertySpecification();
-
-			const PropertyMap& props_big = dbig_view.properties.GetProperties();
-			for (const auto& pair_big : props_big)
-			{
-				const PropertyId id = pair_big.first;
-				const PropertyDefinition* underlying_definition = specification.GetProperty(id);
-				if (!underlying_definition)
-					return DiscreteInterpolation();
-
-				const Property& p_big = pair_big.second;
-				const Property& p_small = *underlying_definition->GetDefaultValue();
-				const Property& p_interp0 = (p0_smaller ? p_small : p_big);
-				const Property& p_interp1 = (p0_smaller ? p_big : p_small);
-
-				Property p = InterpolateProperties(p_interp0, p_interp1, alpha, element, p_big.definition);
-				p.definition = p_big.definition;
-				d_new.properties.SetProperty(id, p);
-			}
+			RMLUI_ERRORMSG("Invalid filter pointer, were the filter keys properly prepared?");
+			return p_discrete;
 		}
 
-		return Property{ DecoratorsPtr(std::move(decorator)), Property::DECORATOR };
+		// Build the new, interpolated filter list.
+		const bool p0_bigger = ptr0->list.size() > ptr1->list.size();
+		auto& big_list = (p0_bigger ? ptr0->list : ptr1->list);
+		auto filter = MakeUnique<FilterDeclarationList>();
+		auto& list = filter->list;
+		list.reserve(big_list.size());
+
+		for (size_t i = 0; i < big_list.size(); i++)
+		{
+			EffectDeclarationView d0 = GetEffectDeclarationView(ptr0->list, i);
+			EffectDeclarationView d1 = GetEffectDeclarationView(ptr1->list, i);
+
+			const EffectDeclarationView& declaration = (p0_bigger ? d0 : d1);
+			list.push_back(FilterDeclaration{*declaration.type, static_cast<FilterInstancer*>(declaration.instancer), PropertyDictionary()});
+
+			if (!InterpolateEffectProperties(list.back().properties, d0, d1, alpha, element))
+				return p_discrete;
+		}
+
+		return Property{FiltersPtr(std::move(filter)), Unit::FILTER};
+	}
+
+	if (p0.unit == Unit::COLORSTOPLIST && p1.unit == Unit::COLORSTOPLIST)
+	{
+		RMLUI_ASSERT(p0.value.GetType() == Variant::COLORSTOPLIST && p1.value.GetType() == Variant::COLORSTOPLIST);
+		const auto& c0 = p0.value.GetReference<ColorStopList>();
+		const auto& c1 = p1.value.GetReference<ColorStopList>();
+
+		if (c0.size() != c1.size())
+			return p_discrete;
+
+		const size_t N = c0.size();
+		ColorStopList result(N);
+
+		for (size_t i = 0; i < N; i++)
+		{
+			result[i].color = InterpolateColour(c0[i].color.ToNonPremultiplied(), c1[i].color.ToNonPremultiplied(), alpha).ToPremultiplied();
+
+			// We don't provide the property definition in the following, because it doesn't actually represent how
+			// percentages are resolved for stop positions. Here, we don't trivially know how they are resolved, so if
+			// users try to mix lengths and percentages, we instead fall back to discrete interpolation. See the
+			// gradient decorators for how stop positions are resolved.
+			result[i].position = InterpolateNumericValue(c0[i].position, c1[i].position, alpha, element, nullptr);
+		}
+
+		return Property{std::move(result), Unit::COLORSTOPLIST};
 	}
 
 	// Fall back to discrete interpolation for incompatible units.
-	return alpha < 0.5f ? p0 : p1;
+	return p_discrete;
 }
-
-
-
 
 enum class PrepareTransformResult { Unchanged = 0, ChangedT0 = 1, ChangedT1 = 2, ChangedT0andT1 = 3, Invalid = 4 };
 
@@ -342,10 +439,10 @@ static PrepareTransformResult PrepareTransformPair(Transform& t0, Transform& t1,
 		// Requirement: The small set must match types in the same order they appear in the big set.
 		// Example: (letter indicates type, number represents values)
 		// big:       a0 b0 c0 b1
-		//               ^     ^ 
-		// small:     b2 b3   
+		//               ^     ^
+		// small:     b2 b3
 		//            ^  ^
-		// new small: a1 b2 c1 b3   
+		// new small: a1 b2 c1 b3
 		bool prims0_smallest = (prims0.size() < prims1.size());
 
 		auto& small = (prims0_smallest ? prims0 : prims1);
@@ -370,13 +467,9 @@ static PrepareTransformResult PrepareTransformPair(Transform& t0, Transform& t1,
 				if (TransformUtilities::TryConvertToMatchingGenericType(small[i_small], big[i_big]))
 				{
 					// They matched exactly or in their more generic form. One or both primitives may have been converted.
-					match_success = true;
 					if (big[i_big].type != big_type)
 						changed_big = true;
-				}
 
-				if (match_success)
-				{
 					matching_indices.push_back(i_big);
 					match_success = true;
 					i_big += 1;
@@ -387,7 +480,6 @@ static PrepareTransformResult PrepareTransformPair(Transform& t0, Transform& t1,
 			if (!match_success)
 				break;
 		}
-
 
 		if (match_success)
 		{
@@ -417,9 +509,8 @@ static PrepareTransformResult PrepareTransformPair(Transform& t0, Transform& t1,
 		}
 	}
 
-
 	// If we get here, things get tricky. Need to do full matrix interpolation.
-	// In short, we decompose the Transforms into translation, rotation, scale, skew and perspective components. 
+	// In short, we decompose the Transforms into translation, rotation, scale, skew and perspective components.
 	// Then, during update, interpolate these components and combine into a new transform matrix.
 	if (!CombineAndDecompose(t0, element))
 		return PrepareTransformResult::Invalid;
@@ -428,7 +519,6 @@ static PrepareTransformResult PrepareTransformPair(Transform& t0, Transform& t1,
 
 	return PrepareTransformResult::ChangedT0andT1;
 }
-
 
 static bool PrepareTransforms(Vector<AnimationKey>& keys, Element& element, int start_index)
 {
@@ -487,7 +577,7 @@ static bool PrepareTransforms(Vector<AnimationKey>& keys, Element& element, int 
 		auto& prop0 = keys[i - 1].property;
 		auto& prop1 = keys[i].property;
 
-		if(prop0.unit != Property::TRANSFORM || prop1.unit != Property::TRANSFORM)
+		if (prop0.unit != Unit::TRANSFORM || prop1.unit != Unit::TRANSFORM)
 			return false;
 
 		auto& t0 = prop0.value.GetReference<TransformPtr>();
@@ -523,42 +613,55 @@ static void PrepareDecorator(AnimationKey& key)
 	if (!property.value.GetReference<DecoratorsPtr>())
 		property.value = MakeShared<DecoratorDeclarationList>();
 }
+static void PrepareFilter(AnimationKey& key)
+{
+	Property& property = key.property;
+	RMLUI_ASSERT(property.value.GetType() == Variant::FILTERSPTR);
 
+	if (!property.value.GetReference<FiltersPtr>())
+		property.value = MakeShared<FilterDeclarationList>();
+}
 
 ElementAnimation::ElementAnimation(PropertyId property_id, ElementAnimationOrigin origin, const Property& current_value, Element& element,
 	double start_world_time, float duration, int num_iterations, bool alternate_direction) :
-	property_id(property_id),
-	duration(duration), num_iterations(num_iterations), alternate_direction(alternate_direction), last_update_world_time(start_world_time),
-	origin(origin)
+	property_id(property_id), duration(duration), num_iterations(num_iterations), alternate_direction(alternate_direction),
+	last_update_world_time(start_world_time), origin(origin)
 {
 	if (!current_value.definition)
 	{
-		Log::Message(Log::LT_WARNING, "Property in animation key did not have a definition (while adding key '%s').", current_value.ToString().c_str());
+		Log::Message(Log::LT_WARNING, "Property in animation key did not have a definition (while adding key '%s').",
+			current_value.ToString().c_str());
 	}
 	InternalAddKey(0.0f, current_value, element, Tween{});
 }
 
-
 bool ElementAnimation::InternalAddKey(float time, const Property& in_property, Element& element, Tween tween)
 {
-	int valid_properties = (Property::NUMBER_LENGTH_PERCENT | Property::ANGLE | Property::COLOUR | Property::TRANSFORM | Property::KEYWORD | Property::DECORATOR);
+	const Units valid_units =
+		(Unit::NUMBER_LENGTH_PERCENT | Unit::ANGLE | Unit::COLOUR | Unit::TRANSFORM | Unit::KEYWORD | Unit::DECORATOR | Unit::FILTER);
 
-	if (!(in_property.unit & valid_properties))
+	if (!Any(in_property.unit & valid_units))
 	{
-		Log::Message(Log::LT_WARNING, "Property value '%s' is not a valid target for interpolation.", in_property.ToString().c_str());
+		const char* property_type = (in_property.unit == Unit::BOXSHADOWLIST ? "Box shadows do not" : "Property value does not");
+		Log::Message(Log::LT_WARNING, "%s support animations or transitions. Value: %s", property_type, in_property.ToString().c_str());
 		return false;
 	}
 
 	keys.emplace_back(time, in_property, tween);
+	Property& property = keys.back().property;
 	bool result = true;
 
-	if (keys.back().property.unit == Property::TRANSFORM)
+	if (property.unit == Unit::TRANSFORM)
 	{
 		result = PrepareTransforms(keys, element, (int)keys.size() - 1);
 	}
-	else if (keys.back().property.unit == Property::DECORATOR)
+	else if (property.unit == Unit::DECORATOR)
 	{
 		PrepareDecorator(keys.back());
+	}
+	else if (property.unit == Unit::FILTER)
+	{
+		PrepareFilter(keys.back());
 	}
 
 	if (!result)
@@ -570,8 +673,7 @@ bool ElementAnimation::InternalAddKey(float time, const Property& in_property, E
 	return result;
 }
 
-
-bool ElementAnimation::AddKey(float target_time, const Property & in_property, Element& element, Tween tween, bool extend_duration)
+bool ElementAnimation::AddKey(float target_time, const Property& in_property, Element& element, Tween tween, bool extend_duration)
 {
 	if (!IsInitalized())
 	{
@@ -609,7 +711,8 @@ float ElementAnimation::GetInterpolationFactorAndKeys(int* out_key0, int* out_ke
 			}
 		}
 
-		if (key1 < 0) key1 = (int)keys.size() - 1;
+		if (key1 < 0)
+			key1 = (int)keys.size() - 1;
 		key0 = (key1 == 0 ? 0 : key1 - 1);
 	}
 
@@ -631,13 +734,13 @@ float ElementAnimation::GetInterpolationFactorAndKeys(int* out_key0, int* out_ke
 
 	alpha = keys[key1].tween(alpha);
 
-	if (out_key0) *out_key0 = key0;
-	if (out_key1) *out_key1 = key1;
+	if (out_key0)
+		*out_key0 = key0;
+	if (out_key1)
+		*out_key1 = key1;
 
 	return alpha;
 }
-
-
 
 Property ElementAnimation::UpdateAndGetProperty(double world_time, Element& element)
 {
@@ -675,9 +778,8 @@ Property ElementAnimation::UpdateAndGetProperty(double world_time, Element& elem
 	float alpha = GetInterpolationFactorAndKeys(&key0, &key1);
 
 	Property result = InterpolateProperties(keys[key0].property, keys[key1].property, alpha, element, keys[0].property.definition);
-	
+
 	return result;
 }
-
 
 } // namespace Rml

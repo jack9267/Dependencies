@@ -1,33 +1,4 @@
-/*
- * This source file is part of RmlUi, the HTML/CSS Interface Middleware
- *
- * For the latest information, see http://github.com/mikke89/RmlUi
- *
- * Copyright (c) 2008-2010 CodePoint Ltd, Shift Technology Ltd
- * Copyright (c) 2019 The RmlUi Team, and contributors
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- */
-
-#ifndef RMLUI_BACKENDS_PLATFORM_GLFW_H
-#define RMLUI_BACKENDS_PLATFORM_GLFW_H
+#pragma once
 
 #include <RmlUi/Core/Input.h>
 #include <RmlUi/Core/SystemInterface.h>
@@ -57,6 +28,9 @@ private:
 	GLFWcursor* cursor_pointer = nullptr;
 	GLFWcursor* cursor_cross = nullptr;
 	GLFWcursor* cursor_text = nullptr;
+	GLFWcursor* cursor_move = nullptr;
+	GLFWcursor* cursor_resize = nullptr;
+	GLFWcursor* cursor_unavailable = nullptr;
 };
 
 /**
@@ -70,7 +44,7 @@ namespace RmlGLFW {
 bool ProcessKeyCallback(Rml::Context* context, int key, int action, int mods);
 bool ProcessCharCallback(Rml::Context* context, unsigned int codepoint);
 bool ProcessCursorEnterCallback(Rml::Context* context, int entered);
-bool ProcessCursorPosCallback(Rml::Context* context, double xpos, double ypos, int mods);
+bool ProcessCursorPosCallback(Rml::Context* context, GLFWwindow* window, double xpos, double ypos, int mods);
 bool ProcessMouseButtonCallback(Rml::Context* context, int button, int action, int mods);
 bool ProcessScrollCallback(Rml::Context* context, double yoffset, int mods);
 void ProcessFramebufferSizeCallback(Rml::Context* context, int width, int height);
@@ -83,5 +57,3 @@ Rml::Input::KeyIdentifier ConvertKey(int glfw_key);
 int ConvertKeyModifiers(int glfw_mods);
 
 } // namespace RmlGLFW
-
-#endif

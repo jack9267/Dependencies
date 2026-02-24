@@ -1,31 +1,3 @@
-/*
- * This source file is part of RmlUi, the HTML/CSS Interface Middleware
- *
- * For the latest information, see http://github.com/mikke89/RmlUi
- *
- * Copyright (c) 2008-2010 CodePoint Ltd, Shift Technology Ltd
- * Copyright (c) 2019 The RmlUi Team, and contributors
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- */
-
 #include "../../Include/RmlUi/Core/ConvolutionFilter.h"
 #include "../../Include/RmlUi/Core/Profiling.h"
 #include <float.h>
@@ -33,11 +5,9 @@
 
 namespace Rml {
 
-ConvolutionFilter::ConvolutionFilter()
-{}
+ConvolutionFilter::ConvolutionFilter() {}
 
-ConvolutionFilter::~ConvolutionFilter()
-{}
+ConvolutionFilter::~ConvolutionFilter() {}
 
 bool ConvolutionFilter::Initialise(int _kernel_radius, FilterOperation _operation)
 {
@@ -95,8 +65,7 @@ void ConvolutionFilter::Run(byte* destination, const Vector2i destination_dimens
 				for (int kernel_x = 0; kernel_x < kernel_size.x; ++kernel_x)
 				{
 					const int source_x = x - source_offset.x - kernel_radius.x + kernel_x;
-					if (source_y >= 0 && source_y < source_dimensions.y &&
-						source_x >= 0 && source_x < source_dimensions.x)
+					if (source_y >= 0 && source_y < source_dimensions.y && source_x >= 0 && source_x < source_dimensions.x)
 					{
 						const int source_index = (source_y * source_dimensions.x + source_x) * source_bytes_per_pixel + source_alpha_offset;
 						const float pixel_opacity = float(source[source_index]) * kernel[kernel_y * kernel_size.x + kernel_x];
@@ -112,11 +81,9 @@ void ConvolutionFilter::Run(byte* destination, const Vector2i destination_dimens
 
 			opacity = Math::Min(255.f, opacity);
 
-			const int destination_index = x * destination_bytes_per_pixel + destination_alpha_offset;
+			const int destination_index = y * destination_stride + x * destination_bytes_per_pixel + destination_alpha_offset;
 			destination[destination_index] = byte(opacity);
 		}
-
-		destination += destination_stride;
 	}
 }
 

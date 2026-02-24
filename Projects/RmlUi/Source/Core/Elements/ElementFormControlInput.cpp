@@ -1,31 +1,3 @@
-/*
- * This source file is part of RmlUi, the HTML/CSS Interface Middleware
- *
- * For the latest information, see http://github.com/mikke89/RmlUi
- *
- * Copyright (c) 2008-2010 CodePoint Ltd, Shift Technology Ltd
- * Copyright (c) 2019 The RmlUi Team, and contributors
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- */
-
 #include "../../../Include/RmlUi/Core/Elements/ElementFormControlInput.h"
 #include "../../../Include/RmlUi/Core/Event.h"
 #include "InputTypeButton.h"
@@ -37,7 +9,6 @@
 
 namespace Rml {
 
-// Constructs a new ElementFormControlInput.
 ElementFormControlInput::ElementFormControlInput(const String& tag) : ElementFormControl(tag)
 {
 	// OnAttributeChange will be called right after this, possible with a non-default type. Thus,
@@ -45,23 +16,19 @@ ElementFormControlInput::ElementFormControlInput(const String& tag) : ElementFor
 	// Instead, we create the InputTypeText in OnAttributeChange in the case where the type attribute has not been set.
 }
 
-ElementFormControlInput::~ElementFormControlInput()
-{}
+ElementFormControlInput::~ElementFormControlInput() {}
 
-// Returns a string representation of the current value of the form control.
 String ElementFormControlInput::GetValue() const
 {
 	RMLUI_ASSERT(type);
 	return type->GetValue();
 }
 
-// Sets the current value of the form control.
 void ElementFormControlInput::SetValue(const String& value)
 {
 	SetAttribute("value", value);
 }
 
-// Returns if this value should be submitted with the form.
 bool ElementFormControlInput::IsSubmitted()
 {
 	RMLUI_ASSERT(type);
@@ -86,14 +53,18 @@ void ElementFormControlInput::GetSelection(int* selection_start, int* selection_
 	type->GetSelection(selection_start, selection_end, selected_text);
 }
 
-// Updates the element's underlying type.
+void ElementFormControlInput::SetCompositionRange(int range_start, int range_end)
+{
+	RMLUI_ASSERT(type);
+	type->SetCompositionRange(range_start, range_end);
+}
+
 void ElementFormControlInput::OnUpdate()
 {
 	RMLUI_ASSERT(type);
 	type->OnUpdate();
 }
 
-// Renders the element's underlying type.
 void ElementFormControlInput::OnRender()
 {
 	RMLUI_ASSERT(type);
@@ -112,7 +83,6 @@ void ElementFormControlInput::OnLayout()
 	type->OnLayout();
 }
 
-// Checks for necessary functional changes in the control as a result of changed attributes.
 void ElementFormControlInput::OnAttributeChange(const ElementAttributes& changed_attributes)
 {
 	ElementFormControl::OnAttributeChange(changed_attributes);
@@ -163,7 +133,6 @@ void ElementFormControlInput::OnAttributeChange(const ElementAttributes& changed
 		DirtyLayout();
 }
 
-// Called when properties on the element are changed.
 void ElementFormControlInput::OnPropertyChange(const PropertyIdSet& changed_properties)
 {
 	ElementFormControl::OnPropertyChange(changed_properties);
@@ -172,21 +141,18 @@ void ElementFormControlInput::OnPropertyChange(const PropertyIdSet& changed_prop
 		type->OnPropertyChange(changed_properties);
 }
 
-// If we are the added element, this will pass the call onto our type handler.
 void ElementFormControlInput::OnChildAdd(Element* child)
 {
 	if (child == this && type)
 		type->OnChildAdd();
 }
 
-// If we are the removed element, this will pass the call onto our type handler.
 void ElementFormControlInput::OnChildRemove(Element* child)
 {
 	if (child == this && type)
 		type->OnChildRemove();
 }
 
-// Handles the "click" event to toggle the control's checked status.
 void ElementFormControlInput::ProcessDefaultAction(Event& event)
 {
 	ElementFormControl::ProcessDefaultAction(event);

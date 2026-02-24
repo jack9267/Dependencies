@@ -1,33 +1,4 @@
-/*
- * This source file is part of RmlUi, the HTML/CSS Interface Middleware
- *
- * For the latest information, see http://github.com/mikke89/RmlUi
- *
- * Copyright (c) 2008-2010 CodePoint Ltd, Shift Technology Ltd
- * Copyright (c) 2019 The RmlUi Team, and contributors
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- */
-
-#ifndef RMLUI_CORE_WIDGETSCROLL_H
-#define RMLUI_CORE_WIDGETSCROLL_H
+#pragma once
 
 #include "../../Include/RmlUi/Core/EventListener.h"
 
@@ -37,20 +8,12 @@ class Element;
 enum class ScrollBehavior;
 
 /**
-	A widget for incorporating scrolling functionality into an element.
-
-	@author Peter Curry
+    A widget for incorporating scrolling functionality into an element.
  */
 
-class WidgetScroll final : public EventListener
-{
+class WidgetScroll final : public EventListener {
 public:
-	enum Orientation
-	{
-		UNKNOWN,
-		VERTICAL,
-		HORIZONTAL
-	};
+	enum Orientation { UNKNOWN, VERTICAL, HORIZONTAL };
 
 	WidgetScroll(Element* parent);
 	virtual ~WidgetScroll();
@@ -88,22 +51,15 @@ public:
 
 	/// Lays out and resizes the internal elements.
 	/// @param[in] containing_block The padded box containing the slider. This is used to resolve relative properties.
-	/// @param[in] length The total length, in pixels, of the slider widget.
+	/// @param[in] slider_length The total length, in pixels, of the slider widget.
 	void FormatElements(Vector2f containing_block, float slider_length);
 
 private:
 	/// Handles events coming through from the slider's components.
 	void ProcessEvent(Event& event) override;
 
-	/// Lays out and resizes the slider's internal elements.
-	/// @param[in] containing_block The padded box containing the slider. This is used to resolve relative properties.
-	/// @param[in] resize_element True to resize the parent slider element, false to only resize its components.
-	/// @param[in] slider_length The total length, in pixels, of the slider widget.
-	/// @param[in] bar_length The total length of the bar, as a proportion of the track length. If this is -1, the intrinsic length will be used.
-	void FormatElements(Vector2f containing_block, bool resize_element, float slider_length, float bar_length = -1);
 	/// Lays out and positions the bar element.
-	/// @param[in] bar_length The total length of the bar, as a proportion of the track length. If this is -1, the intrinsic length will be used.
-	void FormatBar(float bar_length = -1);
+	void FormatBar();
 
 	// Set the offset on 'bar' based on its position.
 	void PositionBar();
@@ -141,4 +97,3 @@ private:
 };
 
 } // namespace Rml
-#endif

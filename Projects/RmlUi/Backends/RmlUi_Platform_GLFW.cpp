@@ -1,44 +1,26 @@
-/*
- * This source file is part of RmlUi, the HTML/CSS Interface Middleware
- *
- * For the latest information, see http://github.com/mikke89/RmlUi
- *
- * Copyright (c) 2008-2010 CodePoint Ltd, Shift Technology Ltd
- * Copyright (c) 2019 The RmlUi Team, and contributors
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- */
-
 #include "RmlUi_Platform_GLFW.h"
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/Input.h>
-#include <RmlUi/Core/Log.h>
+#include <RmlUi/Core/Math.h>
 #include <RmlUi/Core/StringUtilities.h>
-#include <RmlUi/Core/SystemInterface.h>
 #include <GLFW/glfw3.h>
+
+#define GLFW_HAS_EXTRA_CURSORS (GLFW_VERSION_MAJOR >= 3 && GLFW_VERSION_MINOR >= 4)
 
 SystemInterface_GLFW::SystemInterface_GLFW()
 {
 	cursor_pointer = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
 	cursor_cross = glfwCreateStandardCursor(GLFW_CROSSHAIR_CURSOR);
 	cursor_text = glfwCreateStandardCursor(GLFW_IBEAM_CURSOR);
+#if GLFW_HAS_EXTRA_CURSORS
+	cursor_move = glfwCreateStandardCursor(GLFW_RESIZE_ALL_CURSOR);
+	cursor_resize = glfwCreateStandardCursor(GLFW_RESIZE_NWSE_CURSOR);
+	cursor_unavailable = glfwCreateStandardCursor(GLFW_NOT_ALLOWED_CURSOR);
+#else
+	cursor_move = cursor_pointer;
+	cursor_resize = cursor_pointer;
+	cursor_unavailable = nullptr;
+#endif
 }
 
 SystemInterface_GLFW::~SystemInterface_GLFW()
@@ -46,6 +28,11 @@ SystemInterface_GLFW::~SystemInterface_GLFW()
 	glfwDestroyCursor(cursor_pointer);
 	glfwDestroyCursor(cursor_cross);
 	glfwDestroyCursor(cursor_text);
+#if GLFW_HAS_EXTRA_CURSORS
+	glfwDestroyCursor(cursor_move);
+	glfwDestroyCursor(cursor_resize);
+	glfwDestroyCursor(cursor_unavailable);
+#endif
 }
 
 void SystemInterface_GLFW::SetWindow(GLFWwindow* in_window)
@@ -65,19 +52,19 @@ void SystemInterface_GLFW::SetMouseCursor(const Rml::String& cursor_name)
 	if (cursor_name.empty() || cursor_name == "arrow")
 		cursor = nullptr;
 	else if (cursor_name == "move")
-		cursor = cursor_pointer;
+		cursor = cursor_move;
 	else if (cursor_name == "pointer")
 		cursor = cursor_pointer;
 	else if (cursor_name == "resize")
-		cursor = cursor_pointer;
+		cursor = cursor_resize;
 	else if (cursor_name == "cross")
 		cursor = cursor_cross;
 	else if (cursor_name == "text")
 		cursor = cursor_text;
 	else if (cursor_name == "unavailable")
-		cursor = nullptr;
+		cursor = cursor_unavailable;
 	else if (Rml::StringUtilities::StartsWith(cursor_name, "rmlui-scroll"))
-		cursor = cursor_pointer;
+		cursor = cursor_move;
 
 	if (window)
 		glfwSetCursor(window, cursor);
@@ -92,7 +79,18 @@ void SystemInterface_GLFW::SetClipboardText(const Rml::String& text_utf8)
 void SystemInterface_GLFW::GetClipboardText(Rml::String& text)
 {
 	if (window)
-		text = Rml::String(glfwGetClipboardString(window));
+	{
+		const char* clipboard = glfwGetClipboardString(window);
+
+		if (clipboard != nullptr)
+		{
+			text = Rml::String(clipboard);
+		}
+		else
+		{
+			text.clear();
+		}
+	}
 }
 
 bool RmlGLFW::ProcessKeyCallback(Rml::Context* context, int key, int action, int mods)
@@ -110,9 +108,7 @@ bool RmlGLFW::ProcessKeyCallback(Rml::Context* context, int key, int action, int
 		if (key == GLFW_KEY_ENTER || key == GLFW_KEY_KP_ENTER)
 			result &= context->ProcessTextInput('\n');
 		break;
-	case GLFW_RELEASE:
-		result = context->ProcessKeyUp(RmlGLFW::ConvertKey(key), RmlGLFW::ConvertKeyModifiers(mods));
-		break;
+	case GLFW_RELEASE: result = context->ProcessKeyUp(RmlGLFW::ConvertKey(key), RmlGLFW::ConvertKeyModifiers(mods)); break;
 	}
 
 	return result;
@@ -137,12 +133,23 @@ bool RmlGLFW::ProcessCursorEnterCallback(Rml::Context* context, int entered)
 	return result;
 }
 
-bool RmlGLFW::ProcessCursorPosCallback(Rml::Context* context, double xpos, double ypos, int mods)
+bool RmlGLFW::ProcessCursorPosCallback(Rml::Context* context, GLFWwindow* window, double xpos, double ypos, int mods)
 {
 	if (!context)
 		return true;
 
-	bool result = context->ProcessMouseMove(int(xpos), int(ypos), RmlGLFW::ConvertKeyModifiers(mods));
+	using Rml::Vector2i;
+	using Vector2d = Rml::Vector2<double>;
+
+	Vector2i window_size, framebuffer_size;
+	glfwGetWindowSize(window, &window_size.x, &window_size.y);
+	glfwGetFramebufferSize(window, &framebuffer_size.x, &framebuffer_size.y);
+
+	// Convert from mouse position in GLFW screen coordinates to framebuffer coordinates (pixels) used by RmlUi.
+	const Vector2d mouse_pos = Vector2d(xpos, ypos) * (Vector2d(framebuffer_size) / Vector2d(window_size));
+	const Vector2i mouse_pos_round = {int(Rml::Math::Round(mouse_pos.x)), int(Rml::Math::Round(mouse_pos.y))};
+
+	bool result = context->ProcessMouseMove(mouse_pos_round.x, mouse_pos_round.y, RmlGLFW::ConvertKeyModifiers(mods));
 	return result;
 }
 
@@ -155,12 +162,8 @@ bool RmlGLFW::ProcessMouseButtonCallback(Rml::Context* context, int button, int 
 
 	switch (action)
 	{
-	case GLFW_PRESS:
-		result = context->ProcessMouseButtonDown(button, RmlGLFW::ConvertKeyModifiers(mods));
-		break;
-	case GLFW_RELEASE:
-		result = context->ProcessMouseButtonUp(button, RmlGLFW::ConvertKeyModifiers(mods));
-		break;
+	case GLFW_PRESS: result = context->ProcessMouseButtonDown(button, RmlGLFW::ConvertKeyModifiers(mods)); break;
+	case GLFW_RELEASE: result = context->ProcessMouseButtonUp(button, RmlGLFW::ConvertKeyModifiers(mods)); break;
 	}
 	return result;
 }
