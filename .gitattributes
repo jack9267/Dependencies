@@ -1,0 +1,10 @@
+# The root Makefile is Unix-only: a CR in a recipe breaks make. Scoped narrowly on purpose - the
+# vendored third-party sources under Projects/ keep whatever line endings they ship with.
+/Makefile text eol=lf
+
+# The root automated-build script is Windows-only and needs CRLF. Scoped to the root (leading /) so
+# any vendored .bat under Projects/ is left as it ships.
+/BuildAll.bat text eol=crlf
+
+# Its Unix counterpart: a CR breaks sh.
+/BuildAll.sh text eol=lf

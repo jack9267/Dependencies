@@ -1,5 +1,8 @@
 @echo off
-rmdir /S /Q CMake.tmp
-rmdir /S /Q include
-rmdir /S /Q Lib
-pause
+setlocal
+set AUTOMATION=1
+call "%~dp0jbuild\cmake\bat\Clean.bat"
+endlocal
+if exist "%~dp0include" rmdir /S /Q "%~dp0include"
+if exist "%~dp0Lib" rmdir /S /Q "%~dp0Lib"
+if not defined AUTOMATION pause

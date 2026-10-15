@@ -1,4 +1,11 @@
 /include
 /Lib
-/CMake.tmp
 /Dependencies.7z
+
+# Everything JBuild generates - the solution, the .vcxproj projects, intermediates, and the cmake and
+# make build trees - goes here (premake location, cmake binaryDir, make OBJROOT). premake5.exe is committed.
+.jbuild/
+
+*.user
+*.suo
+.vs/
