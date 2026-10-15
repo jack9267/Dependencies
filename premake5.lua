@@ -1508,16 +1508,10 @@ dep("rmlui_debugger", {
 	files = { "Projects/RmlUi/Source/Debugger/**.cpp" },
 })
 
--- NASM, for flac's x86 assembly: on the PATH, else where its installer puts it (as CMake finds it).
+-- NASM, for flac's x86 assembly: jbuild's pinned one (jbuild_nasm, Common.lua - fetched once into jbuild\tools),
+-- whatever is installed, so every machine assembles with the same NASM.
 local function nasm_path()
-	local found = os.pathsearch("nasm.exe", os.getenv("PATH"))
-	if found then return path.join(found, "nasm.exe") end
-	for _, var in ipairs({ "ProgramFiles", "ProgramW6432", "LOCALAPPDATA" }) do
-		local dir = os.getenv(var)
-		local candidate = dir and path.join(dir, var == "LOCALAPPDATA" and "bin/NASM/nasm.exe" or "NASM/nasm.exe")
-		if candidate and os.isfile(candidate) then return candidate end
-	end
-	return "nasm.exe"
+	return path.translate(jbuild_nasm(), "\\")
 end
 
 -- flac: C + x86 intrinsics (FLAC__HAS_X86INTRIN), and on x86 the ia32 .nasm assembly too, as the CMake
