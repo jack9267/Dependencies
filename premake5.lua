@@ -220,8 +220,16 @@ dep("squirrel", { lang = "C++", ext = "cpp" })
 dep("sqstdlib", { lang = "C++", ext = "cpp", forceincludes = IOS_NO_SYSTEM,
 	includedirs = { "Projects/sqstdlib/include", "Projects/squirrel/include" } })
 
-dep("mongoose6", { includedirs = { "Projects/mongoose6/include/mongoose6" } })
-dep("mongoose7", { includedirs = { "Projects/mongoose7/include/mongoose7" } })
+-- mongoose6: 64 KB per socket read/write and of a served file kept queued, where mongoose's defaults are
+-- 1460 and 1024 - one TCP segment per connection per mg_mgr_poll() held HTTP file serving to about 23 KB/s
+-- against a server loop that sleeps between polls. Used only inside mongoose.c, so consumers need not match.
+dep("mongoose6", { includedirs = { "Projects/mongoose6/include/mongoose6" },
+	defines = { "MG_TCP_IO_SIZE=65536", "MG_MAX_HTTP_SEND_MBUF=65536" } })
+-- mongoose7: MG_IO_SIZE (default 512) is the step its buffers grow and round by, and half of how much of a
+-- served file static_cb keeps queued - 1 KB per poll otherwise, the same crawl as mongoose6's defaults.
+-- 32 KB gives 64 KB of a file at a time. Used only inside mongoose.c.
+dep("mongoose7", { includedirs = { "Projects/mongoose7/include/mongoose7" },
+	defines = { "MG_IO_SIZE=32768" } })
 
 -- sqlite: one translation unit. The version .rc is for the DLL only (RC_VERONLY gates it); a static
 -- lib needs neither.
