@@ -179,6 +179,27 @@ dep("bzip2", {
 	},
 })
 
+-- zstd: the library from lib/ (common, compress, decompress, dictBuilder; not legacy or deprecated), as
+-- its own CMake builds it, multithreaded compression included - workers start only when a caller sets
+-- ZSTD_c_nbWorkers. On Windows that uses Vista's condition variables, which YY-Thunks supplies on XP.
+-- The x86_64 assembly decoder is GCC/clang-only, and one Apple compile serves every architecture, so it is
+-- off everywhere (ZSTD_DISABLE_ASM; the C decoder is the same one MSVC builds always use). The DLL is
+-- zstd.dll with its version .rc.
+dep("zstd", {
+	includedirs = { "Projects/zstd/src/lib", "Projects/zstd/src/lib/common" },
+	defines     = { "ZSTD_MULTITHREAD", "ZSTD_DISABLE_ASM" },
+	shared      = { {
+		defines  = { "ZSTD_DLL_EXPORT=1" },
+		addfiles = { "Projects/zstd/src/build/VS2010/libzstd-dll/libzstd-dll.rc" },
+	} },
+	files = {
+		"Projects/zstd/src/lib/common/*.c",
+		"Projects/zstd/src/lib/compress/*.c",
+		"Projects/zstd/src/lib/decompress/*.c",
+		"Projects/zstd/src/lib/dictBuilder/*.c",
+	},
+})
+
 -- png needs zlib's headers to compile, and the SSE2 path (x86/x64 both take the Intel branch).
 -- The DLL is named libpng16 (CMake's RUNTIME_OUTPUT_NAME), keeping png.lib as its import library,
 -- and compiles the version .rc. It links zlib's import library. Elsewhere pure C (no SSE/NEON
@@ -555,6 +576,9 @@ dep("SDL2", {
 headers_project {
 	{ dir = "Projects/zlib/include" },
 	{ file = "Projects/bzip2/src/bzlib.h" },
+	{ file = "Projects/zstd/src/lib/zstd.h" },
+	{ file = "Projects/zstd/src/lib/zdict.h" },
+	{ file = "Projects/zstd/src/lib/zstd_errors.h" },
 	{ dir = "Projects/png/include" },
 	{ dir = "Projects/tinyxml/include" },
 	{ dir = "Projects/lua5.3/include" },

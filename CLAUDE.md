@@ -67,3 +67,15 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
 - **`Projects/curl/apple/curl_config.h` is still 8.12.1's.** It has to be made again by curl's CMake on macOS
   before the iOS build can be trusted with 8.23.0 (not done).
 
+## zstd (`Projects/zstd`)
+
+- **1.5.7, stock** (2026-11-02, added for Galactic's own use). `zstd_static` and `zstd.dll` from `lib/`
+  (common, compress, decompress, dictBuilder), with `zstd.h`, `zdict.h` and `zstd_errors.h` in `include\`.
+  Two symlinks in the release's command-line tests (`tests/cli-tests/bin/unzstd`, `zstdcat`) cannot be made
+  on Windows and are left out; nothing builds from them.
+- **Multithreaded compression is built in** (`ZSTD_MULTITHREAD`, as zstd's own CMake does), but no thread starts
+  unless a caller sets `ZSTD_c_nbWorkers`. On Windows it uses Vista's condition variables; YY-Thunks supplies them
+  on XP, and the XP check on `zstd.dll` is clean (it imports only `KERNEL32` and the CRT).
+- **`ZSTD_DISABLE_ASM` everywhere**: the x86_64 assembly decoder is GCC/clang-only, and the Apple build compiles
+  every architecture in one go. MSVC always uses the C decoder anyway.
+
