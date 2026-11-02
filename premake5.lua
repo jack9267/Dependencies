@@ -263,6 +263,18 @@ dep("angelscript_addons", { lang = "C++", dir = "Projects/angelscript",
 	defines     = { "AS_MAX_PORTABILITY" },
 	files       = ANGELSCRIPT_ADDON_FILES })
 
+-- miniaudio: one translation unit, static only (its MA_DLL is unsupported upstream). Windows keeps its run-time
+-- linking: WASAPI, DirectSound and WinMM are found with LoadLibrary, so the library imports nothing XP lacks
+-- and falls back to whichever backend the system has. Apple compiles it as Objective-C (iOS needs it for
+-- AVAudioSession) through apple/miniaudio.m, with MA_NO_RUNTIME_LINKING as notarization wants - a consumer
+-- links CoreFoundation, CoreAudio and AudioToolbox (and AVFoundation on iOS). Android keeps run-time linking:
+-- AAudio from Android 8, OpenSL ES before it.
+local APPLE_TARGET = os.target() == "macosx" or os.target() == "ios"
+dep("miniaudio", {
+	includedirs = { "Projects/miniaudio/src" },
+	defines     = APPLE_TARGET and { "MA_NO_RUNTIME_LINKING" } or nil,
+	files       = { APPLE_TARGET and "Projects/miniaudio/apple/miniaudio.m" or "Projects/miniaudio/src/miniaudio.c" } })
+
 -- mongoose6: 64 KB per socket read/write and of a served file kept queued, where mongoose's defaults are
 -- 1460 and 1024 - one TCP segment per connection per mg_mgr_poll() held HTTP file serving to about 23 KB/s
 -- against a server loop that sleeps between polls. Used only inside mongoose.c, so consumers need not match.
@@ -622,6 +634,7 @@ headers_project {
 	{ files = "Projects/angelscript/src/add_on/scriptstdstring/*.h", to = "angelscript" },
 	{ files = "Projects/angelscript/src/add_on/serializer/*.h", to = "angelscript" },
 	{ files = "Projects/angelscript/src/add_on/weakref/*.h", to = "angelscript" },
+	{ file = "Projects/miniaudio/src/miniaudio.h" },
 	{ dir = "Projects/mongoose6/include" },
 	{ dir = "Projects/mongoose7/include" },
 	{ dir = "Projects/sqlite/include" },

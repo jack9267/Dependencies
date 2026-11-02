@@ -98,3 +98,21 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
 - XP: the Vista-only `InitializeCriticalSectionEx` is used only for Windows Store builds; the DLL imports only
   `KERNEL32` and `msvcrt`.
 
+## miniaudio (`Projects/miniaudio`)
+
+- **0.11.26, stock** (2026-11-02), meant as an audio device backend for Galactic on every platform (Android has
+  none yet). `src` is the release unchanged; `miniaudio_static` is its one translation unit, with `miniaudio.h`
+  in `include\`. Static only: upstream calls its `MA_DLL` unsupported.
+- **Windows keeps miniaudio's run-time linking**, which is what makes it safe on XP: WASAPI, DirectSound and
+  WinMM (and `avrt`, `ole32`) are found with `LoadLibrary`, and it falls back to whichever the system has. A
+  test program linking it imports only `KERNEL32`, nothing in it newer than XP; on Windows 11 it chose WASAPI.
+  Don't define `MA_NO_RUNTIME_LINKING` for Windows.
+- **Apple builds `apple/miniaudio.m`**, which only includes `src/miniaudio.c`: iOS needs it compiled as
+  Objective-C (`AVAudioSession`). Apple also gets `MA_NO_RUNTIME_LINKING`, because notarization rejects its
+  run-time framework loading, so a consumer links `-framework CoreFoundation -framework CoreAudio -framework
+  AudioToolbox`, plus `AVFoundation` on iOS. Not yet built on a Mac.
+- **Android keeps run-time linking**: AAudio from Android 8, OpenSL ES before. Upstream notes some devices
+  where `dlopen("libOpenSLES.so")` fails; the fix there would be `MA_NO_RUNTIME_LINKING` with `-lOpenSLES`
+  (and `-laaudio`, which needs API 26). Not yet built for Android.
+- Vorbis is not built in (that needs `extras/stb_vorbis.c` or the libvorbis decoder); MP3, FLAC and WAV are.
+
