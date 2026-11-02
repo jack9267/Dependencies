@@ -7,11 +7,6 @@
 --   Lib\<arch>\<toolset>_static\<Debug|Release>\<name>_static.lib
 -- via common_project()'s targetdir - so NO per-library install step is needed, only the headers,
 -- which the "headers" project below assembles into include\ the way install_include() did.
---
--- NOTE: this is being ported in batches. The cross-platform core libraries are done; the Win32-only
--- and heavier libraries (SDL, curl, freetype, harfbuzz, cairo, pixman, litehtml, RmlUi, libressl,
--- asmjit, discord-rpc, libzip, rapidjson, glew, jpeg, pcre2, bsdiff, bass, fmod, MinHook, ogg,
--- vorbis, flac, theora) are still to add - see the TODO at the bottom.
 
 include "jbuild/premake/Common.lua"
 include "jbuild/premake/Warnings.lua"
