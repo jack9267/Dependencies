@@ -80,3 +80,21 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
 - **`ZSTD_DISABLE_ASM` everywhere**: the x86_64 assembly decoder is GCC/clang-only, and the Apple build compiles
   every architecture in one go. MSVC always uses the C decoder anyway.
 
+## AngelScript (`Projects/angelscript`)
+
+- **2.38.0, stock** (2026-11-02), for a planned Galactic scripting backend. `src` is the SDK folder of the release
+  zip unchanged. `angelscript_static` and `angelscript.dll` (`ANGELSCRIPT_EXPORT`; a consumer of the DLL defines
+  `ANGELSCRIPT_DLL_LIBRARY_IMPORT`) from `angelscript/source`; `angelscript_addons_static` from the add-ons a host
+  registers (string, array, dictionary, any, handle, weakref, math, grid, datetime, serializer, helper, context
+  manager, builder). Left out: `scriptfile` (scripts touching files directly), `scriptsocket` (Windows sockets)
+  and `debugger` (a console debugger). The add-ons export nothing, so they are static only and work with either.
+- **Headers**: `angelscript.h` in `include\` (every add-on includes it as `<angelscript.h>`), the add-ons' headers
+  and `aswrappedcall.h` flattened into `include\angelscript\` (`#include <angelscript/scriptarray.h>`). Of the
+  add-ons only `scriptfile` includes another by relative path, and it is not copied.
+- **`AS_MAX_PORTABILITY` everywhere, and a consumer must define it too.** Natives are then registered through the
+  generic calling convention only (`asCALL_GENERIC`; anything else is refused at run time), which needs none of
+  the per-platform assembly (`as_callfunc_*.asm`/`.S`), so the same sources build for every target. The add-ons
+  carry their own generic wrappers for it.
+- XP: the Vista-only `InitializeCriticalSectionEx` is used only for Windows Store builds; the DLL imports only
+  `KERNEL32` and `msvcrt`.
+

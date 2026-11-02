@@ -241,6 +241,33 @@ dep("squirrel", { lang = "C++", ext = "cpp" })
 dep("sqstdlib", { lang = "C++", ext = "cpp", forceincludes = IOS_NO_SYSTEM,
 	includedirs = { "Projects/sqstdlib/include", "Projects/squirrel/include" } })
 
+-- angelscript: the engine, AS_MAX_PORTABILITY everywhere - native functions are registered through the
+-- generic calling convention only, so none of the per-platform assembly (as_callfunc_*.asm/.S) is needed
+-- and one build serves every target. A consumer defines it too: registering a native any other way is
+-- refused at run time. The DLL is angelscript.dll (ANGELSCRIPT_EXPORT; a consumer of it defines
+-- ANGELSCRIPT_DLL_LIBRARY_IMPORT).
+dep("angelscript", { lang = "C++",
+	includedirs = { "Projects/angelscript/src/angelscript/include" },
+	defines     = { "AS_MAX_PORTABILITY" },
+	shared      = "ANGELSCRIPT_EXPORT",
+	files       = { "Projects/angelscript/src/angelscript/source/*.cpp" } })
+-- angelscript_addons: the SDK's add-ons a host registers (string, array, dictionary, any, handle, weakref,
+-- math, grid, datetime, serializer, helper, context manager, and the builder for #include and metadata),
+-- each with its generic wrappers under AS_MAX_PORTABILITY. Static only: they export nothing, and work
+-- with the static library or the DLL alike. Left out: scriptfile (scripts reading and writing files
+-- directly), scriptsocket (Windows sockets) and debugger (a console debugger on stdin/stdout).
+local ANGELSCRIPT_ADDONS = { "contextmgr", "datetime", "scriptany", "scriptarray", "scriptbuilder",
+	"scriptdictionary", "scriptgrid", "scripthandle", "scripthelper", "scriptmath", "scriptstdstring",
+	"serializer", "weakref" }
+local ANGELSCRIPT_ADDON_FILES = {}
+for _, a in ipairs(ANGELSCRIPT_ADDONS) do
+	ANGELSCRIPT_ADDON_FILES[#ANGELSCRIPT_ADDON_FILES + 1] = "Projects/angelscript/src/add_on/" .. a .. "/*.cpp"
+end
+dep("angelscript_addons", { lang = "C++", dir = "Projects/angelscript",
+	includedirs = { "Projects/angelscript/src/angelscript/include" },
+	defines     = { "AS_MAX_PORTABILITY" },
+	files       = ANGELSCRIPT_ADDON_FILES })
+
 -- mongoose6: 64 KB per socket read/write and of a served file kept queued, where mongoose's defaults are
 -- 1460 and 1024 - one TCP segment per connection per mg_mgr_poll() held HTTP file serving to about 23 KB/s
 -- against a server loop that sleeps between polls. Used only inside mongoose.c, so consumers need not match.
@@ -585,6 +612,21 @@ headers_project {
 	{ dir = "Projects/lua5.4/include" },
 	{ dir = "Projects/squirrel/include" },
 	{ dir = "Projects/sqstdlib/include" },
+	{ file = "Projects/angelscript/src/angelscript/include/angelscript.h" },
+	{ file = "Projects/angelscript/src/add_on/autowrapper/aswrappedcall.h", to = "angelscript" },
+	{ files = "Projects/angelscript/src/add_on/contextmgr/*.h", to = "angelscript" },
+	{ files = "Projects/angelscript/src/add_on/datetime/*.h", to = "angelscript" },
+	{ files = "Projects/angelscript/src/add_on/scriptany/*.h", to = "angelscript" },
+	{ files = "Projects/angelscript/src/add_on/scriptarray/*.h", to = "angelscript" },
+	{ files = "Projects/angelscript/src/add_on/scriptbuilder/*.h", to = "angelscript" },
+	{ files = "Projects/angelscript/src/add_on/scriptdictionary/*.h", to = "angelscript" },
+	{ files = "Projects/angelscript/src/add_on/scriptgrid/*.h", to = "angelscript" },
+	{ files = "Projects/angelscript/src/add_on/scripthandle/*.h", to = "angelscript" },
+	{ files = "Projects/angelscript/src/add_on/scripthelper/*.h", to = "angelscript" },
+	{ files = "Projects/angelscript/src/add_on/scriptmath/*.h", to = "angelscript" },
+	{ files = "Projects/angelscript/src/add_on/scriptstdstring/*.h", to = "angelscript" },
+	{ files = "Projects/angelscript/src/add_on/serializer/*.h", to = "angelscript" },
+	{ files = "Projects/angelscript/src/add_on/weakref/*.h", to = "angelscript" },
 	{ dir = "Projects/mongoose6/include" },
 	{ dir = "Projects/mongoose7/include" },
 	{ dir = "Projects/sqlite/include" },
