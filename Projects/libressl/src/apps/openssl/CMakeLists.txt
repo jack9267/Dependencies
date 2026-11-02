@@ -1,8 +1,17 @@
-include_directories(
-	.
-	../../include
-	../../include/compat
-)
+#
+# Copyright (c) 2016 Kinichiro Inoguchi
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 set(
 	OPENSSL_SRC
@@ -12,6 +21,7 @@ set(
 	ciphers.c
 	crl.c
 	crl2p7.c
+	cms.c
 	dgst.c
 	dh.c
 	dhparam.c
@@ -25,7 +35,6 @@ set(
 	gendsa.c
 	genpkey.c
 	genrsa.c
-	nseq.c
 	ocsp.c
 	openssl.c
 	passwd.c
@@ -48,7 +57,6 @@ set(
 	sess_id.c
 	smime.c
 	speed.c
-	spkac.c
 	ts.c
 	verify.c
 	version.c
@@ -66,27 +74,24 @@ if(WIN32)
 	set(OPENSSL_SRC ${OPENSSL_SRC} compat/poll_win.c)
 endif()
 
-check_function_exists(strtonum HAVE_STRTONUM)
-if(HAVE_STRTONUM)
-	add_definitions(-DHAVE_STRTONUM)
-else()
-	set(OPENSSL_SRC ${OPENSSL_SRC} compat/strtonum.c)
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+	check_function_exists(clock_gettime HAVE_CLOCK_GETTIME)
+	if(NOT HAVE_CLOCK_GETTIME)
+			set(OPENSSL_SRC ${OPENSSL_SRC} compat/clock_gettime_osx.c)
+	endif()
 endif()
 
 add_executable(openssl ${OPENSSL_SRC})
-target_link_libraries(openssl ${OPENSSL_LIBS})
+target_include_directories(openssl
+	PRIVATE
+		.
+		../../include/compat
+	PUBLIC
+		../../include
+		${CMAKE_BINARY_DIR}/include)
+target_link_libraries(openssl ${OPENSSL_LIBS} compat_obj)
 
 if(ENABLE_LIBRESSL_INSTALL)
 	install(TARGETS openssl DESTINATION ${CMAKE_INSTALL_BINDIR})
 	install(FILES openssl.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
-endif(ENABLE_LIBRESSL_INSTALL)
-
-if(NOT "${OPENSSLDIR}" STREQUAL "")
-	set(CONF_DIR "${OPENSSLDIR}")
-else()
-	set(CONF_DIR "${CMAKE_INSTALL_PREFIX}/etc/ssl")
-endif()
-if(ENABLE_LIBRESSL_INSTALL)
-	install(FILES cert.pem openssl.cnf x509v3.cnf DESTINATION ${CONF_DIR})
-	install(DIRECTORY DESTINATION ${CONF_DIR}/certs)
 endif(ENABLE_LIBRESSL_INSTALL)

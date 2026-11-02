@@ -1,4 +1,4 @@
-/* $OpenBSD: tasn_fre.c,v 1.15 2016/12/30 16:04:34 jsing Exp $ */
+/* $OpenBSD: tasn_fre.c,v 1.25 2025/08/14 19:02:17 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2000.
  */
@@ -62,25 +62,28 @@
 #include <openssl/asn1t.h>
 #include <openssl/objects.h>
 
-static void asn1_item_combine_free(ASN1_VALUE **pval, const ASN1_ITEM *it,
-    int combine);
+#include "asn1_local.h"
+
+static void asn1_item_free(ASN1_VALUE **pval, const ASN1_ITEM *it);
 
 /* Free up an ASN1 structure */
 
 void
 ASN1_item_free(ASN1_VALUE *val, const ASN1_ITEM *it)
 {
-	asn1_item_combine_free(&val, it, 0);
+	asn1_item_free(&val, it);
 }
+LCRYPTO_ALIAS(ASN1_item_free);
 
 void
 ASN1_item_ex_free(ASN1_VALUE **pval, const ASN1_ITEM *it)
 {
-	asn1_item_combine_free(pval, it, 0);
+	asn1_item_free(pval, it);
 }
+LCRYPTO_ALIAS(ASN1_item_ex_free);
 
 static void
-asn1_item_combine_free(ASN1_VALUE **pval, const ASN1_ITEM *it, int combine)
+asn1_item_free(ASN1_VALUE **pval, const ASN1_ITEM *it)
 {
 	const ASN1_TEMPLATE *tt = NULL, *seqtt;
 	const ASN1_EXTERN_FUNCS *ef;
@@ -88,7 +91,10 @@ asn1_item_combine_free(ASN1_VALUE **pval, const ASN1_ITEM *it, int combine)
 	ASN1_aux_cb *asn1_cb = NULL;
 	int i;
 
-	if (pval == NULL || *pval == NULL)
+	if (pval == NULL)
+		return;
+	/* For primitive types *pval may be something other than C pointer. */
+	if (it->itype != ASN1_ITYPE_PRIMITIVE && *pval == NULL)
 		return;
 
 	if (aux != NULL && aux->asn1_cb != NULL)
@@ -121,10 +127,8 @@ asn1_item_combine_free(ASN1_VALUE **pval, const ASN1_ITEM *it, int combine)
 		}
 		if (asn1_cb)
 			asn1_cb(ASN1_OP_FREE_POST, pval, it, NULL);
-		if (!combine) {
-			free(*pval);
-			*pval = NULL;
-		}
+		free(*pval);
+		*pval = NULL;
 		break;
 
 	case ASN1_ITYPE_EXTERN:
@@ -142,16 +146,16 @@ asn1_item_combine_free(ASN1_VALUE **pval, const ASN1_ITEM *it, int combine)
 			if (i == 2)
 				return;
 		}
-		asn1_enc_free(pval, it);
-		/* If we free up as normal we will invalidate any
-		 * ANY DEFINED BY field and we wont be able to
+		asn1_enc_cleanup(pval, it);
+		/*
+		 * If we free up as normal, we will invalidate any
+		 * ANY DEFINED BY field and we won't be able to
 		 * determine the type of the field it defines. So
 		 * free up in reverse order.
 		 */
-		tt = it->templates + it->tcount - 1;
-		for (i = 0; i < it->tcount; tt--, i++) {
+		for (i = it->tcount - 1; i >= 0; i--) {
 			ASN1_VALUE **pseqval;
-			seqtt = asn1_do_adb(pval, tt, 0);
+			seqtt = asn1_do_adb(pval, &it->templates[i], 0);
 			if (!seqtt)
 				continue;
 			pseqval = asn1_get_field_ptr(pval, seqtt);
@@ -159,10 +163,8 @@ asn1_item_combine_free(ASN1_VALUE **pval, const ASN1_ITEM *it, int combine)
 		}
 		if (asn1_cb)
 			asn1_cb(ASN1_OP_FREE_POST, pval, it, NULL);
-		if (!combine) {
-			free(*pval);
-			*pval = NULL;
-		}
+		free(*pval);
+		*pval = NULL;
 		break;
 	}
 }
@@ -176,28 +178,26 @@ ASN1_template_free(ASN1_VALUE **pval, const ASN1_TEMPLATE *tt)
 		for (i = 0; i < sk_ASN1_VALUE_num(sk); i++) {
 			ASN1_VALUE *vtmp;
 			vtmp = sk_ASN1_VALUE_value(sk, i);
-			asn1_item_combine_free(&vtmp, tt->item,
-			    0);
+			asn1_item_free(&vtmp, tt->item);
 		}
 		sk_ASN1_VALUE_free(sk);
 		*pval = NULL;
 	} else
-		asn1_item_combine_free(pval, tt->item,
-		    tt->flags & ASN1_TFLG_COMBINE);
+		asn1_item_free(pval, tt->item);
 }
 
 void
 ASN1_primitive_free(ASN1_VALUE **pval, const ASN1_ITEM *it)
 {
 	int utype;
-	if (it) {
-		const ASN1_PRIMITIVE_FUNCS *pf;
-		pf = it->funcs;
-		if (pf && pf->prim_free) {
-			pf->prim_free(pval, it);
-			return;
-		}
+
+	if (it != NULL && it->funcs != NULL) {
+		const ASN1_PRIMITIVE_FUNCS *pf = it->funcs;
+
+		pf->prim_free(pval, it);
+		return;
 	}
+
 	/* Special case: if 'it' is NULL free contents of ASN1_TYPE */
 	if (!it) {
 		ASN1_TYPE *typ = (ASN1_TYPE *)*pval;

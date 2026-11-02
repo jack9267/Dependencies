@@ -1,4 +1,4 @@
-.\" $OpenBSD: SSL_CTX_get0_certificate.3,v 1.2 2018/03/23 14:28:16 schwarze Exp $
+.\" $OpenBSD: SSL_CTX_get0_certificate.3,v 1.4 2025/06/08 22:47:20 schwarze Exp $
 .\"
 .\" Copyright (c) 2018 Ingo Schwarze <schwarze@openbsd.org>
 .\"
@@ -14,13 +14,15 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: March 23 2018 $
+.Dd $Mdocdate: June 8 2025 $
 .Dt SSL_CTX_GET0_CERTIFICATE 3
 .Os
 .Sh NAME
 .Nm SSL_CTX_get0_certificate
 .Nd get the active certificate from an SSL context
 .Sh SYNOPSIS
+.Lb libssl libcrypto
+.In openssl/ssl.h
 .Ft X509 *
 .Fo SSL_CTX_get0_certificate
 .Fa "const SSL_CTX *ctx"
@@ -39,6 +41,7 @@ or similar functions.
 .Pp
 The returned pointer must not be freed by the caller.
 .Sh SEE ALSO
+.Xr ssl 3 ,
 .Xr SSL_CTX_new 3 ,
 .Xr SSL_CTX_use_certificate 3 ,
 .Xr X509_get_pubkey 3 ,

@@ -1,4 +1,4 @@
-.\"	$OpenBSD: SSL_load_client_CA_file.3,v 1.7 2018/03/21 16:12:41 schwarze Exp $
+.\"	$OpenBSD: SSL_load_client_CA_file.3,v 1.10 2025/06/08 22:52:00 schwarze Exp $
 .\"	OpenSSL b97fdb57 Nov 11 09:33:09 2016 +0100
 .\"
 .\" This file is a derived work.
@@ -65,7 +65,7 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: March 21 2018 $
+.Dd $Mdocdate: June 8 2025 $
 .Dt SSL_LOAD_CLIENT_CA_FILE 3
 .Os
 .Sh NAME
@@ -74,6 +74,7 @@
 .Nm SSL_add_dir_cert_subjects_to_stack
 .Nd load certificate names from files
 .Sh SYNOPSIS
+.Lb libssl libcrypto
 .In openssl/ssl.h
 .Ft STACK_OF(X509_NAME) *
 .Fn SSL_load_client_CA_file "const char *file"
@@ -141,12 +142,13 @@ else
 .Ed
 .Sh SEE ALSO
 .Xr PEM_read_bio_X509 3 ,
+.Xr ssl 3 ,
 .Xr SSL_CTX_set_client_CA_list 3 ,
 .Xr X509_get_subject_name 3 ,
 .Xr X509_NAME_new 3
 .Sh HISTORY
 .Fn SSL_load_client_CA_file
-appeared before SSLeay 0.8 and has been available since
+first appeared in SSLeay 0.8.0 and has been available since
 .Ox 2.4 .
 .Pp
 .Fn SSL_add_file_cert_subjects_to_stack

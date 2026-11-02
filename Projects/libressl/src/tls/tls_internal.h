@@ -1,4 +1,4 @@
-/* $OpenBSD: tls_internal.h,v 1.71.2.1 2018/04/18 16:29:11 jsing Exp $ */
+/* $OpenBSD: tls_internal.h,v 1.88 2026/09/20 17:26:14 beck Exp $ */
 /*
  * Copyright (c) 2014 Jeremie Courreges-Anglas <jca@openbsd.org>
  * Copyright (c) 2014 Joel Sing <jsing@openbsd.org>
@@ -19,6 +19,8 @@
 #ifndef HEADER_TLS_INTERNAL_H
 #define HEADER_TLS_INTERNAL_H
 
+#include <pthread.h>
+
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
@@ -26,16 +28,16 @@
 
 __BEGIN_HIDDEN_DECLS
 
-#ifndef _PATH_SSL_CA_FILE
-#define _PATH_SSL_CA_FILE "/etc/ssl/cert.pem"
+#ifndef TLS_DEFAULT_CA_FILE
+#define TLS_DEFAULT_CA_FILE	"/etc/ssl/cert.pem"
 #endif
 
-#define TLS_CIPHERS_DEFAULT	"TLSv1.2+AEAD+ECDHE:TLSv1.2+AEAD+DHE"
+#define TLS_CIPHERS_DEFAULT	"TLSv1.3:TLSv1.2+AEAD+ECDHE:TLSv1.2+AEAD+DHE"
 #define TLS_CIPHERS_COMPAT	"HIGH:!aNULL"
 #define TLS_CIPHERS_LEGACY	"HIGH:MEDIUM:!aNULL"
 #define TLS_CIPHERS_ALL		"ALL:!aNULL:!eNULL"
 
-#define TLS_ECDHE_CURVES	"X25519,P-256,P-384"
+#define TLS_ECDHE_CURVES	"X25519MLKEM768,X25519,P-256,P-384"
 
 union tls_addr {
 	struct in_addr ip4;
@@ -44,7 +46,8 @@ union tls_addr {
 
 struct tls_error {
 	char *msg;
-	int num;
+	int code;
+	int errno_value;
 	int tls;
 };
 
@@ -76,9 +79,14 @@ struct tls_ticket_key {
 	time_t		time;
 };
 
+typedef int (*tls_sign_cb)(void *_cb_arg, const char *_pubkey_hash,
+    const uint8_t *_input, size_t _input_len, int _padding_type,
+    uint8_t **_out_signature, size_t *_out_signature_len);
+
 struct tls_config {
 	struct tls_error error;
 
+	pthread_mutex_t mutex;
 	int refcount;
 
 	char *alpn;
@@ -108,21 +116,28 @@ struct tls_config {
 	int verify_name;
 	int verify_time;
 	int skip_private_key_check;
+	int use_fake_private_key;
+	tls_sign_cb sign_cb;
+	void *sign_cb_arg;
 };
 
 struct tls_conninfo {
 	char *alpn;
 	char *cipher;
+	int cipher_strength;
 	char *servername;
 	int session_resumed;
 	char *version;
 
+	char *common_name;
 	char *hash;
 	char *issuer;
 	char *subject;
 
-	uint8_t *peer_cert;
-	size_t peer_cert_len;
+	uint8_t *peer_unverified_bundle;
+	size_t peer_unverified_bundle_len;
+	uint8_t *peer_verified_chain;
+	size_t peer_verified_chain_len;
 
 	time_t notbefore;
 	time_t notafter;
@@ -185,7 +200,8 @@ struct tls {
 	struct tls_sni_ctx *sni_ctx;
 
 	X509 *ssl_peer_cert;
-	STACK_OF(X509) *ssl_peer_chain;
+	STACK_OF(X509) *ssl_peer_unverified_bundle;
+	STACK_OF(X509) *ssl_peer_verified_chain;
 
 	struct tls_conninfo *conninfo;
 
@@ -202,7 +218,6 @@ int tls_set_string(const char **_dest, const char *_src);
 
 struct tls_keypair *tls_keypair_new(void);
 void tls_keypair_clear_key(struct tls_keypair *_keypair);
-void tls_keypair_clear(struct tls_keypair *_keypair);
 void tls_keypair_free(struct tls_keypair *_keypair);
 int tls_keypair_set_cert_file(struct tls_keypair *_keypair,
     struct tls_error *_error, const char *_cert_file);
@@ -227,6 +242,8 @@ struct tls_config *tls_config_new_internal(void);
 struct tls *tls_new(void);
 struct tls *tls_server_conn(struct tls *ctx);
 
+int tls_get_common_name(struct tls *_ctx, X509 *_cert, const char *_in_name,
+    char **_out_common_name);
 int tls_check_name(struct tls *ctx, X509 *cert, const char *servername,
     int *match);
 int tls_configure_server(struct tls *ctx);
@@ -248,27 +265,27 @@ int tls_set_cbs(struct tls *ctx,
     tls_read_cb read_cb, tls_write_cb write_cb, void *cb_arg);
 
 void tls_error_clear(struct tls_error *error);
-int tls_error_set(struct tls_error *error, const char *fmt, ...)
-    __attribute__((__format__ (printf, 2, 3)))
-    __attribute__((__nonnull__ (2)));
-int tls_error_setx(struct tls_error *error, const char *fmt, ...)
-    __attribute__((__format__ (printf, 2, 3)))
-    __attribute__((__nonnull__ (2)));
-int tls_config_set_error(struct tls_config *cfg, const char *fmt, ...)
-    __attribute__((__format__ (printf, 2, 3)))
-    __attribute__((__nonnull__ (2)));
-int tls_config_set_errorx(struct tls_config *cfg, const char *fmt, ...)
-    __attribute__((__format__ (printf, 2, 3)))
-    __attribute__((__nonnull__ (2)));
-int tls_set_error(struct tls *ctx, const char *fmt, ...)
-    __attribute__((__format__ (printf, 2, 3)))
-    __attribute__((__nonnull__ (2)));
-int tls_set_errorx(struct tls *ctx, const char *fmt, ...)
-    __attribute__((__format__ (printf, 2, 3)))
-    __attribute__((__nonnull__ (2)));
-int tls_set_ssl_errorx(struct tls *ctx, const char *fmt, ...)
-    __attribute__((__format__ (printf, 2, 3)))
-    __attribute__((__nonnull__ (2)));
+int tls_error_set(struct tls_error *error, int code, const char *fmt, ...)
+    __attribute__((__format__ (printf, 3, 4)))
+    __attribute__((__nonnull__ (3)));
+int tls_error_setx(struct tls_error *error, int code, const char *fmt, ...)
+    __attribute__((__format__ (printf, 3, 4)))
+    __attribute__((__nonnull__ (3)));
+int tls_config_set_error(struct tls_config *cfg, int code, const char *fmt, ...)
+    __attribute__((__format__ (printf, 3, 4)))
+    __attribute__((__nonnull__ (3)));
+int tls_config_set_errorx(struct tls_config *cfg, int code, const char *fmt, ...)
+    __attribute__((__format__ (printf, 3, 4)))
+    __attribute__((__nonnull__ (3)));
+int tls_set_error(struct tls *ctx, int code, const char *fmt, ...)
+    __attribute__((__format__ (printf, 3, 4)))
+    __attribute__((__nonnull__ (3)));
+int tls_set_errorx(struct tls *ctx, int code, const char *fmt, ...)
+    __attribute__((__format__ (printf, 3, 4)))
+    __attribute__((__nonnull__ (3)));
+int tls_set_ssl_errorx(struct tls *ctx, int code, const char *fmt, ...)
+    __attribute__((__format__ (printf, 3, 4)))
+    __attribute__((__nonnull__ (3)));
 
 int tls_ssl_error(struct tls *ctx, SSL *ssl_conn, int ssl_ret,
     const char *prefix);
@@ -287,9 +304,30 @@ int tls_cert_pubkey_hash(X509 *_cert, char **_hash);
 
 int tls_password_cb(char *_buf, int _size, int _rwflag, void *_u);
 
+RSA_METHOD *tls_signer_rsa_method(void);
+EC_KEY_METHOD *tls_signer_ecdsa_method(void);
+
+#define TLS_PADDING_NONE			0
+#define TLS_PADDING_RSA_PKCS1			1
+
+int tls_config_set_sign_cb(struct tls_config *_config, tls_sign_cb _cb,
+    void *_cb_arg);
+
+struct tls_signer* tls_signer_new(void);
+void tls_signer_free(struct tls_signer * _signer);
+const char *tls_signer_error(struct tls_signer * _signer);
+int tls_signer_add_keypair_file(struct tls_signer *_signer,
+    const char *_cert_file, const char *_key_file);
+int tls_signer_add_keypair_mem(struct tls_signer *_signer, const uint8_t *_cert,
+    size_t _cert_len, const uint8_t *_key, size_t _key_len);
+int tls_signer_sign(struct tls_signer *_signer, const char *_pubkey_hash,
+    const uint8_t *_input, size_t _input_len, int _padding_type,
+    uint8_t **_out_signature, size_t *_out_signature_len);
+
 __END_HIDDEN_DECLS
 
 /* XXX this function is not fully hidden so relayd can use it */
 void tls_config_skip_private_key_check(struct tls_config *config);
+void tls_config_use_fake_private_key(struct tls_config *config);
 
 #endif /* HEADER_TLS_INTERNAL_H */

@@ -1,3 +1,4 @@
+/*	$OpenBSD: hkdf_test.c,v 1.3 2026/09/14 23:36:58 kenjiro Exp $	*/
 /* Copyright (c) 2014, Google Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -247,8 +248,6 @@ static const HKDFTestVector kTests[] = {
 
 int main(void) {
 	size_t i;
-	OPENSSL_add_all_algorithms_noconf();
-
 	for (i = 0; i < OPENSSL_ARRAY_SIZE(kTests); i++) {
 		const HKDFTestVector *test = &kTests[i];
 		uint8_t prk[EVP_MAX_MD_SIZE];

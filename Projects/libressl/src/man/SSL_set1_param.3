@@ -1,4 +1,4 @@
-.\" $OpenBSD: SSL_set1_param.3,v 1.4 2018/03/23 14:28:16 schwarze Exp $
+.\" $OpenBSD: SSL_set1_param.3,v 1.7 2025/06/08 22:52:00 schwarze Exp $
 .\" full merge up to:
 .\" OpenSSL man3/SSL_CTX_get0_param 99d63d46 Oct 26 13:56:48 2016 -0400
 .\"
@@ -49,7 +49,7 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: March 23 2018 $
+.Dd $Mdocdate: June 8 2025 $
 .Dt SSL_SET1_PARAM 3
 .Os
 .Sh NAME
@@ -59,6 +59,7 @@
 .Nm SSL_set1_param
 .Nd get and set verification parameters
 .Sh SYNOPSIS
+.Lb libssl libcrypto
 .In openssl/ssl.h
 .Ft X509_VERIFY_PARAM *
 .Fo SSL_CTX_get0_param
@@ -88,7 +89,7 @@ or
 .Fa ssl ,
 respectively.
 The returned pointer must not be freed by the calling application,
-but the application can modify the parameters pointed to
+but the application can modify the parameters pointed to,
 to suit its needs: for example to add a hostname check.
 .Pp
 .Fn SSL_CTX_set1_param
@@ -121,6 +122,7 @@ X509_VERIFY_PARAM *vpm = SSL_get0_param(ssl);
 X509_VERIFY_PARAM_set1_host(vpm, "www.foo.com", 0);
 .Ed
 .Sh SEE ALSO
+.Xr ssl 3 ,
 .Xr X509_VERIFY_PARAM_set_flags 3
 .Sh HISTORY
 .Fn SSL_CTX_set1_param

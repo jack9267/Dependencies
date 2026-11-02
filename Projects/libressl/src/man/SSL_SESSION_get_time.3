@@ -1,4 +1,4 @@
-.\"	$OpenBSD: SSL_SESSION_get_time.3,v 1.6 2018/03/21 08:06:34 schwarze Exp $
+.\"	$OpenBSD: SSL_SESSION_get_time.3,v 1.9 2025/06/08 22:52:00 schwarze Exp $
 .\"	OpenSSL b97fdb57 Nov 11 09:33:09 2016 +0100
 .\"
 .\" This file was written by Lutz Jaenicke <jaenicke@openssl.org>.
@@ -49,7 +49,7 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: March 21 2018 $
+.Dd $Mdocdate: June 8 2025 $
 .Dt SSL_SESSION_GET_TIME 3
 .Os
 .Sh NAME
@@ -63,6 +63,7 @@
 .Nm SSL_set_timeout
 .Nd retrieve and manipulate session time and timeout settings
 .Sh SYNOPSIS
+.Lb libssl libcrypto
 .In openssl/ssl.h
 .Ft long
 .Fn SSL_SESSION_get_time "const SSL_SESSION *s"
@@ -117,7 +118,7 @@ and
 functions are synonyms for the
 .Fn SSL_SESSION_*
 counterparts.
-.Sh NOTES
+.Pp
 Sessions are expired by examining the creation time and the timeout value.
 Both are set at creation time of the session to the actual time and the default
 timeout value at creation, respectively, as set by
@@ -149,11 +150,12 @@ pointer for the session
 .Xr SSL_SESSION_new 3
 .Sh HISTORY
 .Fn SSL_get_time ,
-.Fn SSL_set_time ,
 .Fn SSL_get_timeout ,
 and
 .Fn SSL_set_timeout
-appeared before SSLeay 0.8.
+appeared in SSLeay 0.4 or earlier.
+.Fn SSL_set_time
+first appeared in SSLeay 0.5.2.
 .Fn SSL_SESSION_get_time ,
 .Fn SSL_SESSION_set_time ,
 .Fn SSL_SESSION_get_timeout ,

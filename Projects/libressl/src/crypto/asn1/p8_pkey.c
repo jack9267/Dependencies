@@ -1,4 +1,4 @@
-/* $OpenBSD: p8_pkey.c,v 1.17 2015/09/10 15:56:25 jsing Exp $ */
+/* $OpenBSD: p8_pkey.c,v 1.26 2025/12/05 14:19:27 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -62,6 +62,8 @@
 #include <openssl/asn1t.h>
 #include <openssl/x509.h>
 
+#include "x509_local.h"
+
 /* Minor tweak to operation: zero private key data */
 static int
 pkey_cb(int operation, ASN1_VALUE **pval, const ASN1_ITEM *it, void *exarg)
@@ -69,11 +71,8 @@ pkey_cb(int operation, ASN1_VALUE **pval, const ASN1_ITEM *it, void *exarg)
 	/* Since the structure must still be valid use ASN1_OP_FREE_PRE */
 	if (operation == ASN1_OP_FREE_PRE) {
 		PKCS8_PRIV_KEY_INFO *key = (PKCS8_PRIV_KEY_INFO *)*pval;
-		if (key->pkey != NULL &&
-		    key->pkey->type == V_ASN1_OCTET_STRING &&
-		    key->pkey->value.octet_string != NULL)
-			explicit_bzero(key->pkey->value.octet_string->data,
-			    key->pkey->value.octet_string->length);
+		if (key->pkey != NULL)
+			explicit_bzero(key->pkey->data, key->pkey->length);
 	}
 	return 1;
 }
@@ -95,7 +94,7 @@ static const ASN1_TEMPLATE PKCS8_PRIV_KEY_INFO_seq_tt[] = {
 	{
 		.offset = offsetof(PKCS8_PRIV_KEY_INFO, pkey),
 		.field_name = "pkey",
-		.item = &ASN1_ANY_it,
+		.item = &ASN1_OCTET_STRING_it,
 	},
 	{
 		.flags = ASN1_TFLG_IMPLICIT | ASN1_TFLG_SET_OF | ASN1_TFLG_OPTIONAL,
@@ -114,6 +113,7 @@ const ASN1_ITEM PKCS8_PRIV_KEY_INFO_it = {
 	.size = sizeof(PKCS8_PRIV_KEY_INFO),
 	.sname = "PKCS8_PRIV_KEY_INFO",
 };
+LCRYPTO_ALIAS(PKCS8_PRIV_KEY_INFO_it);
 
 
 PKCS8_PRIV_KEY_INFO *
@@ -122,80 +122,75 @@ d2i_PKCS8_PRIV_KEY_INFO(PKCS8_PRIV_KEY_INFO **a, const unsigned char **in, long 
 	return (PKCS8_PRIV_KEY_INFO *)ASN1_item_d2i((ASN1_VALUE **)a, in, len,
 	    &PKCS8_PRIV_KEY_INFO_it);
 }
+LCRYPTO_ALIAS(d2i_PKCS8_PRIV_KEY_INFO);
 
 int
 i2d_PKCS8_PRIV_KEY_INFO(PKCS8_PRIV_KEY_INFO *a, unsigned char **out)
 {
 	return ASN1_item_i2d((ASN1_VALUE *)a, out, &PKCS8_PRIV_KEY_INFO_it);
 }
+LCRYPTO_ALIAS(i2d_PKCS8_PRIV_KEY_INFO);
 
 PKCS8_PRIV_KEY_INFO *
 PKCS8_PRIV_KEY_INFO_new(void)
 {
 	return (PKCS8_PRIV_KEY_INFO *)ASN1_item_new(&PKCS8_PRIV_KEY_INFO_it);
 }
+LCRYPTO_ALIAS(PKCS8_PRIV_KEY_INFO_new);
 
 void
 PKCS8_PRIV_KEY_INFO_free(PKCS8_PRIV_KEY_INFO *a)
 {
 	ASN1_item_free((ASN1_VALUE *)a, &PKCS8_PRIV_KEY_INFO_it);
 }
+LCRYPTO_ALIAS(PKCS8_PRIV_KEY_INFO_free);
 
 int
 PKCS8_pkey_set0(PKCS8_PRIV_KEY_INFO *priv, ASN1_OBJECT *aobj, int version,
     int ptype, void *pval, unsigned char *penc, int penclen)
 {
-	unsigned char **ppenc = NULL;
-
 	if (version >= 0) {
 		if (!ASN1_INTEGER_set(priv->version, version))
 			return 0;
 	}
-	if (penc) {
-		int pmtype;
-		ASN1_OCTET_STRING *oct;
-		oct = ASN1_OCTET_STRING_new();
-		if (!oct)
-			return 0;
-		oct->data = penc;
-		ppenc = &oct->data;
-		oct->length = penclen;
-		if (priv->broken == PKCS8_NO_OCTET)
-			pmtype = V_ASN1_SEQUENCE;
-		else
-			pmtype = V_ASN1_OCTET_STRING;
-		ASN1_TYPE_set(priv->pkey, pmtype, oct);
-	}
-	if (!X509_ALGOR_set0(priv->pkeyalg, aobj, ptype, pval)) {
-		/* If call fails do not swallow 'enc' */
-		if (ppenc)
-			*ppenc = NULL;
+	if (!X509_ALGOR_set0(priv->pkeyalg, aobj, ptype, pval))
 		return 0;
-	}
+	if (penc != NULL)
+		ASN1_STRING_set0(priv->pkey, penc, penclen);
 	return 1;
 }
+LCRYPTO_ALIAS(PKCS8_pkey_set0);
 
 int
-PKCS8_pkey_get0(ASN1_OBJECT **ppkalg, const unsigned char **pk, int *ppklen,
-    X509_ALGOR **pa, PKCS8_PRIV_KEY_INFO *p8)
+PKCS8_pkey_get0(const ASN1_OBJECT **ppkalg, const unsigned char **pk,
+    int *ppklen, const X509_ALGOR **pa, const PKCS8_PRIV_KEY_INFO *p8)
 {
-	if (ppkalg)
+	if (ppkalg != NULL)
 		*ppkalg = p8->pkeyalg->algorithm;
-	if (p8->pkey->type == V_ASN1_OCTET_STRING) {
-		p8->broken = PKCS8_OK;
-		if (pk) {
-			*pk = p8->pkey->value.octet_string->data;
-			*ppklen = p8->pkey->value.octet_string->length;
-		}
-	} else if (p8->pkey->type == V_ASN1_SEQUENCE) {
-		p8->broken = PKCS8_NO_OCTET;
-		if (pk) {
-			*pk = p8->pkey->value.sequence->data;
-			*ppklen = p8->pkey->value.sequence->length;
-		}
-	} else
-		return 0;
-	if (pa)
+	if (pk != NULL) {
+		*pk = ASN1_STRING_get0_data(p8->pkey);
+		*ppklen = ASN1_STRING_length(p8->pkey);
+	}
+	if (pa != NULL)
 		*pa = p8->pkeyalg;
 	return 1;
 }
+LCRYPTO_ALIAS(PKCS8_pkey_get0);
+
+const STACK_OF(X509_ATTRIBUTE) *
+PKCS8_pkey_get0_attrs(const PKCS8_PRIV_KEY_INFO *p8)
+{
+	return p8->attributes;
+}
+LCRYPTO_ALIAS(PKCS8_pkey_get0_attrs);
+
+int
+PKCS8_pkey_add1_attr_by_NID(PKCS8_PRIV_KEY_INFO *p8, int nid, int type,
+    const unsigned char *bytes, int len)
+{
+	if (X509at_add1_attr_by_NID(&p8->attributes, nid, type, bytes,
+	    len) != NULL)
+		return 1;
+	return 0;
+}
+LCRYPTO_ALIAS(PKCS8_pkey_add1_attr_by_NID);

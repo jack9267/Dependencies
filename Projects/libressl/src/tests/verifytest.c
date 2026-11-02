@@ -1,4 +1,4 @@
-/*	$OpenBSD: verifytest.c,v 1.7 2017/04/30 03:53:31 jsing Exp $	*/
+/*	$OpenBSD: verifytest.c,v 1.10 2026/05/30 17:04:48 jsing Exp $	*/
 /*
  * Copyright (c) 2014 Joel Sing <jsing@openbsd.org>
  *
@@ -40,6 +40,7 @@ struct verify_test {
 	const char name[128];
 	int want_return;
 	int want_match;
+	int name_type;
 };
 
 struct verify_test verify_tests[] = {
@@ -120,6 +121,14 @@ struct verify_test verify_tests[] = {
 		.common_name = "*.org",
 		.common_name_len = -1,
 		.name = "openbsd.org",
+		.want_return = 0,
+		.want_match = 0,
+	},
+	{
+		/* CN wildcard without SANs - invalid CN wildcard. */
+		.common_name = "*.org.",
+		.common_name_len = -1,
+		.name = "openbsd.org.",
 		.want_return = 0,
 		.want_match = 0,
 	},
@@ -474,7 +483,8 @@ do_verify_test(int test_no, struct verify_test *vt)
 		if ((name = X509_NAME_new()) == NULL)
 			errx(1, "failed to malloc X509_NAME");
 		if (X509_NAME_add_entry_by_NID(name, NID_commonName,
-		    MBSTRING_ASC, (unsigned char *)vt->common_name,
+		    vt->name_type ? vt->name_type : MBSTRING_ASC,
+		    (unsigned char *)vt->common_name,
 		    vt->common_name_len, -1, 0) == 0)
 			errx(1, "failed to add name entry");
 		if (X509_set_subject_name(cert, name) == 0)
@@ -495,8 +505,9 @@ do_verify_test(int test_no, struct verify_test *vt)
 		goto done;
 	}
 	if (match != vt->want_match) {
-		fprintf(stderr, "FAIL: test %i failed to match name '%s'\n",
-		    test_no, vt->name);
+		fprintf(stderr, "FAIL: test %i %s name '%s'\n",
+		    test_no, vt->want_match ? "failed to match" : "matched",
+		    vt->name);
 		goto done;
 	}
 

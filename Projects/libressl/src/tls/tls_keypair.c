@@ -1,4 +1,4 @@
-/* $OpenBSD: tls_keypair.c,v 1.5.2.1 2018/04/18 16:29:11 jsing Exp $ */
+/* $OpenBSD: tls_keypair.c,v 1.15 2026/09/19 16:56:13 tb Exp $ */
 /*
  * Copyright (c) 2014 Joel Sing <jsing@openbsd.org>
  *
@@ -15,9 +15,14 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <limits.h>
+#include <stdint.h>
+#include <stdlib.h>
+
 #include <openssl/bio.h>
 #include <openssl/err.h>
 #include <openssl/pem.h>
+#include <openssl/x509.h>
 
 #include <tls.h>
 
@@ -27,14 +32,6 @@ struct tls_keypair *
 tls_keypair_new(void)
 {
 	return calloc(1, sizeof(struct tls_keypair));
-}
-
-void
-tls_keypair_clear_key(struct tls_keypair *keypair)
-{
-	freezero(keypair->key_mem, keypair->key_len);
-	keypair->key_mem = NULL;
-	keypair->key_len = 0;
 }
 
 static int
@@ -62,6 +59,14 @@ tls_keypair_pubkey_hash(struct tls_keypair *keypair, struct tls_error *error)
 	X509_free(cert);
  done:
 	return (rv);
+}
+
+void
+tls_keypair_clear_key(struct tls_keypair *keypair)
+{
+	freezero(keypair->key_mem, keypair->key_len);
+	keypair->key_mem = NULL;
+	keypair->key_len = 0;
 }
 
 int
@@ -117,25 +122,16 @@ tls_keypair_set_ocsp_staple_mem(struct tls_keypair *keypair,
 }
 
 void
-tls_keypair_clear(struct tls_keypair *keypair)
-{
-	struct tls_error error;
-
-	tls_keypair_set_cert_mem(keypair, &error, NULL, 0);
-	tls_keypair_set_key_mem(keypair, &error, NULL, 0);
-	tls_keypair_set_ocsp_staple_mem(keypair, &error, NULL, 0);
-
-	free(keypair->pubkey_hash);
-	keypair->pubkey_hash = NULL;
-}
-
-void
 tls_keypair_free(struct tls_keypair *keypair)
 {
 	if (keypair == NULL)
 		return;
 
-	tls_keypair_clear(keypair);
+	tls_keypair_clear_key(keypair);
+
+	free(keypair->cert_mem);
+	free(keypair->ocsp_staple);
+	free(keypair->pubkey_hash);
 
 	free(keypair);
 }
@@ -146,26 +142,34 @@ tls_keypair_load_cert(struct tls_keypair *keypair, struct tls_error *error,
 {
 	char *errstr = "unknown";
 	BIO *cert_bio = NULL;
-	int ssl_err;
+	unsigned long ssl_err;
 	int rv = -1;
 
 	X509_free(*cert);
 	*cert = NULL;
 
 	if (keypair->cert_mem == NULL) {
-		tls_error_set(error, "keypair has no certificate");
+		tls_error_setx(error, TLS_ERROR_UNKNOWN,
+		    "keypair has no certificate");
+		goto err;
+	}
+	if (keypair->cert_len > INT_MAX) {
+		tls_error_setx(error, TLS_ERROR_INVALID_ARGUMENT,
+		    "certificate too long");
 		goto err;
 	}
 	if ((cert_bio = BIO_new_mem_buf(keypair->cert_mem,
 	    keypair->cert_len)) == NULL) {
-		tls_error_set(error, "failed to create certificate bio");
+		tls_error_setx(error, TLS_ERROR_UNKNOWN,
+		    "failed to create certificate bio");
 		goto err;
 	}
 	if ((*cert = PEM_read_bio_X509(cert_bio, NULL, tls_password_cb,
 	    NULL)) == NULL) {
 		if ((ssl_err = ERR_peek_error()) != 0)
-		    errstr = ERR_error_string(ssl_err, NULL);
-		tls_error_set(error, "failed to load certificate: %s", errstr);
+			errstr = ERR_error_string(ssl_err, NULL);
+		tls_error_setx(error, TLS_ERROR_UNKNOWN,
+		    "failed to load certificate: %s", errstr);
 		goto err;
 	}
 

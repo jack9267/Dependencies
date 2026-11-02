@@ -1,4 +1,4 @@
-.\"	$OpenBSD: SSL_CTX_set_cert_verify_callback.3,v 1.3 2018/03/21 05:07:04 schwarze Exp $
+.\"	$OpenBSD: SSL_CTX_set_cert_verify_callback.3,v 1.7 2026/08/25 00:08:28 jsg Exp $
 .\"	OpenSSL b97fdb57 Nov 11 09:33:09 2016 +0100
 .\"
 .\" This file was written by Lutz Jaenicke <jaenicke@openssl.org>.
@@ -48,13 +48,14 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: March 21 2018 $
+.Dd $Mdocdate: August 25 2026 $
 .Dt SSL_CTX_SET_CERT_VERIFY_CALLBACK 3
 .Os
 .Sh NAME
 .Nm SSL_CTX_set_cert_verify_callback
 .Nd set peer certificate verification procedure
 .Sh SYNOPSIS
+.Lb libssl libcrypto
 .In openssl/ssl.h
 .Ft void
 .Fo SSL_CTX_set_cert_verify_callback
@@ -72,8 +73,8 @@ objects that are created from
 inherit the setting valid at the time when
 .Xr SSL_new 3
 is called.
-.Sh NOTES
-Whenever a certificate is verified during a SSL/TLS handshake,
+.Pp
+Whenever a certificate is verified during an SSL/TLS handshake,
 a verification function is called.
 If the application does not explicitly specify a verification callback
 function, the built-in verification function is used.
@@ -128,7 +129,7 @@ function set using
 .Xr SSL_get_verify_result 3
 .Sh HISTORY
 .Fn SSL_CTX_set_cert_verify_callback
-appeared before SSLeay 0.8 and has been available since
+first appeared in SSLeay 0.6.1 and has been available since
 .Ox 2.4 .
 .Pp
 Previous to OpenSSL 0.9.7, the

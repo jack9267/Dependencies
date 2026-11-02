@@ -1,4 +1,4 @@
-/* $OpenBSD: bss_acpt.c,v 1.27 2017/01/29 17:49:22 beck Exp $ */
+/* $OpenBSD: bss_acpt.c,v 1.33 2025/06/02 12:18:21 jsg Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -65,7 +65,9 @@
 
 #include <openssl/bio.h>
 #include <openssl/buffer.h>
-#include <openssl/err.h>
+
+#include "bio_local.h"
+#include "err_local.h"
 
 #define SOCKET_PROTOCOL IPPROTO_TCP
 
@@ -100,7 +102,7 @@ static void BIO_ACCEPT_free(BIO_ACCEPT *a);
 #define ACPT_S_GET_ACCEPT_SOCKET	2
 #define ACPT_S_OK			3
 
-static BIO_METHOD methods_acceptp = {
+static const BIO_METHOD methods_acceptp = {
 	.type = BIO_TYPE_ACCEPT,
 	.name = "socket accept",
 	.bwrite = acpt_write,
@@ -111,11 +113,12 @@ static BIO_METHOD methods_acceptp = {
 	.destroy = acpt_free
 };
 
-BIO_METHOD *
+const BIO_METHOD *
 BIO_s_accept(void)
 {
 	return (&methods_acceptp);
 }
+LCRYPTO_ALIAS(BIO_s_accept);
 
 static int
 acpt_new(BIO *bi)
@@ -258,11 +261,12 @@ again:
 		if (c->bio_chain != NULL) {
 			if ((dbio = BIO_dup_chain(c->bio_chain)) == NULL)
 				goto err;
-			if (!BIO_push(dbio, bio)) goto err;
-				bio = dbio;
+			if (!BIO_push(dbio, bio))
+				goto err;
+			bio = dbio;
 		}
-		if (BIO_push(b, bio)
-			== NULL) goto err;
+		if (BIO_push(b, bio) == NULL)
+			goto err;
 
 		c->state = ACPT_S_OK;
 		return (1);
@@ -436,7 +440,7 @@ acpt_puts(BIO *bp, const char *str)
 }
 
 BIO *
-BIO_new_accept(char *str)
+BIO_new_accept(const char *str)
 {
 	BIO *ret;
 
@@ -450,4 +454,4 @@ BIO_new_accept(char *str)
 		return (NULL);
 	}
 }
-
+LCRYPTO_ALIAS(BIO_new_accept);

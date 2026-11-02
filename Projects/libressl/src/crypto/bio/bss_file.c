@@ -1,4 +1,4 @@
-/* $OpenBSD: bss_file.c,v 1.32 2017/01/29 17:49:22 beck Exp $ */
+/* $OpenBSD: bss_file.c,v 1.36 2025/05/10 05:54:38 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -88,7 +88,9 @@
 #include <string.h>
 
 #include <openssl/bio.h>
-#include <openssl/err.h>
+
+#include "bio_local.h"
+#include "err_local.h"
 
 static int file_write(BIO *h, const char *buf, int num);
 static int file_read(BIO *h, char *buf, int size);
@@ -98,7 +100,7 @@ static long file_ctrl(BIO *h, int cmd, long arg1, void *arg2);
 static int file_new(BIO *h);
 static int file_free(BIO *data);
 
-static BIO_METHOD methods_filep = {
+static const BIO_METHOD methods_filep = {
 	.type = BIO_TYPE_FILE,
 	.name = "FILE pointer",
 	.bwrite = file_write,
@@ -135,6 +137,7 @@ BIO_new_file(const char *filename, const char *mode)
 	BIO_set_fp(ret, file, BIO_CLOSE);
 	return (ret);
 }
+LCRYPTO_ALIAS(BIO_new_file);
 
 BIO *
 BIO_new_fp(FILE *stream, int close_flag)
@@ -147,12 +150,14 @@ BIO_new_fp(FILE *stream, int close_flag)
 	BIO_set_fp(ret, stream, close_flag);
 	return (ret);
 }
+LCRYPTO_ALIAS(BIO_new_fp);
 
-BIO_METHOD *
+const BIO_METHOD *
 BIO_s_file(void)
 {
 	return (&methods_filep);
 }
+LCRYPTO_ALIAS(BIO_s_file);
 
 static int
 file_new(BIO *bi)

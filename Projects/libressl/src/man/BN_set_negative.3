@@ -1,4 +1,4 @@
-.\"	$OpenBSD: BN_set_negative.3,v 1.4 2018/03/23 00:09:11 schwarze Exp $
+.\"	$OpenBSD: BN_set_negative.3,v 1.7 2025/06/08 22:40:29 schwarze Exp $
 .\"
 .\" Copyright (c) 2016 Ingo Schwarze <schwarze@openbsd.org>
 .\"
@@ -14,7 +14,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: March 23 2018 $
+.Dd $Mdocdate: June 8 2025 $
 .Dt BN_SET_NEGATIVE 3
 .Os
 .Sh NAME
@@ -22,6 +22,8 @@
 .Nm BN_is_negative
 .Nd change and inspect the sign of a BIGNUM
 .Sh SYNOPSIS
+.Lb libcrypto
+.In openssl/bn.h
 .Ft void
 .Fo BN_set_negative
 .Fa "BIGNUM *b"
@@ -44,7 +46,6 @@ are non-zero, otherwise it sets it to positive.
 .Fn BN_is_negative
 tests the sign of
 .Fa b .
-It is currently implemented as a macro.
 .Sh RETURN VALUES
 .Fn BN_is_negative
 returns 1 if

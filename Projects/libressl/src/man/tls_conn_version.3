@@ -1,4 +1,4 @@
-.\" $OpenBSD: tls_conn_version.3,v 1.7 2018/02/10 04:43:16 jsing Exp $
+.\" $OpenBSD: tls_conn_version.3,v 1.14 2026/09/20 17:26:14 beck Exp $
 .\"
 .\" Copyright (c) 2015 Bob Beck <beck@openbsd.org>
 .\" Copyright (c) 2016, 2018 Joel Sing <jsing@openbsd.org>
@@ -15,30 +15,37 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: February 10 2018 $
+.Dd $Mdocdate: September 20 2026 $
 .Dt TLS_CONN_VERSION 3
 .Os
 .Sh NAME
 .Nm tls_conn_version ,
 .Nm tls_conn_cipher ,
+.Nm tls_conn_cipher_strength ,
 .Nm tls_conn_alpn_selected ,
 .Nm tls_conn_servername ,
 .Nm tls_conn_session_resumed ,
 .Nm tls_peer_cert_provided ,
 .Nm tls_peer_cert_contains_name ,
 .Nm tls_peer_cert_chain_pem ,
+.Nm tls_peer_cert_unverified_bundle_pem ,
+.Nm tls_peer_cert_verified_chain_pem ,
 .Nm tls_peer_cert_issuer ,
 .Nm tls_peer_cert_subject ,
+.Nm tls_peer_cert_common_name ,
 .Nm tls_peer_cert_hash ,
 .Nm tls_peer_cert_notbefore ,
 .Nm tls_peer_cert_notafter
 .Nd inspect an established TLS connection
 .Sh SYNOPSIS
+.Lb libtls libssl libcrypto
 .In tls.h
 .Ft const char *
 .Fn tls_conn_version "struct tls *ctx"
 .Ft const char *
 .Fn tls_conn_cipher "struct tls *ctx"
+.Ft int
+.Fn tls_conn_cipher_strength "struct tls *ctx"
 .Ft const char *
 .Fn tls_conn_alpn_selected "struct tls *ctx"
 .Ft const char *
@@ -54,13 +61,25 @@
 .Fc
 .Ft const uint8_t *
 .Fo tls_peer_cert_chain_pem
-.Fa struct tls *ctx
-.Fa size_t *size
+.Fa "struct tls *ctx"
+.Fa "size_t *size"
+.Fc
+.Ft const uint8_t *
+.Fo tls_peer_cert_unverified_bundle_pem
+.Fa "struct tls *ctx"
+.Fa "size_t *size"
+.Fc
+.Ft const uint8_t *
+.Fo tls_peer_cert_verified_chain_pem
+.Fa "struct tls *ctx"
+.Fa "size_t *size"
 .Fc
 .Ft const char *
 .Fn tls_peer_cert_issuer "struct tls *ctx"
 .Ft const char *
 .Fn tls_peer_cert_subject "struct tls *ctx"
+.Ft const char *
+.Fn tls_peer_cert_common_name "struct tls *ctx"
 .Ft const char *
 .Fn tls_peer_cert_hash "struct tls *ctx"
 .Ft time_t
@@ -80,6 +99,11 @@ connected to
 .Fn tls_conn_cipher
 returns a string corresponding to the cipher suite negotiated with the peer
 connected to
+.Ar ctx .
+.Pp
+.Fn tls_conn_cipher_strength
+returns the strength in bits for the symmetric cipher that is being
+used with the peer connected to
 .Ar ctx .
 .Pp
 .Fn tls_conn_alpn_selected
@@ -111,10 +135,21 @@ has provided a certificate that contains a
 SAN or CN that matches
 .Ar name .
 .Pp
+.Fn tls_peer_cert_unverified_bundle_pem
+returns a pointer to memory containing the PEM-encoded, unverified
+bundle of certificates that was sent by the peer of
+.Ar ctx
+during the TLS handshake.
+.Pp
 .Fn tls_peer_cert_chain_pem
-returns a pointer to memory containing a PEM-encoded certificate chain for the
-peer certificate from
-.Ar ctx .
+is equivalent to
+.Fn tls_peer_cert_unverified_bundle_pem .
+.Pp
+.Fn tls_peer_cert_verified_chain_pem
+returns a pointer to memory containing the PEM-encoded certificate
+chain that was verified for the peer of
+.Ar ctx
+during the TLS handshake.
 .Pp
 .Fn tls_peer_cert_subject
 returns a string
@@ -125,6 +160,11 @@ corresponding to the subject of the peer certificate from
 returns a string
 corresponding to the issuer of the peer certificate from
 .Ar ctx .
+.Fn tls_peer_cert_common_name
+returns a string
+corresponding to the common name of the peer certificate from
+.Ar ctx
+or the empty string if no common name is present.
 .Pp
 .Fn tls_peer_cert_hash
 returns a string
@@ -150,9 +190,6 @@ the peer certificate from
 returns the time corresponding to the end of the validity period of
 the peer certificate from
 .Ar ctx .
-.Pp
-POINTER TO
-.Xr tls_ocsp_process_response 3
 .Sh RETURN VALUES
 The
 .Fn tls_conn_session_resumed
@@ -200,6 +237,29 @@ appeared in
 .Fn tls_conn_session_resumed
 appeared in
 .Ox 6.3 .
+.Pp
+.Fn tls_conn_cipher_strength
+appeared in
+.Ox 6.7 .
+.Pp
+.Fn tls_peer_cert_common_name
+appeared in
+.Ox 7.7 .
+.Pp
+.Fn tls_peer_cert_unverified_bundle_pem
+and
+.Fn tls_peer_cert_verified_chain_pem
+appeared in
+.Ox 8.0 .
 .Sh AUTHORS
 .An Bob Beck Aq Mt beck@openbsd.org
 .An Joel Sing Aq Mt jsing@openbsd.org
+.Sh BUGS
+.Fn tls_peer_cert_chain_pem
+is poorly named:
+it returns the unverified bundle of certificates sent by the peer,
+not the chain that was verified during the handshake.
+It will be deprecated in a future release in favour of
+.Fn tls_peer_cert_unverified_bundle_pem
+and
+.Fn tls_peer_cert_verified_chain_pem .

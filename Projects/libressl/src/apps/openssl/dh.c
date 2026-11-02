@@ -1,4 +1,4 @@
-/* $OpenBSD: dh.c,v 1.11 2018/02/07 05:47:55 jsing Exp $ */
+/* $OpenBSD: dh.c,v 1.16 2025/01/19 10:24:17 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -75,7 +75,6 @@
 #include <openssl/x509.h>
 
 static struct {
-	int C;
 	int check;
 	char *infile;
 	int informat;
@@ -83,60 +82,54 @@ static struct {
 	char *outfile;
 	int outformat;
 	int text;
-} dh_config;
+} cfg;
 
-static struct option dh_options[] = {
-	{
-		.name = "C",
-		.desc = "Convert DH parameters into C code",
-		.type = OPTION_FLAG,
-		.opt.flag = &dh_config.C,
-	},
+static const struct option dh_options[] = {
 	{
 		.name = "check",
 		.desc = "Check the DH parameters",
 		.type = OPTION_FLAG,
-		.opt.flag = &dh_config.check,
+		.opt.flag = &cfg.check,
 	},
 	{
 		.name = "in",
 		.argname = "file",
 		.desc = "Input file (default stdin)",
 		.type = OPTION_ARG,
-		.opt.arg = &dh_config.infile,
+		.opt.arg = &cfg.infile,
 	},
 	{
 		.name = "inform",
 		.argname = "format",
 		.desc = "Input format (DER or PEM (default))",
 		.type = OPTION_ARG_FORMAT,
-		.opt.value = &dh_config.informat,
+		.opt.value = &cfg.informat,
 	},
 	{
 		.name = "noout",
 		.desc = "No output",
 		.type = OPTION_FLAG,
-		.opt.flag = &dh_config.noout,
+		.opt.flag = &cfg.noout,
 	},
 	{
 		.name = "out",
 		.argname = "file",
 		.desc = "Output file (default stdout)",
 		.type = OPTION_ARG,
-		.opt.arg = &dh_config.outfile,
+		.opt.arg = &cfg.outfile,
 	},
 	{
 		.name = "outform",
 		.argname = "format",
 		.desc = "Output format (DER or PEM (default))",
 		.type = OPTION_ARG_FORMAT,
-		.opt.value = &dh_config.outformat,
+		.opt.value = &cfg.outformat,
 	},
 	{
 		.name = "text",
 		.desc = "Print a text form of the DH parameters",
 		.type = OPTION_FLAG,
-		.opt.flag = &dh_config.text,
+		.opt.flag = &cfg.text,
 	},
 	{ NULL },
 };
@@ -145,7 +138,7 @@ static void
 dh_usage(void)
 {
 	fprintf(stderr,
-	    "usage: dh [-C] [-check] [-in file] [-inform format]\n"
+	    "usage: dh [-check] [-in file] [-inform format]\n"
 	    "    [-noout] [-out file] [-outform format] [-text]\n\n");
 	options_usage(dh_options);
 }
@@ -158,17 +151,15 @@ dh_main(int argc, char **argv)
 	BIO *in = NULL, *out = NULL;
 	int ret = 1;
 
-	if (single_execution) {
-		if (pledge("stdio cpath wpath rpath", NULL) == -1) {
-			perror("pledge");
-			exit(1);
-		}
+	if (pledge("stdio cpath wpath rpath", NULL) == -1) {
+		perror("pledge");
+		exit(1);
 	}
 
-	memset(&dh_config, 0, sizeof(dh_config));
+	memset(&cfg, 0, sizeof(cfg));
 
-	dh_config.informat = FORMAT_PEM;
-	dh_config.outformat = FORMAT_PEM;
+	cfg.informat = FORMAT_PEM;
+	cfg.outformat = FORMAT_PEM;
 
 	if (options_parse(argc, argv, dh_options, NULL, NULL) != 0) {
 		dh_usage();
@@ -181,26 +172,26 @@ dh_main(int argc, char **argv)
 		ERR_print_errors(bio_err);
 		goto end;
 	}
-	if (dh_config.infile == NULL)
+	if (cfg.infile == NULL)
 		BIO_set_fp(in, stdin, BIO_NOCLOSE);
 	else {
-		if (BIO_read_filename(in, dh_config.infile) <= 0) {
-			perror(dh_config.infile);
+		if (BIO_read_filename(in, cfg.infile) <= 0) {
+			perror(cfg.infile);
 			goto end;
 		}
 	}
-	if (dh_config.outfile == NULL) {
+	if (cfg.outfile == NULL) {
 		BIO_set_fp(out, stdout, BIO_NOCLOSE);
 	} else {
-		if (BIO_write_filename(out, dh_config.outfile) <= 0) {
-			perror(dh_config.outfile);
+		if (BIO_write_filename(out, cfg.outfile) <= 0) {
+			perror(cfg.outfile);
 			goto end;
 		}
 	}
 
-	if (dh_config.informat == FORMAT_ASN1)
+	if (cfg.informat == FORMAT_ASN1)
 		dh = d2i_DHparams_bio(in, NULL);
-	else if (dh_config.informat == FORMAT_PEM)
+	else if (cfg.informat == FORMAT_PEM)
 		dh = PEM_read_bio_DHparams(in, NULL, NULL, NULL);
 	else {
 		BIO_printf(bio_err, "bad input format specified\n");
@@ -211,10 +202,10 @@ dh_main(int argc, char **argv)
 		ERR_print_errors(bio_err);
 		goto end;
 	}
-	if (dh_config.text) {
+	if (cfg.text) {
 		DHparams_print(out, dh);
 	}
-	if (dh_config.check) {
+	if (cfg.check) {
 		if (!DH_check(dh, &i)) {
 			ERR_print_errors(bio_err);
 			goto end;
@@ -230,51 +221,10 @@ dh_main(int argc, char **argv)
 		if (i == 0)
 			printf("DH parameters appear to be ok.\n");
 	}
-	if (dh_config.C) {
-		unsigned char *data;
-		int len, l, bits;
-
-		len = BN_num_bytes(dh->p);
-		bits = BN_num_bits(dh->p);
-		data = malloc(len);
-		if (data == NULL) {
-			perror("malloc");
-			goto end;
-		}
-		l = BN_bn2bin(dh->p, data);
-		printf("static unsigned char dh%d_p[] = {", bits);
-		for (i = 0; i < l; i++) {
-			if ((i % 12) == 0)
-				printf("\n\t");
-			printf("0x%02X, ", data[i]);
-		}
-		printf("\n\t};\n");
-
-		l = BN_bn2bin(dh->g, data);
-		printf("static unsigned char dh%d_g[] = {", bits);
-		for (i = 0; i < l; i++) {
-			if ((i % 12) == 0)
-				printf("\n\t");
-			printf("0x%02X, ", data[i]);
-		}
-		printf("\n\t};\n\n");
-
-		printf("DH *get_dh%d()\n\t{\n", bits);
-		printf("\tDH *dh;\n\n");
-		printf("\tif ((dh = DH_new()) == NULL) return(NULL);\n");
-		printf("\tdh->p = BN_bin2bn(dh%d_p, sizeof(dh%d_p), NULL);\n",
-		    bits, bits);
-		printf("\tdh->g = BN_bin2bn(dh%d_g, sizeof(dh%d_g), NULL);\n",
-		    bits, bits);
-		printf("\tif ((dh->p == NULL) || (dh->g == NULL))\n");
-		printf("\t\treturn(NULL);\n");
-		printf("\treturn(dh);\n\t}\n");
-		free(data);
-	}
-	if (!dh_config.noout) {
-		if (dh_config.outformat == FORMAT_ASN1)
+	if (!cfg.noout) {
+		if (cfg.outformat == FORMAT_ASN1)
 			i = i2d_DHparams_bio(out, dh);
-		else if (dh_config.outformat == FORMAT_PEM)
+		else if (cfg.outformat == FORMAT_PEM)
 			i = PEM_write_bio_DHparams(out, dh);
 		else {
 			BIO_printf(bio_err, "bad output format specified for outfile\n");

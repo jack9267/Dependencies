@@ -1,4 +1,4 @@
-/* $OpenBSD: keypairtest.c,v 1.3 2018/02/14 15:59:50 jsing Exp $ */
+/* $OpenBSD: keypairtest.c,v 1.8 2026/04/15 20:13:07 tb Exp $ */
 /*
  * Copyright (c) 2018 Joel Sing <jsing@openbsd.org>
  *
@@ -15,10 +15,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifdef _MSC_VER
-#define NO_REDEF_POSIX_FUNCTIONS
-#endif
-
 #include <sys/stat.h>
 
 #include <err.h>
@@ -33,7 +29,7 @@
 #include <tls_internal.h>
 
 #define PUBKEY_HASH \
-    "SHA256:858d0f94beb0a08eb4f13871ba57bf0a2e081287d0efbaeb3bbac59dd8f1a8e5"
+    "SHA256:f03c535d374614e7356c0a4e6fd37fe94297b60ed86212adcba40e8e0b07bc9f"
 
 char *cert_file, *key_file, *ocsp_staple_file;
 
@@ -92,8 +88,7 @@ do_keypair_tests(void)
 	const uint8_t *cert, *key, *ocsp_staple;
 	X509 *x509_cert = NULL;
 	struct tls_keypair *kp;
-	struct tls_error err;
-	char *hash = NULL;
+	struct tls_error err = { 0 };
 	int failed = 1;
 
 	load_file(cert_file, &cert, &cert_len);
@@ -130,30 +125,15 @@ do_keypair_tests(void)
 		goto done;
 	if (strcmp(kp->pubkey_hash, PUBKEY_HASH) != 0) {
 		fprintf(stderr, "FAIL: got pubkey hash '%s', want '%s'",
-		    hash, PUBKEY_HASH);
+		    kp->pubkey_hash, PUBKEY_HASH);
 		goto done;
 	}
 
-	tls_keypair_clear(kp);
+	tls_keypair_clear_key(kp);
 
-	if (kp->cert_mem != NULL || kp->cert_len != 0) {
-		fprintf(stderr, "FAIL: cert not cleared (mem %p, len %zu)",
-		    kp->cert_mem, kp->cert_len);
-		goto done;
-	}
 	if (kp->key_mem != NULL || kp->key_len != 0) {
 		fprintf(stderr, "FAIL: key not cleared (mem %p, len %zu)",
 		    kp->key_mem, kp->key_len);
-		goto done;
-	}
-	if (kp->ocsp_staple != NULL || kp->ocsp_staple_len != 0) {
-		fprintf(stderr, "FAIL: ocsp staple not cleared (mem %p, "
-		    "len %zu)", kp->ocsp_staple, kp->ocsp_staple_len);
-		goto done;
-	}
-	if (kp->pubkey_hash != NULL) {
-		fprintf(stderr, "FAIL: pubkey hash not cleared (mem %p)\n",
-		    kp->pubkey_hash);
 		goto done;
 	}
 
@@ -180,7 +160,7 @@ do_keypair_tests(void)
 		goto done;
 	if (strcmp(kp->pubkey_hash, PUBKEY_HASH) != 0) {
 		fprintf(stderr, "FAIL: got pubkey hash '%s', want '%s'",
-		    hash, PUBKEY_HASH);
+		    kp->pubkey_hash, PUBKEY_HASH);
 		goto done;
 	}
 
@@ -190,7 +170,7 @@ do_keypair_tests(void)
 		goto done;
 	}
 
-	tls_keypair_clear(kp);
+	tls_keypair_clear_key(kp);
 
 	if (kp->key_mem != NULL || kp->key_len != 0) {
 		fprintf(stderr, "FAIL: key not cleared (mem %p, len %zu)",
@@ -198,13 +178,14 @@ do_keypair_tests(void)
 		goto done;
 	}
 
-	tls_keypair_free(kp);
-
 	failed = 0;
 
  done:
+	tls_keypair_free(kp);
 	X509_free(x509_cert);
-	free(hash);
+	free((uint8_t *)cert);
+	free((uint8_t *)key);
+	free((uint8_t *)ocsp_staple);
 
 	return (failed);
 }

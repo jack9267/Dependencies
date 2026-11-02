@@ -1,4 +1,4 @@
-/* $OpenBSD: asn1pars.c,v 1.9 2018/02/07 05:47:55 jsing Exp $ */
+/* $OpenBSD: asn1pars.c,v 1.20 2026/01/31 09:01:09 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -66,7 +66,6 @@
 #include <string.h>
 
 #include "apps.h"
-#include "progs.h"
 
 #include <openssl/err.h>
 #include <openssl/evp.h>
@@ -86,14 +85,14 @@ static struct {
 	int offset;
 	char *oidfile;
 	STACK_OF(OPENSSL_STRING) *osk;
-} asn1pars_config;
+} cfg;
 
 static int
 asn1pars_opt_dlimit(char *arg)
 {
 	const char *errstr;
 
-	asn1pars_config.dump = strtonum(arg, 1, INT_MAX, &errstr);
+	cfg.dump = strtonum(arg, 1, INT_MAX, &errstr);
 	if (errstr) {
 		fprintf(stderr, "-dlimit must be from 1 to INT_MAX: %s\n",
 		    errstr);
@@ -107,7 +106,7 @@ asn1pars_opt_length(char *arg)
 {
 	const char *errstr;
 
-	asn1pars_config.length = strtonum(arg, 1, UINT_MAX, &errstr);
+	cfg.length = strtonum(arg, 1, UINT_MAX, &errstr);
 	if (errstr) {
 		fprintf(stderr, "-length must be from 1 to UINT_MAX: %s\n",
 		    errstr);
@@ -119,20 +118,20 @@ asn1pars_opt_length(char *arg)
 static int
 asn1pars_opt_strparse(char *arg)
 {
-	if (sk_OPENSSL_STRING_push(asn1pars_config.osk, arg) == 0) {
+	if (sk_OPENSSL_STRING_push(cfg.osk, arg) == 0) {
 		fprintf(stderr, "-strparse cannot add argument\n");
 		return (-1);
 	}
 	return (0);
 }
 
-static struct option asn1pars_options[] = {
+static const struct option asn1pars_options[] = {
 	{
 		.name = "dump",
 		.desc = "Dump unknown data in hex form",
 		.type = OPTION_VALUE,
 		.value = -1,
-		.opt.value = &asn1pars_config.dump,
+		.opt.value = &cfg.dump,
 	},
 	{
 		.name = "dlimit",
@@ -146,34 +145,34 @@ static struct option asn1pars_options[] = {
 		.argname = "file",
 		.desc = "File to generate ASN.1 structure from",
 		.type = OPTION_ARG,
-		.opt.arg = &asn1pars_config.genconf,
+		.opt.arg = &cfg.genconf,
 	},
 	{
 		.name = "genstr",
 		.argname = "string",
 		.desc = "String to generate ASN.1 structure from",
 		.type = OPTION_ARG,
-		.opt.arg = &asn1pars_config.genstr,
+		.opt.arg = &cfg.genstr,
 	},
 	{
 		.name = "i",
 		.desc = "Indent output according to depth of structures",
 		.type = OPTION_FLAG,
-		.opt.flag = &asn1pars_config.indent,
+		.opt.flag = &cfg.indent,
 	},
 	{
 		.name = "in",
 		.argname = "file",
 		.desc = "The input file (default stdin)",
 		.type = OPTION_ARG,
-		.opt.arg = &asn1pars_config.infile,
+		.opt.arg = &cfg.infile,
 	},
 	{
 		.name = "inform",
 		.argname = "fmt",
 		.desc = "Input format (DER, TXT or PEM (default))",
 		.type = OPTION_ARG_FORMAT,
-		.opt.value = &asn1pars_config.informat,
+		.opt.value = &cfg.informat,
 	},
 	{
 		.name = "length",
@@ -186,28 +185,28 @@ static struct option asn1pars_options[] = {
 		.name = "noout",
 		.desc = "Do not produce any output",
 		.type = OPTION_FLAG,
-		.opt.flag = &asn1pars_config.noout,
+		.opt.flag = &cfg.noout,
 	},
 	{
 		.name = "offset",
 		.argname = "num",
 		.desc = "Offset to begin parsing",
 		.type = OPTION_ARG_INT,
-		.opt.value = &asn1pars_config.offset,
+		.opt.value = &cfg.offset,
 	},
 	{
 		.name = "oid",
 		.argname = "file",
 		.desc = "File containing additional object identifiers (OIDs)",
 		.type = OPTION_ARG,
-		.opt.arg = &asn1pars_config.oidfile,
+		.opt.arg = &cfg.oidfile,
 	},
 	{
 		.name = "out",
 		.argname = "file",
 		.desc = "Output file in DER format",
 		.type = OPTION_ARG,
-		.opt.arg = &asn1pars_config.derfile,
+		.opt.arg = &cfg.derfile,
 	},
 	{
 		.name = "strparse",
@@ -221,7 +220,7 @@ static struct option asn1pars_options[] = {
 };
 
 static void
-asn1pars_usage()
+asn1pars_usage(void)
 {
 	fprintf(stderr,
 	    "usage: asn1parse [-i] [-dlimit num] [-dump] [-genconf file] "
@@ -238,26 +237,22 @@ int
 asn1parse_main(int argc, char **argv)
 {
 	int i, j, ret = 1;
-	long num, tmplen;
+	long num;
 	BIO *in = NULL, *out = NULL, *b64 = NULL, *derout = NULL;
-	char *str = NULL;
 	const char *errstr = NULL;
-	unsigned char *tmpbuf;
-	const unsigned char *ctmpbuf;
+	const unsigned char *str;
 	BUF_MEM *buf = NULL;
 	ASN1_TYPE *at = NULL;
 
-	if (single_execution) {
-		if (pledge("stdio cpath wpath rpath", NULL) == -1) {
-			perror("pledge");
-			exit(1);
-		}
+	if (pledge("stdio cpath wpath rpath", NULL) == -1) {
+		perror("pledge");
+		exit(1);
 	}
 
-	memset(&asn1pars_config, 0, sizeof(asn1pars_config));
+	memset(&cfg, 0, sizeof(cfg));
 
-	asn1pars_config.informat = FORMAT_PEM;
-	if ((asn1pars_config.osk = sk_OPENSSL_STRING_new_null()) == NULL) {
+	cfg.informat = FORMAT_PEM;
+	if ((cfg.osk = sk_OPENSSL_STRING_new_null()) == NULL) {
 		BIO_printf(bio_err, "Memory allocation failure\n");
 		goto end;
 	}
@@ -269,34 +264,34 @@ asn1parse_main(int argc, char **argv)
 
 	in = BIO_new(BIO_s_file());
 	out = BIO_new(BIO_s_file());
-	if ((in == NULL) || (out == NULL)) {
+	if (in == NULL || out == NULL) {
 		ERR_print_errors(bio_err);
 		goto end;
 	}
 	BIO_set_fp(out, stdout, BIO_NOCLOSE | BIO_FP_TEXT);
 
-	if (asn1pars_config.oidfile != NULL) {
-		if (BIO_read_filename(in, asn1pars_config.oidfile) <= 0) {
+	if (cfg.oidfile != NULL) {
+		if (BIO_read_filename(in, cfg.oidfile) <= 0) {
 			BIO_printf(bio_err, "problems opening %s\n",
-			    asn1pars_config.oidfile);
+			    cfg.oidfile);
 			ERR_print_errors(bio_err);
 			goto end;
 		}
 		OBJ_create_objects(in);
 	}
-	if (asn1pars_config.infile == NULL)
+	if (cfg.infile == NULL)
 		BIO_set_fp(in, stdin, BIO_NOCLOSE);
 	else {
-		if (BIO_read_filename(in, asn1pars_config.infile) <= 0) {
-			perror(asn1pars_config.infile);
+		if (BIO_read_filename(in, cfg.infile) <= 0) {
+			perror(cfg.infile);
 			goto end;
 		}
 	}
 
-	if (asn1pars_config.derfile) {
-		if (!(derout = BIO_new_file(asn1pars_config.derfile, "wb"))) {
+	if (cfg.derfile != NULL) {
+		if ((derout = BIO_new_file(cfg.derfile, "wb")) == NULL) {
 			BIO_printf(bio_err, "problems opening %s\n",
-			    asn1pars_config.derfile);
+			    cfg.derfile);
 			ERR_print_errors(bio_err);
 			goto end;
 		}
@@ -304,18 +299,16 @@ asn1parse_main(int argc, char **argv)
 	if ((buf = BUF_MEM_new()) == NULL)
 		goto end;
 	if (!BUF_MEM_grow(buf, BUFSIZ * 8))
-		goto end;	/* Pre-allocate :-) */
+		goto end;
 
-	if (asn1pars_config.genstr || asn1pars_config.genconf) {
-		num = do_generate(bio_err, asn1pars_config.genstr,
-		    asn1pars_config.genconf, buf);
+	if (cfg.genstr != NULL || cfg.genconf) {
+		num = do_generate(bio_err, cfg.genstr, cfg.genconf, buf);
 		if (num < 0) {
 			ERR_print_errors(bio_err);
 			goto end;
 		}
 	} else {
-
-		if (asn1pars_config.informat == FORMAT_PEM) {
+		if (cfg.informat == FORMAT_PEM) {
 			BIO *tmp;
 
 			if ((b64 = BIO_new(BIO_f_base64())) == NULL)
@@ -335,32 +328,31 @@ asn1parse_main(int argc, char **argv)
 			num += i;
 		}
 	}
-	str = buf->data;
+	str = (const unsigned char *)buf->data;
 
 	/* If any structs to parse go through in sequence */
 
-	if (sk_OPENSSL_STRING_num(asn1pars_config.osk)) {
-		tmpbuf = (unsigned char *) str;
-		tmplen = num;
-		for (i = 0; i < sk_OPENSSL_STRING_num(asn1pars_config.osk);
-		     i++) {
+	if (sk_OPENSSL_STRING_num(cfg.osk) > 0) {
+		const unsigned char *p;
+		const unsigned char *tmpbuf = str;
+		long tmplen = num;
+
+		for (i = 0; i < sk_OPENSSL_STRING_num(cfg.osk); i++) {
 			ASN1_TYPE *atmp;
 			int typ;
-			j = strtonum(
-			    sk_OPENSSL_STRING_value(asn1pars_config.osk, i),
+			j = strtonum(sk_OPENSSL_STRING_value(cfg.osk, i),
 			    1, INT_MAX, &errstr);
 			if (errstr) {
 				BIO_printf(bio_err,
 				    "'%s' is an invalid number: %s\n",
-				    sk_OPENSSL_STRING_value(asn1pars_config.osk,
-				    i), errstr);
+				    sk_OPENSSL_STRING_value(cfg.osk, i), errstr);
 				continue;
 			}
 			tmpbuf += j;
 			tmplen -= j;
 			atmp = at;
-			ctmpbuf = tmpbuf;
-			at = d2i_ASN1_TYPE(NULL, &ctmpbuf, tmplen);
+			p = tmpbuf;
+			at = d2i_ASN1_TYPE(NULL, &p, tmplen);
 			ASN1_TYPE_free(atmp);
 			if (!at) {
 				BIO_printf(bio_err, "Error parsing structure\n");
@@ -368,42 +360,38 @@ asn1parse_main(int argc, char **argv)
 				goto end;
 			}
 			typ = ASN1_TYPE_get(at);
-			if ((typ == V_ASN1_OBJECT) ||
-			    (typ == V_ASN1_NULL)) {
+			if (typ == V_ASN1_BOOLEAN || typ == V_ASN1_NULL ||
+			    typ == V_ASN1_OBJECT) {
 				BIO_printf(bio_err, "Can't parse %s type\n",
-				    typ == V_ASN1_NULL ? "NULL" : "OBJECT");
+				    ASN1_tag2str(typ));
 				ERR_print_errors(bio_err);
 				goto end;
 			}
 			/* hmm... this is a little evil but it works */
-			tmpbuf = at->value.asn1_string->data;
-			tmplen = at->value.asn1_string->length;
+			tmpbuf = ASN1_STRING_get0_data(at->value.asn1_string);
+			tmplen = ASN1_STRING_length(at->value.asn1_string);
 		}
-		str = (char *) tmpbuf;
+		str = tmpbuf;
 		num = tmplen;
 	}
-	if (asn1pars_config.offset >= num) {
+	if (cfg.offset >= num) {
 		BIO_printf(bio_err, "Error: offset too large\n");
 		goto end;
 	}
-	num -= asn1pars_config.offset;
+	num -= cfg.offset;
 
-	if ((asn1pars_config.length == 0) ||
-	    ((long)asn1pars_config.length > num))
-		asn1pars_config.length = (unsigned int) num;
-	if (derout) {
-		if (BIO_write(derout, str + asn1pars_config.offset,
-		    asn1pars_config.length) != (int)asn1pars_config.length) {
+	if (cfg.length == 0 || (long)cfg.length > num)
+		cfg.length = (unsigned int) num;
+	if (derout != NULL) {
+		if (BIO_write(derout, str + cfg.offset,
+		    cfg.length) != (int)cfg.length) {
 			BIO_printf(bio_err, "Error writing output\n");
 			ERR_print_errors(bio_err);
 			goto end;
 		}
 	}
-	if (!asn1pars_config.noout &&
-	    !ASN1_parse_dump(out,
-	    (unsigned char *)&(str[asn1pars_config.offset]),
-	    asn1pars_config.length, asn1pars_config.indent,
-	    asn1pars_config.dump)) {
+	if (!cfg.noout && !ASN1_parse_dump(out, &str[cfg.offset], cfg.length,
+	    cfg.indent, cfg.dump)) {
 		ERR_print_errors(bio_err);
 		goto end;
 	}
@@ -417,14 +405,14 @@ asn1parse_main(int argc, char **argv)
 		ERR_print_errors(bio_err);
 	BUF_MEM_free(buf);
 	ASN1_TYPE_free(at);
-	sk_OPENSSL_STRING_free(asn1pars_config.osk);
+	sk_OPENSSL_STRING_free(cfg.osk);
 	OBJ_cleanup();
 
 	return (ret);
 }
 
 static int
-do_generate(BIO * bio, char *genstr, char *genconf, BUF_MEM * buf)
+do_generate(BIO *bio, char *genstr, char *genconf, BUF_MEM *buf)
 {
 	CONF *cnf = NULL;
 	int len;

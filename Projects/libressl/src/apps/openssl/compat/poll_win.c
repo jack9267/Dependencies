@@ -73,6 +73,8 @@ compute_select_revents(int fd, short events,
 			rc |= POLLHUP;
 		else if (conn_has_oob_data(fd))
 			rc |= POLLRDBAND | POLLPRI;
+		else
+			rc |= POLLERR;
 	}
 
 	return rc;
@@ -152,6 +154,9 @@ wsa_select_errno(int err)
 	case WSAENETDOWN:
 		errno = ENOMEM;
 		break;
+	default:
+		errno = EIO;
+		break;
 	}
 	return -1;
 }
@@ -166,6 +171,7 @@ poll(struct pollfd *pfds, nfds_t nfds, int timeout_ms)
 	 * select machinery
 	 */
 	fd_set rfds, wfds, efds;
+	fd_set rfds_in, wfds_in, efds_in;
 	int rc;
 	int num_sockets;
 
@@ -248,15 +254,36 @@ poll(struct pollfd *pfds, nfds_t nfds, int timeout_ms)
 	timespent_ms = 0;
 	wait_rc = WAIT_FAILED;
 
-	if (timeout_ms < 0)
-		timeout_ms = INFINITE;
-	looptime_ms = timeout_ms > 100 ? 100 : timeout_ms;
+	looptime_ms = (timeout_ms > 100 || timeout_ms == -1) ? 100 : timeout_ms;
+
+	/*
+	 * select() clears every descriptor that is not ready from the
+	 * fd_sets, so a pass that times out leaves them empty. Keep a
+	 * pristine copy and restore it before each select(), otherwise the
+	 * next pass hands select() three empty sets and Windows fails it with
+	 * WSAEINVAL instead of waiting out the remaining timeout.
+	 */
+	rfds_in = rfds;
+	wfds_in = wfds;
+	efds_in = efds;
 
 	do {
-		struct timeval tv;
+		TIMEVAL tv;
+
+		/*
+		 * Cap the wait at the time remaining so the final pass
+		 * does not overshoot the requested timeout.
+		 */
+		if (timeout_ms != -1 && timeout_ms - timespent_ms < looptime_ms)
+			looptime_ms = timeout_ms - timespent_ms;
+
 		tv.tv_sec = 0;
 		tv.tv_usec = looptime_ms * 1000;
 		int handle_signaled = 0;
+
+		rfds = rfds_in;
+		wfds = wfds_in;
+		efds = efds_in;
 
 		/*
 		 * Check if any file handles have signaled
@@ -273,14 +300,14 @@ poll(struct pollfd *pfds, nfds_t nfds, int timeout_ms)
 				 * general errno value.
 				 */
 				errno = ENOMEM;
-				return 0;
+				return -1;
 			}
 		}
 
 		/*
 		 * If we signaled on a file handle, don't wait on the sockets.
 		 */
-		if (wait_rc >= WAIT_OBJECT_0 &&
+		if (num_handles && wait_rc >= WAIT_OBJECT_0 &&
 		    (wait_rc <= WAIT_OBJECT_0 + num_handles - 1)) {
 			tv.tv_usec = 0;
 			handle_signaled = 1;
@@ -298,7 +325,7 @@ poll(struct pollfd *pfds, nfds_t nfds, int timeout_ms)
 
 		timespent_ms += looptime_ms;
 
-	} while (timespent_ms < timeout_ms);
+	} while (timeout_ms == -1 || timespent_ms < timeout_ms);
 
 	rc = 0;
 	num_handles = 0;

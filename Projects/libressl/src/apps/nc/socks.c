@@ -1,4 +1,4 @@
-/*	$OpenBSD: socks.c,v 1.24 2016/06/27 14:43:04 deraadt Exp $	*/
+/*	$OpenBSD: socks.c,v 1.34 2025/05/22 06:40:26 djm Exp $	*/
 
 /*
  * Copyright (c) 1999 Niklas Hallqvist.  All rights reserved.
@@ -53,7 +53,7 @@
 #define SOCKS_DOMAIN	3
 #define SOCKS_IPV6	4
 
-int	remote_connect(const char *, const char *, struct addrinfo);
+int	remote_connect(const char *, const char *, struct addrinfo, char *);
 int	socks_connect(const char *, const char *, struct addrinfo,
 	    const char *, const char *, struct addrinfo, int,
 	    const char *);
@@ -65,7 +65,7 @@ decode_addrport(const char *h, const char *p, struct sockaddr *addr,
 	int r;
 	struct addrinfo hints, *res;
 
-	bzero(&hints, sizeof(hints));
+	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = v4only ? PF_INET : PF_UNSPEC;
 	hints.ai_flags = numeric ? AI_NUMERICHOST : 0;
 	hints.ai_socktype = SOCK_STREAM;
@@ -109,17 +109,16 @@ proxy_read_line(int fd, char *buf, size_t bufsz)
 	return (off);
 }
 
-static const char *
-getproxypass(const char *proxyuser, const char *proxyhost)
+static void
+getproxypass(const char *proxyuser, const char *proxyhost,
+    char *pw, size_t pwlen)
 {
 	char prompt[512];
-	static char pw[256];
 
 	snprintf(prompt, sizeof(prompt), "Proxy password for %s@%s: ",
 	   proxyuser, proxyhost);
-	if (readpassphrase(prompt, pw, sizeof(pw), RPP_REQUIRE_TTY) == NULL)
+	if (readpassphrase(prompt, pw, pwlen, RPP_REQUIRE_TTY) == NULL)
 		errx(1, "Unable to read proxy passphrase");
-	return (pw);
 }
 
 /*
@@ -188,7 +187,6 @@ socks_connect(const char *host, const char *port,
 	struct sockaddr_in *in4 = (struct sockaddr_in *)&addr;
 	struct sockaddr_in6 *in6 = (struct sockaddr_in6 *)&addr;
 	in_port_t serverport;
-	const char *proxypass = NULL;
 
 	if (proxyport == NULL)
 		proxyport = (socksv == -1) ? HTTP_PROXY_PORT : SOCKS_PORT;
@@ -203,7 +201,7 @@ socks_connect(const char *host, const char *port,
 	if (authretry++ > 3)
 		errx(1, "Too many authentication failures");
 
-	proxyfd = remote_connect(proxyhost, proxyport, proxyhints);
+	proxyfd = remote_connect(proxyhost, proxyport, proxyhints, NULL);
 
 	if (proxyfd < 0)
 		return (-1);
@@ -295,19 +293,33 @@ socks_connect(const char *host, const char *port,
 		default:
 			errx(1, "connection failed, unsupported address type");
 		}
-	} else if (socksv == 4) {
-		/* This will exit on lookup failure */
-		decode_addrport(host, port, (struct sockaddr *)&addr,
-		    sizeof(addr), 1, 0);
+	} else if (socksv == 4 || socksv == 44) {
+		if (socksv == 4) {
+			/* This will exit on lookup failure */
+			decode_addrport(host, port, (struct sockaddr *)&addr,
+			    sizeof(addr), 1, 0);
+		}
 
 		/* Version 4 */
 		buf[0] = SOCKS_V4;
 		buf[1] = SOCKS_CONNECT;	/* connect */
 		memcpy(buf + 2, &in4->sin_port, sizeof in4->sin_port);
-		memcpy(buf + 4, &in4->sin_addr, sizeof in4->sin_addr);
+		if (socksv == 4) {
+			memcpy(buf + 4, &in4->sin_addr, sizeof in4->sin_addr);
+		} else {
+			/* SOCKS4A uses addr of 0.0.0.x, and hostname later */
+			buf[4] = buf[5] = buf[6] = 0;
+			buf[7] = 1;
+		}
 		buf[8] = 0;	/* empty username */
 		wlen = 9;
-
+		if (socksv == 44) {
+			/* SOCKS4A has nul-terminated hostname after user */
+			if (strlcpy(buf + 9, host,
+			    sizeof(buf) - 9) >= sizeof(buf) - 9)
+				errx(1, "hostname too big");
+			wlen = 9 + strlen(host) + 1;
+		}
 		cnt = atomicio(vwrite, proxyfd, buf, wlen);
 		if (cnt != wlen)
 			err(1, "write failed (%zu/%zu)", cnt, wlen);
@@ -323,7 +335,7 @@ socks_connect(const char *host, const char *port,
 		/* HTTP proxy CONNECT */
 
 		/* Disallow bad chars in hostname */
-		if (strcspn(host, "\r\n\t []:") != strlen(host))
+		if (strcspn(host, "\r\n\t []") != strlen(host))
 			errx(1, "Invalid hostname");
 
 		/* Try to be sane about numeric IPv6 addresses */
@@ -336,7 +348,7 @@ socks_connect(const char *host, const char *port,
 			    "CONNECT %s:%d HTTP/1.0\r\n",
 			    host, ntohs(serverport));
 		}
-		if (r == -1 || (size_t)r >= sizeof(buf))
+		if (r < 0 || (size_t)r >= sizeof(buf))
 			errx(1, "hostname too long");
 		r = strlen(buf);
 
@@ -345,22 +357,27 @@ socks_connect(const char *host, const char *port,
 			err(1, "write failed (%zu/%d)", cnt, r);
 
 		if (authretry > 1) {
+			char proxypass[256];
 			char resp[1024];
 
-			proxypass = getproxypass(proxyuser, proxyhost);
+			getproxypass(proxyuser, proxyhost,
+			    proxypass, sizeof proxypass);
 			r = snprintf(buf, sizeof(buf), "%s:%s",
 			    proxyuser, proxypass);
+			explicit_bzero(proxypass, sizeof proxypass);
 			if (r == -1 || (size_t)r >= sizeof(buf) ||
 			    b64_ntop(buf, strlen(buf), resp,
 			    sizeof(resp)) == -1)
 				errx(1, "Proxy username/password too long");
 			r = snprintf(buf, sizeof(buf), "Proxy-Authorization: "
 			    "Basic %s\r\n", resp);
-			if (r == -1 || (size_t)r >= sizeof(buf))
+			if (r < 0 || (size_t)r >= sizeof(buf))
 				errx(1, "Proxy auth response too long");
 			r = strlen(buf);
 			if ((cnt = atomicio(vwrite, proxyfd, buf, r)) != r)
 				err(1, "write failed (%zu/%d)", cnt, r);
+			explicit_bzero(proxypass, sizeof proxypass);
+			explicit_bzero(buf, sizeof buf);
 		}
 
 		/* Terminate headers */
@@ -370,15 +387,16 @@ socks_connect(const char *host, const char *port,
 		/* Read status reply */
 		proxy_read_line(proxyfd, buf, sizeof(buf));
 		if (proxyuser != NULL &&
-		    strncmp(buf, "HTTP/1.0 407 ", 12) == 0) {
+		    (strncmp(buf, "HTTP/1.0 407 ", 13) == 0 ||
+		    strncmp(buf, "HTTP/1.1 407 ", 13) == 0)) {
 			if (authretry > 1) {
 				fprintf(stderr, "Proxy authentication "
 				    "failed\n");
 			}
 			close(proxyfd);
 			goto again;
-		} else if (strncmp(buf, "HTTP/1.0 200 ", 12) != 0 &&
-		    strncmp(buf, "HTTP/1.1 200 ", 12) != 0)
+		} else if (strncmp(buf, "HTTP/1.0 200 ", 13) != 0 &&
+		    strncmp(buf, "HTTP/1.1 200 ", 13) != 0)
 			errx(1, "Proxy error: \"%s\"", buf);
 
 		/* Headers continue until we hit an empty line */

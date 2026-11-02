@@ -1,4 +1,4 @@
-.\"	$OpenBSD: BN_set_flags.3,v 1.2 2018/03/21 09:03:49 schwarze Exp $
+.\"	$OpenBSD: BN_set_flags.3,v 1.7 2025/06/08 22:40:29 schwarze Exp $
 .\"
 .\" Copyright (c) 2017 Ingo Schwarze <schwarze@openbsd.org>
 .\"
@@ -14,7 +14,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: March 21 2018 $
+.Dd $Mdocdate: June 8 2025 $
 .Dt BN_SET_FLAGS 3
 .Os
 .Sh NAME
@@ -22,6 +22,7 @@
 .Nm BN_get_flags
 .Nd enable and inspect flags on BIGNUM objects
 .Sh SYNOPSIS
+.Lb libcrypto
 .In openssl/bn.h
 .Ft void
 .Fo BN_set_flags
@@ -47,6 +48,8 @@ together:
 .It Dv BN_FLG_CONSTTIME
 If this flag is set on the divident
 .Fa a
+or the divisor
+.Fa d
 in
 .Xr BN_div 3 ,
 on the exponent
@@ -59,27 +62,14 @@ or the modulus
 .Fa n
 in
 .Xr BN_mod_inverse 3 ,
-these functions prefer algorithms with an execution time independent
+these functions select algorithms with an execution time independent
 of the respective numbers, to avoid exposing sensitive information
-to timing attacks.
+to timing side-channel attacks.
 .Pp
-If this flag is set on the exponent
-.Fa p
-in
-.Xr BN_exp 3
-or if the modulus
-.Fa m
-is even for
-.Xr BN_mod_exp 3 ,
-an error occurs.
-.Pp
-Various functions automatically set this flag on sensitive data.
-For example, the default implementations of
-.Xr DH_generate_key 3 ,
-.Xr DSA_generate_key 3 ,
-and
-.Xr RSA_generate_key_ex 3
-set it on the generated private key.
+This flag is off by default for
+.Vt BIGNUM
+objects created with
+.Xr BN_new 3 .
 .It Dv BN_FLG_MALLOCED
 If this flag is set,
 .Xr BN_free 3
@@ -107,14 +97,12 @@ object is usually a terrible idea that can cause both disclosure
 of secret data and memory leaks.
 This flag is automatically set on the constant
 .Vt BIGNUM
-objects returned by
-.Xr BN_value_one 3
-and by the functions documented in
-.Xr BN_get0_nist_prime_521 3 .
+object returned by
+.Xr BN_value_one 3 .
 .El
 .Pp
 .Fn BN_get_flags
-interpretes
+interprets
 .Fa flags
 as a bitmask and returns those of the given flags that are set in
 .Fa b ,
@@ -125,11 +113,6 @@ The
 .Fa flags
 argument has the same syntax as for
 .Fn BN_set_flags .
-.Pp
-These functions are currently implemented as macros, but they are
-likely to become real functions in the future when the
-.Vt BIGNUM
-data type will be made opaque.
 .Sh RETURN VALUES
 .Fn BN_get_flags
 returns zero or more of the above constants, OR'ed together.
@@ -148,3 +131,31 @@ first appeared in SSLeay 0.9.1 and have been available since
 No public interface exists to clear a flag once it is set.
 So think twice before using
 .Fn BN_set_flags .
+.Sh BUGS
+Even if the
+.Dv BN_FLG_CONSTTIME
+flag is set on
+.Fa a
+or
+.Fa b ,
+.Fn BN_gcd
+neither fails nor operates in constant time, potentially allowing
+timing side-channel attacks.
+.Pp
+Even if the
+.Dv BN_FLG_CONSTTIME
+flag is set on
+.Fa p ,
+if the modulus
+.Fa m
+is even,
+.Xr BN_mod_exp 3
+does not operate in constant time, potentially allowing
+timing side-channel attacks.
+.Pp
+If
+.Dv BN_FLG_CONSTTIME
+is set on
+.Fa p ,
+.Fn BN_exp
+fails instead of operating in constant time.

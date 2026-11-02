@@ -1,4 +1,4 @@
-.\"	$OpenBSD: SSL_CTX_get_verify_mode.3,v 1.4 2018/03/21 17:58:58 schwarze Exp $
+.\"	$OpenBSD: SSL_CTX_get_verify_mode.3,v 1.6 2025/06/08 22:52:00 schwarze Exp $
 .\"	OpenSSL b97fdb57 Nov 11 09:33:09 2016 +0100
 .\"
 .\" This file was written by Lutz Jaenicke <jaenicke@openssl.org>.
@@ -48,7 +48,7 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: March 21 2018 $
+.Dd $Mdocdate: June 8 2025 $
 .Dt SSL_CTX_GET_VERIFY_MODE 3
 .Os
 .Sh NAME
@@ -60,6 +60,7 @@
 .Nm SSL_CTX_get_verify_callback
 .Nd get currently set verification parameters
 .Sh SYNOPSIS
+.Lb libssl libcrypto
 .In openssl/ssl.h
 .Ft int
 .Fn SSL_CTX_get_verify_mode "const SSL_CTX *ctx"
@@ -121,7 +122,7 @@ pointer is returned and the default callback will be used.
 .Fn SSL_get_verify_callback ,
 and
 .Fn SSL_CTX_get_verify_callback
-appeared before SSLeay 0.8 and have been available since
+first appeared in SSLeay 0.8.0 and have been available since
 .Ox 2.4 .
 .Pp
 .Fn SSL_CTX_get_verify_depth

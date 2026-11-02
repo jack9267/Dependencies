@@ -1,4 +1,4 @@
-/* $OpenBSD: s_time.c,v 1.23 2018/02/07 05:47:55 jsing Exp $ */
+/* $OpenBSD: s_time.c,v 1.39 2025/01/02 13:10:03 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -78,8 +78,6 @@
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 
-#include "s_apps.h"
-
 #define SSL_CONNECT_NAME	"localhost:4433"
 
 #define BUFSIZZ 1024*10
@@ -90,13 +88,15 @@
 extern int verify_depth;
 
 static void s_time_usage(void);
-static SSL *doConnection(SSL * scon);
+static int run_test(SSL *);
+static int benchmark(int);
+static void print_tally_mark(SSL *);
 
 static SSL_CTX *tm_ctx = NULL;
 static const SSL_METHOD *s_time_meth = NULL;
 static long bytes_read = 0;
 
-struct {
+static struct {
 	int bugs;
 	char *CAfile;
 	char *CApath;
@@ -111,42 +111,42 @@ struct {
 	int verify;
 	int verify_depth;
 	char *www_path;
-} s_time_config;
+} cfg;
 
-struct option s_time_options[] = {
+static const struct option s_time_options[] = {
 	{
 		.name = "bugs",
 		.desc = "Enable workarounds for known SSL/TLS bugs",
 		.type = OPTION_FLAG,
-		.opt.flag = &s_time_config.bugs,
+		.opt.flag = &cfg.bugs,
 	},
 	{
 		.name = "CAfile",
 		.argname = "file",
 		.desc = "File containing trusted certificates in PEM format",
 		.type = OPTION_ARG,
-		.opt.arg = &s_time_config.CAfile,
+		.opt.arg = &cfg.CAfile,
 	},
 	{
 		.name = "CApath",
 		.argname = "path",
 		.desc = "Directory containing trusted certificates",
 		.type = OPTION_ARG,
-		.opt.arg = &s_time_config.CApath,
+		.opt.arg = &cfg.CApath,
 	},
 	{
 		.name = "cert",
 		.argname = "file",
 		.desc = "Client certificate to use, if one is requested",
 		.type = OPTION_ARG,
-		.opt.arg = &s_time_config.certfile,
+		.opt.arg = &cfg.certfile,
 	},
 	{
 		.name = "cipher",
 		.argname = "list",
 		.desc = "List of cipher suites to send to the server",
 		.type = OPTION_ARG,
-		.opt.arg = &s_time_config.cipher,
+		.opt.arg = &cfg.cipher,
 	},
 	{
 		.name = "connect",
@@ -154,39 +154,39 @@ struct option s_time_options[] = {
 		.desc = "Host and port to connect to (default "
 		    SSL_CONNECT_NAME ")",
 		.type = OPTION_ARG,
-		.opt.arg = &s_time_config.host,
+		.opt.arg = &cfg.host,
 	},
 	{
 		.name = "key",
 		.argname = "file",
 		.desc = "Client private key to use, if one is required",
 		.type = OPTION_ARG,
-		.opt.arg = &s_time_config.keyfile,
+		.opt.arg = &cfg.keyfile,
 	},
 	{
 		.name = "nbio",
 		.desc = "Use non-blocking I/O",
 		.type = OPTION_FLAG,
-		.opt.flag = &s_time_config.nbio,
+		.opt.flag = &cfg.nbio,
 	},
 	{
 		.name = "new",
 		.desc = "Use a new session ID for each connection",
 		.type = OPTION_VALUE,
-		.opt.value = &s_time_config.perform,
+		.opt.value = &cfg.perform,
 		.value = 1,
 	},
 	{
 		.name = "no_shutdown",
 		.desc = "Shut down the connection without notifying the server",
 		.type = OPTION_FLAG,
-		.opt.flag = &s_time_config.no_shutdown,
+		.opt.flag = &cfg.no_shutdown,
 	},
 	{
 		.name = "reuse",
 		.desc = "Reuse the same session ID for each connection",
 		.type = OPTION_VALUE,
-		.opt.value = &s_time_config.perform,
+		.opt.value = &cfg.perform,
 		.value = 2,
 	},
 	{
@@ -194,21 +194,21 @@ struct option s_time_options[] = {
 		.argname = "seconds",
 		.desc = "Duration to perform timing tests for (default 30)",
 		.type = OPTION_ARG_TIME,
-		.opt.tvalue = &s_time_config.maxtime,
+		.opt.tvalue = &cfg.maxtime,
 	},
 	{
 		.name = "verify",
 		.argname = "depth",
 		.desc = "Enable peer certificate verification with given depth",
 		.type = OPTION_ARG_INT,
-		.opt.value = &s_time_config.verify_depth,
+		.opt.value = &cfg.verify_depth,
 	},
 	{
 		.name = "www",
 		.argname = "page",
 		.desc = "Page to GET from the server (default none)",
 		.type = OPTION_ARG,
-		.opt.arg = &s_time_config.www_path,
+		.opt.arg = &cfg.www_path,
 	},
 	{ NULL },
 };
@@ -226,64 +226,44 @@ s_time_usage(void)
 }
 
 /***********************************************************************
- * TIME - time functions
- */
-#define START	0
-#define STOP	1
-
-static double
-tm_Time_F(int op)
-{
-	return app_timer_user(op);
-}
-
-/***********************************************************************
  * MAIN - main processing area for client
  *			real name depends on MONOLITH
  */
 int
 s_time_main(int argc, char **argv)
 {
-	double totalTime = 0.0;
-	int nConn = 0;
-	SSL *scon = NULL;
-	time_t finishtime;
 	int ret = 1;
-	char buf[1024 * 8];
-	int ver;
 
-	if (single_execution) {
-		if (pledge("stdio rpath inet dns", NULL) == -1) {
-			perror("pledge");
-			exit(1);
-		}
+	if (pledge("stdio rpath inet dns", NULL) == -1) {
+		perror("pledge");
+		exit(1);
 	}
 
-	s_time_meth = SSLv23_client_method();
+	s_time_meth = TLS_client_method();
 
 	verify_depth = 0;
 
-	memset(&s_time_config, 0, sizeof(s_time_config));
+	memset(&cfg, 0, sizeof(cfg));
 
-	s_time_config.host = SSL_CONNECT_NAME;
-	s_time_config.maxtime = SECONDS;
-	s_time_config.perform = 3;
-	s_time_config.verify = SSL_VERIFY_NONE;
-	s_time_config.verify_depth = -1;
+	cfg.host = SSL_CONNECT_NAME;
+	cfg.maxtime = SECONDS;
+	cfg.perform = 3;
+	cfg.verify = SSL_VERIFY_NONE;
+	cfg.verify_depth = -1;
 
 	if (options_parse(argc, argv, s_time_options, NULL, NULL) != 0) {
 		s_time_usage();
 		goto end;
 	}
 
-	if (s_time_config.verify_depth >= 0) {
-		s_time_config.verify = SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE;
-		verify_depth = s_time_config.verify_depth;
+	if (cfg.verify_depth >= 0) {
+		cfg.verify = SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE;
+		verify_depth = cfg.verify_depth;
 		BIO_printf(bio_err, "verify depth is %d\n", verify_depth);
 	}
 
-	if (s_time_config.www_path != NULL &&
-	    strlen(s_time_config.www_path) > MYBUFSIZ - 100) {
+	if (cfg.www_path != NULL &&
+	    strlen(cfg.www_path) > MYBUFSIZ - 100) {
 		BIO_printf(bio_err, "-www option too long\n");
 		goto end;
 	}
@@ -293,25 +273,25 @@ s_time_main(int argc, char **argv)
 
 	SSL_CTX_set_quiet_shutdown(tm_ctx, 1);
 
-	if (s_time_config.bugs)
+	if (cfg.bugs)
 		SSL_CTX_set_options(tm_ctx, SSL_OP_ALL);
 
-	if (s_time_config.cipher != NULL) {
-		if (!SSL_CTX_set_cipher_list(tm_ctx, s_time_config.cipher)) {
+	if (cfg.cipher != NULL) {
+		if (!SSL_CTX_set_cipher_list(tm_ctx, cfg.cipher)) {
 			BIO_printf(bio_err, "error setting cipher list\n");
 			ERR_print_errors(bio_err);
 			goto end;
 		}
 	}
 
-	SSL_CTX_set_verify(tm_ctx, s_time_config.verify, NULL);
+	SSL_CTX_set_verify(tm_ctx, cfg.verify, NULL);
 
-	if (!set_cert_stuff(tm_ctx, s_time_config.certfile,
-	    s_time_config.keyfile))
+	if (!set_cert_stuff(tm_ctx, cfg.certfile,
+	    cfg.keyfile))
 		goto end;
 
-	if ((!SSL_CTX_load_verify_locations(tm_ctx, s_time_config.CAfile,
-	    s_time_config.CApath)) ||
+	if ((!SSL_CTX_load_verify_locations(tm_ctx, cfg.CAfile,
+	    cfg.CApath)) ||
 	    (!SSL_CTX_set_default_verify_paths(tm_ctx))) {
 		/*
 		 * BIO_printf(bio_err,"error setting default verify
@@ -321,160 +301,24 @@ s_time_main(int argc, char **argv)
 		/* goto end; */
 	}
 
-	if (!(s_time_config.perform & 1))
-		goto next;
-	printf("Collecting connection statistics for %lld seconds\n",
-	    (long long)s_time_config.maxtime);
-
 	/* Loop and time how long it takes to make connections */
-
-	bytes_read = 0;
-	finishtime = time(NULL) + s_time_config.maxtime;
-	tm_Time_F(START);
-	for (;;) {
-		if (finishtime < time(NULL))
-			break;
-		if ((scon = doConnection(NULL)) == NULL)
+	if (cfg.perform & 1) {
+		printf("Collecting connection statistics for %lld seconds\n",
+		    (long long)cfg.maxtime);
+		if (benchmark(0))
 			goto end;
-
-		if (s_time_config.www_path != NULL) {
-			int i, retval = snprintf(buf, sizeof buf,
-			    "GET %s HTTP/1.0\r\n\r\n", s_time_config.www_path);
-			if ((size_t)retval >= sizeof buf) {
-				fprintf(stderr, "URL too long\n");
-				goto end;
-			}
-			SSL_write(scon, buf, strlen(buf));
-			while ((i = SSL_read(scon, buf, sizeof(buf))) > 0)
-				bytes_read += i;
-		}
-		if (s_time_config.no_shutdown)
-			SSL_set_shutdown(scon, SSL_SENT_SHUTDOWN |
-			    SSL_RECEIVED_SHUTDOWN);
-		else
-			SSL_shutdown(scon);
-
-		nConn += 1;
-		if (SSL_session_reused(scon))
-			ver = 'r';
-		else {
-			ver = SSL_version(scon);
-			if (ver == TLS1_VERSION)
-				ver = 't';
-			else if (ver == SSL3_VERSION)
-				ver = '3';
-			else if (ver == SSL2_VERSION)
-				ver = '2';
-			else
-				ver = '*';
-		}
-		fputc(ver, stdout);
-		fflush(stdout);
-
-		SSL_free(scon);
-		scon = NULL;
 	}
-	totalTime += tm_Time_F(STOP);	/* Add the time for this iteration */
-
-	printf("\n\n%d connections in %.2fs; %.2f connections/user sec, bytes read %ld\n",
-	    nConn, totalTime, ((double) nConn / totalTime), bytes_read);
-	printf("%d connections in %lld real seconds, %ld bytes read per connection\n",
-	    nConn,
-	    (long long)(time(NULL) - finishtime + s_time_config.maxtime),
-	    bytes_read / nConn);
-
 	/*
 	 * Now loop and time connections using the same session id over and
 	 * over
 	 */
-
- next:
-	if (!(s_time_config.perform & 2))
-		goto end;
-	printf("\n\nNow timing with session id reuse.\n");
-
-	/* Get an SSL object so we can reuse the session id */
-	if ((scon = doConnection(NULL)) == NULL) {
-		fprintf(stderr, "Unable to get connection\n");
-		goto end;
-	}
-	if (s_time_config.www_path != NULL) {
-		int retval = snprintf(buf, sizeof buf,
-		    "GET %s HTTP/1.0\r\n\r\n", s_time_config.www_path);
-		if ((size_t)retval >= sizeof buf) {
-			fprintf(stderr, "URL too long\n");
+	if (cfg.perform & 2) {
+		printf("\n\nNow timing with session id reuse.\n");
+		if (benchmark(1))
 			goto end;
-		}
-		SSL_write(scon, buf, strlen(buf));
-		while (SSL_read(scon, buf, sizeof(buf)) > 0);
 	}
-	if (s_time_config.no_shutdown)
-		SSL_set_shutdown(scon, SSL_SENT_SHUTDOWN |
-		    SSL_RECEIVED_SHUTDOWN);
-	else
-		SSL_shutdown(scon);
-
-	nConn = 0;
-	totalTime = 0.0;
-
-	finishtime = time(NULL) + s_time_config.maxtime;
-
-	printf("starting\n");
-	bytes_read = 0;
-	tm_Time_F(START);
-
-	for (;;) {
-		if (finishtime < time(NULL))
-			break;
-		if ((doConnection(scon)) == NULL)
-			goto end;
-
-		if (s_time_config.www_path) {
-			int i, retval = snprintf(buf, sizeof buf,
-			    "GET %s HTTP/1.0\r\n\r\n", s_time_config.www_path);
-			if ((size_t)retval >= sizeof buf) {
-				fprintf(stderr, "URL too long\n");
-				goto end;
-			}
-			SSL_write(scon, buf, strlen(buf));
-			while ((i = SSL_read(scon, buf, sizeof(buf))) > 0)
-				bytes_read += i;
-		}
-		if (s_time_config.no_shutdown)
-			SSL_set_shutdown(scon, SSL_SENT_SHUTDOWN |
-			    SSL_RECEIVED_SHUTDOWN);
-		else
-			SSL_shutdown(scon);
-
-		nConn += 1;
-		if (SSL_session_reused(scon))
-			ver = 'r';
-		else {
-			ver = SSL_version(scon);
-			if (ver == TLS1_VERSION)
-				ver = 't';
-			else if (ver == SSL3_VERSION)
-				ver = '3';
-			else if (ver == SSL2_VERSION)
-				ver = '2';
-			else
-				ver = '*';
-		}
-		fputc(ver, stdout);
-		fflush(stdout);
-	}
-	totalTime += tm_Time_F(STOP);	/* Add the time for this iteration */
-
-	printf("\n\n%d connections in %.2fs; %.2f connections/user sec, bytes read %ld\n", nConn, totalTime, ((double) nConn / totalTime), bytes_read);
-	printf("%d connections in %lld real seconds, %ld bytes read per connection\n",
-	    nConn,
-	    (long long)(time(NULL) - finishtime + s_time_config.maxtime),
-	    bytes_read / nConn);
-
 	ret = 0;
  end:
-	SSL_free(scon);
-
 	if (tm_ctx != NULL) {
 		SSL_CTX_free(tm_ctx);
 		tm_ctx = NULL;
@@ -484,44 +328,32 @@ s_time_main(int argc, char **argv)
 }
 
 /***********************************************************************
- * doConnection - make a connection
+ * run_test - make a connection, get a file, and shut down the connection
+ *	
  * Args:
- *		scon	= earlier ssl connection for session id, or NULL
+ *		scon	= SSL connection
  * Returns:
- *		SSL *	= the connection pointer.
+ *		1 on success, 0 on error
  */
-static SSL *
-doConnection(SSL * scon)
+static int
+run_test(SSL *scon)
 {
+	char buf[1024 * 8];
 	struct pollfd pfd[1];
-	SSL *serverCon;
 	BIO *conn;
 	long verify_error;
-	int i;
+	int i, retval;
 
 	if ((conn = BIO_new(BIO_s_connect())) == NULL)
-		return (NULL);
-
-/*	BIO_set_conn_port(conn,port);*/
-	BIO_set_conn_hostname(conn, s_time_config.host);
-
-	if (scon == NULL)
-		serverCon = SSL_new(tm_ctx);
-	else {
-		serverCon = scon;
-		SSL_set_connect_state(serverCon);
-	}
-
-	SSL_set_bio(serverCon, conn, conn);
-
-	/* ok, lets connect */
+		return 0;
+	BIO_set_conn_hostname(conn, cfg.host);
+	SSL_set_connect_state(scon);
+	SSL_set_bio(scon, conn, conn);
 	for (;;) {
-		i = SSL_connect(serverCon);
+		i = SSL_connect(scon);
 		if (BIO_sock_should_retry(i)) {
 			BIO_printf(bio_err, "DELAY\n");
-
-			i = SSL_get_fd(serverCon);
-			pfd[0].fd = i;
+			pfd[0].fd = SSL_get_fd(scon);
 			pfd[0].events = POLLIN;
 			poll(pfd, 1, -1);
 			continue;
@@ -530,15 +362,102 @@ doConnection(SSL * scon)
 	}
 	if (i <= 0) {
 		BIO_printf(bio_err, "ERROR\n");
-		verify_error = SSL_get_verify_result(serverCon);
+		verify_error = SSL_get_verify_result(scon);
 		if (verify_error != X509_V_OK)
 			BIO_printf(bio_err, "verify error:%s\n",
 			    X509_verify_cert_error_string(verify_error));
 		else
 			ERR_print_errors(bio_err);
-		if (scon == NULL)
-			SSL_free(serverCon);
-		return NULL;
+		return 0;
 	}
-	return serverCon;
+	if (cfg.www_path != NULL) {
+		retval = snprintf(buf, sizeof buf,
+		    "GET %s HTTP/1.0\r\n\r\n", cfg.www_path);
+		if (retval < 0 || retval >= sizeof buf) {
+			fprintf(stderr, "URL too long\n");
+			return 0;
+		}
+		if (SSL_write(scon, buf, retval) != retval)
+			return 0;
+		while ((i = SSL_read(scon, buf, sizeof(buf))) > 0)
+			bytes_read += i;
+	}
+	if (cfg.no_shutdown)
+		SSL_set_shutdown(scon, SSL_SENT_SHUTDOWN |
+		    SSL_RECEIVED_SHUTDOWN);
+	else
+		SSL_shutdown(scon);
+	return 1;
+}
+
+static void
+print_tally_mark(SSL *scon)
+{
+	int ver;
+
+	if (SSL_session_reused(scon))
+		ver = 'r';
+	else {
+		ver = SSL_version(scon);
+		if (ver == TLS1_VERSION)
+			ver = 't';
+		else
+			ver = '*';
+	}
+	fputc(ver, stdout);
+	fflush(stdout);
+}
+
+static int
+benchmark(int reuse_session)
+{
+	double elapsed, totalTime;
+	int nConn = 0;
+	SSL *scon = NULL;
+	int ret = 1;
+
+	if (reuse_session) {
+		/* Get an SSL object so we can reuse the session id */
+		if ((scon = SSL_new(tm_ctx)) == NULL)
+			goto end;
+		if (!run_test(scon)) {
+			fprintf(stderr, "Unable to get connection\n");
+			goto end;
+		}
+		printf("starting\n");
+	}
+
+	nConn = 0;
+	bytes_read = 0;
+
+	app_timer_real(TM_RESET);
+	app_timer_user(TM_RESET);
+	for (;;) {
+		elapsed = app_timer_real(TM_GET);
+		if (elapsed > cfg.maxtime)
+			break;
+		if (scon == NULL) {
+			if ((scon = SSL_new(tm_ctx)) == NULL)
+				goto end;
+		}
+		if (!run_test(scon))
+			goto end;
+		nConn += 1;
+		print_tally_mark(scon);
+		if (!reuse_session) {
+			SSL_free(scon);
+			scon = NULL;
+		}
+	}
+	totalTime = app_timer_user(TM_GET);
+
+	printf("\n\n%d connections in %.2fs; %.2f connections/user sec, bytes read %ld\n",
+	    nConn, totalTime, ((double) nConn / totalTime), bytes_read);
+	printf("%d connections in %.0f real seconds, %ld bytes read per connection\n",
+	    nConn, elapsed, nConn > 0 ? bytes_read / nConn : 0);
+
+	ret = 0;
+ end:
+	SSL_free(scon);
+	return ret;
 }

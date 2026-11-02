@@ -1,5 +1,6 @@
-.\" $OpenBSD: ECDSA_SIG_new.3,v 1.11 2018/03/23 23:18:17 schwarze Exp $
+.\" $OpenBSD: ECDSA_SIG_new.3,v 1.24 2025/06/13 18:34:00 schwarze Exp $
 .\" full merge up to: OpenSSL e9b77246 Jan 20 19:58:49 2017 +0100
+.\" selective merge up to: OpenSSL da4ea0cf Aug 5 16:13:24 2019 +0100
 .\"
 .\" This file was written by Nils Larsch <nils@openssl.org>.
 .\" Copyright (c) 2004, 2005, 2013, 2016 The OpenSSL Project.
@@ -49,32 +50,28 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: March 23 2018 $
+.Dd $Mdocdate: June 13 2025 $
 .Dt ECDSA_SIG_NEW 3
 .Os
 .Sh NAME
 .Nm ECDSA_SIG_new ,
 .Nm ECDSA_SIG_free ,
 .Nm ECDSA_SIG_get0 ,
+.Nm ECDSA_SIG_get0_r ,
+.Nm ECDSA_SIG_get0_s ,
 .Nm ECDSA_SIG_set0 ,
 .Nm i2d_ECDSA_SIG ,
 .Nm d2i_ECDSA_SIG ,
 .Nm ECDSA_size ,
-.Nm ECDSA_sign_setup ,
 .Nm ECDSA_sign ,
-.Nm ECDSA_sign_ex ,
 .Nm ECDSA_verify ,
 .Nm ECDSA_do_sign ,
-.Nm ECDSA_do_sign_ex ,
-.Nm ECDSA_do_verify ,
-.Nm ECDSA_OpenSSL ,
-.Nm ECDSA_get_default_method ,
-.Nm ECDSA_set_default_method ,
-.Nm ECDSA_set_method
+.Nm ECDSA_do_verify
 .Nd Elliptic Curve Digital Signature Algorithm
 .Sh SYNOPSIS
-.In openssl/ecdsa.h
-.Ft ECDSA_SIG*
+.Lb libcrypto
+.In openssl/ec.h
+.Ft ECDSA_SIG *
 .Fo ECDSA_SIG_new
 .Fa void
 .Fc
@@ -88,6 +85,14 @@
 .Fa "const BIGNUM **r"
 .Fa "const BIGNUM **s"
 .Fc
+.Ft const BIGNUM *
+.Fo ECDSA_SIG_get0_r
+.Fa "const ECDSA_SIG *sig"
+.Fc
+.Ft const BIGNUM *
+.Fo ECDSA_SIG_get0_s
+.Fa "const ECDSA_SIG *sig"
+.Fc
 .Ft int
 .Fo ECDSA_SIG_set0
 .Fa "ECDSA_SIG *sig"
@@ -96,25 +101,18 @@
 .Fc
 .Ft int
 .Fo i2d_ECDSA_SIG
-.Fa "const ECDSA_SIG *sig"
-.Fa "unsigned char **pp"
+.Fa "const ECDSA_SIG *sig_in"
+.Fa "unsigned char **der_out"
 .Fc
-.Ft ECDSA_SIG*
+.Ft ECDSA_SIG *
 .Fo d2i_ECDSA_SIG
-.Fa "ECDSA_SIG **sig"
-.Fa "const unsigned char **pp"
+.Fa "ECDSA_SIG **sig_out"
+.Fa "const unsigned char **der_in"
 .Fa "long len"
 .Fc
 .Ft int
 .Fo ECDSA_size
 .Fa "const EC_KEY *eckey"
-.Fc
-.Ft int
-.Fo ECDSA_sign_setup
-.Fa "EC_KEY *eckey"
-.Fa "BN_CTX *ctx"
-.Fa "BIGNUM **kinv"
-.Fa "BIGNUM **rp"
 .Fc
 .Ft int
 .Fo ECDSA_sign
@@ -126,17 +124,6 @@
 .Fa "EC_KEY *eckey"
 .Fc
 .Ft int
-.Fo ECDSA_sign_ex
-.Fa "int type"
-.Fa "const unsigned char *dgst"
-.Fa "int dgstlen"
-.Fa "unsigned char *sig"
-.Fa "unsigned int *siglen"
-.Fa "const BIGNUM *kinv"
-.Fa "const BIGNUM *rp"
-.Fa "EC_KEY *eckey"
-.Fc
-.Ft int
 .Fo ECDSA_verify
 .Fa "int type"
 .Fa "const unsigned char *dgst"
@@ -145,18 +132,10 @@
 .Fa "int siglen"
 .Fa "EC_KEY *eckey"
 .Fc
-.Ft ECDSA_SIG*
+.Ft ECDSA_SIG *
 .Fo ECDSA_do_sign
 .Fa "const unsigned char *dgst"
 .Fa "int dgst_len"
-.Fa "EC_KEY *eckey"
-.Fc
-.Ft ECDSA_SIG*
-.Fo ECDSA_do_sign_ex
-.Fa "const unsigned char *dgst"
-.Fa "int dgstlen"
-.Fa "const BIGNUM *kinv"
-.Fa "const BIGNUM *rp"
 .Fa "EC_KEY *eckey"
 .Fc
 .Ft int
@@ -165,23 +144,6 @@
 .Fa "int dgst_len"
 .Fa "const ECDSA_SIG *sig"
 .Fa "EC_KEY* eckey"
-.Fc
-.Ft const ECDSA_METHOD*
-.Fo ECDSA_OpenSSL
-.Fa void
-.Fc
-.Ft const ECDSA_METHOD*
-.Fo ECDSA_get_default_method
-.Fa void
-.Fc
-.Ft void
-.Fo ECDSA_set_default_method
-.Fa "const ECDSA_METHOD *meth"
-.Fc
-.Ft int
-.Fo ECDSA_set_method
-.Fa "EC_KEY *eckey"
-.Fa "const ECDSA_METHOD *meth"
 .Fc
 .Sh DESCRIPTION
 These functions provide a low level interface to ECDSA.
@@ -231,6 +193,15 @@ and
 .Fa s
 values contained in
 .Fa sig .
+The values
+.Fa r
+and
+.Fa s
+can also be retrieved separately by the corresponding function
+.Fn ECDSA_SIG_get0_r
+and
+.Fn ECDSA_SIG_get0_s ,
+respectively.
 .Pp
 .Fn ECDSA_SIG_set0
 sets the
@@ -246,71 +217,31 @@ should not be freed by the caller.
 .Pp
 .Fn i2d_ECDSA_SIG
 creates the DER encoding of the ECDSA signature
-.Fa sig
+.Fa sig_in
 and writes the encoded signature to
-.Fa *pp
-(note: if
-.Fa pp
-is
-.Dv NULL ,
-.Fn i2d_ECDSA_SIG
-returns the expected length in bytes of the DER-encoded signature).
-.Fn i2d_ECDSA_SIG
-returns the length of the DER-encoded signature (or 0 on error).
-.Pp
+.Pf * Fa der_out .
 .Fn d2i_ECDSA_SIG
-decodes a DER-encoded ECDSA signature and returns the decoded signature
-in a newly allocated
-.Vt ECDSA_SIG
-structure.
-.Fa *sig
-points to the buffer containing the DER-encoded signature of size
-.Fa len .
+decodes the DER-encoded signature stored in the buffer
+.Pf * Fa der_in
+which is
+.Fa len
+bytes long into
+.Pf * Fa sig_out .
+For details about the semantics, examples, caveats, and bugs, see
+.Xr ASN1_item_d2i 3 .
 .Pp
 .Fn ECDSA_size
 returns the maximum length of a DER-encoded ECDSA signature created with
 the private EC key
 .Fa eckey .
 .Pp
-.Fn ECDSA_sign_setup
-may be used to precompute parts of the signing operation.
-.Fa eckey
-is the private EC key and
-.Fa ctx
-is a pointer to a
-.Vt BN_CTX
-structure (or
-.Dv NULL ) .
-The precomputed values are returned in
-.Fa kinv
-and
-.Fa rp
-and can be used in a later call to
-.Fa ECDSA_sign_ex
-or
-.Fa ECDSA_do_sign_ex .
-.Pp
 .Fn ECDSA_sign
-is a wrapper function for
-.Fa ECDSA_sign_ex
-with
-.Fa kinv
-and
-.Fa rp
-set to
-.Dv NULL .
-.Pp
-.Fn ECDSA_sign_ex
 computes a digital signature of the
 .Fa dgstlen
 bytes hash value
 .Fa dgst
 using the private EC key
-.Fa eckey
-and the optional pre-computed values
-.Fa kinv
-and
-.Fa rp .
+.Fa eckey .
 The DER-encoded signature is stored in
 .Fa sig
 and its length is returned in
@@ -340,26 +271,12 @@ The parameter
 is ignored.
 .Pp
 .Fn ECDSA_do_sign
-is a wrapper function for
-.Fn ECDSA_do_sign_ex
-with
-.Fa kinv
-and
-.Fa rp
-set to
-.Dv NULL .
-.Pp
-.Fn ECDSA_do_sign_ex
 computes a digital signature of the
 .Fa dgst_len
 bytes hash value
 .Fa dgst
 using the private key
-.Fa eckey
-and the optional pre-computed values
-.Fa kinv
-and
-.Fa rp .
+.Fa eckey .
 The signature is returned in a newly allocated
 .Vt ECDSA_SIG
 structure (or
@@ -376,20 +293,43 @@ of size
 using the public key
 .Fa eckey .
 .Sh RETURN VALUES
+.Fn ECDSA_SIG_new
+returns the new
+.Vt ECDSA_SIG
+object or
+.Dv NULL
+if an error occurs.
+.Pp
+.Fn i2d_ECDSA_SIG
+returns the number of bytes successfully encoded
+or a negative value if an error occurs.
+.Pp
+.Fn d2i_ECDSA_SIG
+returns a pointer to the decoded
+.Vt ECDSA_SIG
+structure or
+.Dv NULL
+if an error occurs.
+.Pp
 .Fn ECDSA_size
 returns the maximum length signature or 0 on error.
 .Pp
-.Fn ECDSA_SIG_set0 ,
-.Fn ECDSA_sign ,
-.Fn ECDSA_sign_ex ,
+.Fn ECDSA_SIG_get0_r
 and
-.Fn ECDSA_sign_setup
+.Fn ECDSA_SIG_get0_s
+return a pointer owned by the
+.Vt ECDSA_SIG
+object if it has been set or
+.Dv NULL
+otherwise.
+.Pp
+.Fn ECDSA_SIG_set0
+and
+.Fn ECDSA_sign
 return 1 if successful or 0 on error.
 .Pp
 .Fn ECDSA_do_sign
-and
-.Fn ECDSA_do_sign_ex
-return a pointer to an allocated
+returns a pointer to an allocated
 .Vt ECDSA_SIG
 structure or
 .Dv NULL
@@ -403,8 +343,8 @@ error.
 The error codes can be obtained by
 .Xr ERR_get_error 3 .
 .Sh EXAMPLES
-Creating an ECDSA signature of given SHA-1 hash value using the named
-curve secp192k1.
+Creating an ECDSA signature of given SHA-384 hash value using the named
+curve secp384r1.
 .Pp
 First step: create an
 .Vt EC_KEY
@@ -417,7 +357,7 @@ int ret;
 ECDSA_SIG *sig;
 EC_KEY *eckey;
 
-eckey = EC_KEY_new_by_curve_name(NID_secp192k1);
+eckey = EC_KEY_new_by_curve_name(NID_secp384r1);
 if (eckey == NULL) {
 	/* error */
 }
@@ -426,10 +366,10 @@ if (!EC_KEY_generate_key(eckey)) {
 }
 .Ed
 .Pp
-Second step: compute the ECDSA signature of a SHA-1 hash value using
+Second step: compute the ECDSA signature of a SHA-384 hash value using
 .Fn ECDSA_do_sign
 .Bd -literal -offset indent
-sig = ECDSA_do_sign(digest, 20, eckey);
+sig = ECDSA_do_sign(digest, SHA384_DIGEST_LENGTH, eckey);
 if (sig == NULL) {
 	/* error */
 }
@@ -452,12 +392,12 @@ if (!ECDSA_sign(0, dgst, dgstlen, pp, &buf_len, eckey) {
 Third step: verify the created ECDSA signature using
 .Fn ECDSA_do_verify
 .Pp
-.Dl ret = ECDSA_do_verify(digest, 20, sig, eckey);
+.Dl ret = ECDSA_do_verify(digest, SHA384_DIGEST_LENGTH, sig, eckey);
 .Pp
 or using
 .Fn ECDSA_verify
 .Pp
-.Dl ret = ECDSA_verify(0, digest, 20, buffer, buf_len, eckey);
+.Dl ret = ECDSA_verify(0, digest, SHA384_DIGEST_LENGTH, buffer, buf_len, eckey);
 .Pp
 and finally evaluate the return value:
 .Bd -literal -offset indent
@@ -471,16 +411,18 @@ if (ret == -1) {
 }
 .Ed
 .Sh SEE ALSO
+.Xr crypto 3 ,
 .Xr d2i_ECPKParameters 3 ,
 .Xr DSA_new 3 ,
-.Xr EC_GROUP_new 3 ,
+.Xr EC_GROUP_new_by_curve_name 3 ,
+.Xr EC_KEY_METHOD_new 3 ,
 .Xr EC_KEY_new 3 ,
-.Xr ECDSA_set_ex_data 3 ,
+.Xr EC_KEY_set_ex_data 3 ,
 .Xr EVP_DigestSignInit 3 ,
 .Xr EVP_DigestVerifyInit 3 ,
 .Xr RSA_new 3
 .Sh STANDARDS
-ANSI X9.62, US Federal Information Processing Standard FIPS 186-2
+ANSI X9.62, US Federal Information Processing Standard FIPS 186-5
 (Digital Signature Standard, DSS)
 .Sh HISTORY
 .Fn ECDSA_SIG_new ,
@@ -488,18 +430,11 @@ ANSI X9.62, US Federal Information Processing Standard FIPS 186-2
 .Fn i2d_ECDSA_SIG ,
 .Fn d2i_ECDSA_SIG ,
 .Fn ECDSA_size ,
-.Fn ECDSA_sign_setup ,
 .Fn ECDSA_sign ,
-.Fn ECDSA_sign_ex ,
 .Fn ECDSA_verify ,
 .Fn ECDSA_do_sign ,
-.Fn ECDSA_do_sign_ex ,
-.Fn ECDSA_do_verify ,
-.Fn ECDSA_OpenSSL ,
-.Fn ECDSA_get_default_method ,
-.Fn ECDSA_set_default_method ,
 and
-.Fn ECDSA_set_method
+.Fn ECDSA_do_verify
 first appeared in OpenSSL 0.9.8 and have been available since
 .Ox 4.5 .
 .Pp
@@ -508,6 +443,11 @@ and
 .Fn ECDSA_SIG_set0
 first appeared in OpenSSL 1.1.0 and have been available since
 .Ox 6.3 .
+.Fn ECDSA_SIG_get0_r
+and
+.Fn ECDSA_SIG_get0_s
+first appeared in OpenSSL 1.1.1 and have been available since
+.Ox 7.1 .
 .Sh AUTHORS
 .An Nils Larsch
 for the OpenSSL project.

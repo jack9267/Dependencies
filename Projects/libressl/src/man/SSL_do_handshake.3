@@ -1,4 +1,4 @@
-.\"	$OpenBSD: SSL_do_handshake.3,v 1.5 2018/03/21 05:07:04 schwarze Exp $
+.\"	$OpenBSD: SSL_do_handshake.3,v 1.8 2026/08/25 00:08:28 jsg Exp $
 .\"	OpenSSL b97fdb57 Nov 11 09:33:09 2016 +0100
 .\"
 .\" This file was written by Martin Sjoegren <martin@strakt.com>.
@@ -48,19 +48,20 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: March 21 2018 $
+.Dd $Mdocdate: August 25 2026 $
 .Dt SSL_DO_HANDSHAKE 3
 .Os
 .Sh NAME
 .Nm SSL_do_handshake
 .Nd perform a TLS/SSL handshake
 .Sh SYNOPSIS
+.Lb libssl libcrypto
 .In openssl/ssl.h
 .Ft int
 .Fn SSL_do_handshake "SSL *ssl"
 .Sh DESCRIPTION
 .Fn SSL_do_handshake
-will wait for a SSL/TLS handshake to take place.
+will wait for an SSL/TLS handshake to take place.
 If the connection is in client mode, the handshake will be started.
 The handshake routines may have to be explicitly set in advance using either
 .Xr SSL_set_connect_state 3
@@ -148,5 +149,5 @@ to find out the reason.
 .Xr SSL_set_connect_state 3
 .Sh HISTORY
 .Fn SSL_do_handshake
-appeared before SSLeay 0.8 and has been available since
+first appeared in SSLeay 0.8.0 and has been available since
 .Ox 2.4 .

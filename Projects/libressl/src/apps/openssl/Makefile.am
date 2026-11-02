@@ -1,11 +1,34 @@
+#
+# Copyright (c) 2015 Brent Cook
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
 include $(top_srcdir)/Makefile.am.common
 
+-include $(abs_top_builddir)/crypto/libcrypto_la_objects.mk
+-include $(abs_top_builddir)/ssl/libssl_la_objects.mk
+
+if !ENABLE_LIBTLS_ONLY
 bin_PROGRAMS = openssl
-
 dist_man_MANS = openssl.1
+else
+noinst_PROGRAMS = openssl
+endif
 
-openssl_LDADD = $(abs_top_builddir)/ssl/libssl.la
-openssl_LDADD += $(abs_top_builddir)/crypto/libcrypto.la
+openssl_LDADD = $(libcrypto_la_objects)
+openssl_LDADD += $(libcompat_la_objects)
+openssl_LDADD += $(libcompatnoopt_la_objects)
+openssl_LDADD += $(libssl_la_objects)
 openssl_LDADD += $(PLATFORM_LDADD) $(PROG_LDADD)
 
 openssl_SOURCES = apps.c
@@ -14,6 +37,7 @@ openssl_SOURCES += ca.c
 openssl_SOURCES += ciphers.c
 openssl_SOURCES += crl.c
 openssl_SOURCES += crl2p7.c
+openssl_SOURCES += cms.c
 openssl_SOURCES += dgst.c
 openssl_SOURCES += dh.c
 openssl_SOURCES += dhparam.c
@@ -27,7 +51,6 @@ openssl_SOURCES += gendh.c
 openssl_SOURCES += gendsa.c
 openssl_SOURCES += genpkey.c
 openssl_SOURCES += genrsa.c
-openssl_SOURCES += nseq.c
 openssl_SOURCES += ocsp.c
 openssl_SOURCES += openssl.c
 openssl_SOURCES += passwd.c
@@ -50,7 +73,6 @@ openssl_SOURCES += s_time.c
 openssl_SOURCES += sess_id.c
 openssl_SOURCES += smime.c
 openssl_SOURCES += speed.c
-openssl_SOURCES += spkac.c
 openssl_SOURCES += ts.c
 openssl_SOURCES += verify.c
 openssl_SOURCES += version.c
@@ -80,45 +102,7 @@ openssl_SOURCES += compat/clock_gettime_osx.c
 endif
 endif
 
-if !HAVE_STRTONUM
-openssl_SOURCES += compat/strtonum.c
-endif
-
 noinst_HEADERS = apps.h
-noinst_HEADERS += progs.h
-noinst_HEADERS += s_apps.h
-noinst_HEADERS += testdsa.h
-noinst_HEADERS += testrsa.h
-noinst_HEADERS += timeouts.h
 
-EXTRA_DIST = cert.pem
-EXTRA_DIST += openssl.cnf
-EXTRA_DIST += x509v3.cnf
-EXTRA_DIST += CMakeLists.txt
+EXTRA_DIST = CMakeLists.txt
 
-install-exec-hook:
-	@if [ "@OPENSSLDIR@x" != "x" ]; then \
-		OPENSSLDIR="$(DESTDIR)@OPENSSLDIR@"; \
-	else \
-		OPENSSLDIR="$(DESTDIR)$(sysconfdir)/ssl"; \
-	fi; \
-	mkdir -p "$$OPENSSLDIR/certs"; \
-	for i in cert.pem openssl.cnf x509v3.cnf; do \
-		if [ ! -f "$$OPENSSLDIR/$i" ]; then \
-			$(INSTALL) -m 644 "$(srcdir)/$$i" "$$OPENSSLDIR/$$i"; \
-		else \
-			echo " $$OPENSSLDIR/$$i already exists, install will not overwrite"; \
-		fi \
-	done
-
-uninstall-local:
-	@if [ "@OPENSSLDIR@x" != "x" ]; then \
-		OPENSSLDIR="$(DESTDIR)@OPENSSLDIR@"; \
-	else \
-		OPENSSLDIR="$(DESTDIR)$(sysconfdir)/ssl"; \
-	fi; \
-	for i in cert.pem openssl.cnf x509v3.cnf; do \
-		if cmp -s "$$OPENSSLDIR/$$i" "$(srcdir)/$$i"; then \
-			rm -f "$$OPENSSLDIR/$$i"; \
-		fi \
-	done

@@ -1,5 +1,6 @@
-.\"	$OpenBSD: SSL_CTX_use_certificate.3,v 1.7 2018/03/24 00:55:37 schwarze Exp $
-.\"	OpenSSL e248596b Apr 8 22:49:57 2005 +0000
+.\" $OpenBSD: SSL_CTX_use_certificate.3,v 1.18 2025/06/08 22:52:00 schwarze Exp $
+.\" full merge up to: OpenSSL 3aaa1bd0 Mar 28 16:35:25 2017 +1000
+.\" selective merge up to: OpenSSL d1f7a1e6 Apr 26 14:05:40 2018 +0100
 .\"
 .\" This file was written by Lutz Jaenicke <jaenicke@openssl.org>.
 .\" Copyright (c) 2000, 2001, 2002, 2003, 2005 The OpenSSL Project.
@@ -49,7 +50,7 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: March 24 2018 $
+.Dd $Mdocdate: June 8 2025 $
 .Dt SSL_CTX_USE_CERTIFICATE 3
 .Os
 .Sh NAME
@@ -58,6 +59,7 @@
 .Nm SSL_CTX_use_certificate_file ,
 .Nm SSL_use_certificate ,
 .Nm SSL_use_certificate_ASN1 ,
+.Nm SSL_use_certificate_chain_file ,
 .Nm SSL_use_certificate_file ,
 .Nm SSL_CTX_use_certificate_chain_file ,
 .Nm SSL_CTX_use_certificate_chain_mem ,
@@ -77,6 +79,7 @@
 .Nm SSL_check_private_key
 .Nd load certificate and key data
 .Sh SYNOPSIS
+.Lb libssl libcrypto
 .In openssl/ssl.h
 .Ft int
 .Fn SSL_CTX_use_certificate "SSL_CTX *ctx" "X509 *x"
@@ -88,6 +91,8 @@
 .Fn SSL_use_certificate "SSL *ssl" "X509 *x"
 .Ft int
 .Fn SSL_use_certificate_ASN1 "SSL *ssl" "unsigned char *d" "int len"
+.Ft int
+.Fn SSL_use_certificate_chain_file "SSL *ssl" "const char *file"
 .Ft int
 .Fn SSL_use_certificate_file "SSL *ssl" "const char *file" "int type"
 .Ft int
@@ -117,7 +122,7 @@
 .Ft int
 .Fn SSL_use_RSAPrivateKey "SSL *ssl" "RSA *rsa"
 .Ft int
-.Fn SSL_use_RSAPrivateKey_ASN1 "SSL *ssl" "unsigned char *d" "long len"
+.Fn SSL_use_RSAPrivateKey_ASN1 "SSL *ssl" "const unsigned char *d" "long len"
 .Ft int
 .Fn SSL_use_RSAPrivateKey_file "SSL *ssl" "const char *file" "int type"
 .Ft int
@@ -218,7 +223,9 @@ The certificates must be in PEM format and must be sorted starting with the
 subject's certificate (actual client or server certificate),
 followed by intermediate CA certificates if applicable,
 and ending at the highest level (root) CA.
-There is no corresponding function working on a single
+With the exception of
+.Fn SSL_use_certificate_chain_file ,
+there is no corresponding function working on a single
 .Vt SSL
 object.
 .Pp
@@ -309,9 +316,9 @@ It compares the
 key components and parameters of an OpenSSL private key with the
 corresponding certificate loaded into
 .Fa ctx .
-If more than one key/certificate pair (RSA/DSA) is installed,
+If more than one key/certificate pair (RSA/ECDSA) is installed,
 the last item installed will be compared.
-If, e.g., the last item was a RSA certificate or key,
+If, e.g., the last item was an RSA certificate or key,
 the RSA key/certificate pair will be checked.
 .Fn SSL_check_private_key
 performs the same
@@ -334,10 +341,10 @@ They merely compare the public materials (e.g. exponent and modulus of
 an RSA key) and/or key parameters (e.g. EC params of an EC key) of a
 key pair.
 .Sh NOTES
-The internal certificate store of OpenSSL can hold two private key/certificate
-pairs at a time:
-one key/certificate of type RSA and one key/certificate of type DSA.
-The certificate used depends on the cipher select, see also
+The internal certificate store of OpenSSL can hold several private
+key/certificate pairs at a time.
+The certificate used depends on the cipher selected.
+See also
 .Xr SSL_CTX_set_cipher_list 3 .
 .Pp
 When reading certificates and private keys from file, files of type
@@ -354,11 +361,8 @@ can contain more than one item.
 .Fn SSL_CTX_use_certificate_chain_file
 adds the first certificate found in the file to the certificate store.
 The other certificates are added to the store of chain certificates using
-.Xr SSL_CTX_add_extra_chain_cert 3 .
-There exists only one extra chain store, so that the same chain is appended
-to both types of certificates, RSA and DSA!
-If it is not intended to use both type of certificate at the same time,
-it is recommended to use the
+.Xr SSL_CTX_add1_chain_cert 3 .
+It is recommended to use the
 .Fn SSL_CTX_use_certificate_chain_file
 instead of the
 .Fn SSL_CTX_use_certificate_file
@@ -384,41 +388,56 @@ Otherwise check out the error stack to find out the reason.
 .Sh SEE ALSO
 .Xr ssl 3 ,
 .Xr SSL_clear 3 ,
+.Xr SSL_CTX_add1_chain_cert 3 ,
 .Xr SSL_CTX_add_extra_chain_cert 3 ,
 .Xr SSL_CTX_load_verify_locations 3 ,
 .Xr SSL_CTX_set_cipher_list 3 ,
+.Xr SSL_CTX_set_client_CA_list 3 ,
 .Xr SSL_CTX_set_client_cert_cb 3 ,
 .Xr SSL_CTX_set_default_passwd_cb 3 ,
 .Xr SSL_new 3 ,
 .Xr X509_check_private_key 3
 .Sh HISTORY
+.Fn SSL_use_certificate ,
+.Fn SSL_use_certificate_file ,
+.Fn SSL_use_RSAPrivateKey ,
+and
+.Fn SSL_use_RSAPrivateKey_file
+appeared in SSLeay 0.4 or earlier.
+.Fn SSL_use_certificate_ASN1
+and
+.Fn SSL_use_RSAPrivateKey_ASN1
+first appeared in SSLeay 0.5.1.
+.Fn SSL_use_PrivateKey_file ,
+.Fn SSL_use_PrivateKey_ASN1 ,
+and
+.Fn SSL_use_PrivateKey
+first appeared in SSLeay 0.6.0.
 .Fn SSL_CTX_use_certificate ,
 .Fn SSL_CTX_use_certificate_ASN1 ,
 .Fn SSL_CTX_use_certificate_file ,
-.Fn SSL_use_certificate ,
-.Fn SSL_use_certificate_ASN1 ,
-.Fn SSL_use_certificate_file ,
 .Fn SSL_CTX_use_PrivateKey ,
 .Fn SSL_CTX_use_PrivateKey_ASN1 ,
 .Fn SSL_CTX_use_PrivateKey_file ,
 .Fn SSL_CTX_use_RSAPrivateKey ,
 .Fn SSL_CTX_use_RSAPrivateKey_ASN1 ,
-.Fn SSL_CTX_use_RSAPrivateKey_file ,
-.Fn SSL_use_PrivateKey_file ,
-.Fn SSL_use_PrivateKey_ASN1 ,
-.Fn SSL_use_PrivateKey ,
-.Fn SSL_use_RSAPrivateKey ,
-.Fn SSL_use_RSAPrivateKey_ASN1 ,
-.Fn SSL_use_RSAPrivateKey_file ,
-.Fn SSL_CTX_check_private_key ,
+and
+.Fn SSL_CTX_use_RSAPrivateKey_file
+first appeared in SSLeay 0.6.1.
+.Fn SSL_CTX_check_private_key
 and
 .Fn SSL_check_private_key
-appeared before SSLeay 0.8 and have been available since
+first appeared in SSLeay 0.6.5.
+All these functions have been available since
 .Ox 2.4 .
 .Pp
 .Fn SSL_CTX_use_certificate_chain_file
 first appeared in OpenSSL 0.9.4 and has been available since
 .Ox 2.6 .
+.Pp
+.Fn SSL_use_certificate_chain_file
+first appeared in OpenSSL 1.1.0 and has been available since
+.Ox 6.9 .
 .Pp
 Support for DER encoded private keys
 .Pq Dv SSL_FILETYPE_ASN1

@@ -1,4 +1,4 @@
-/* $OpenBSD: bss_fd.c,v 1.18 2015/02/12 03:54:07 jsing Exp $ */
+/* $OpenBSD: bss_fd.c,v 1.21 2023/07/05 21:23:37 beck Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -65,6 +65,8 @@
 
 #include <openssl/bio.h>
 
+#include "bio_local.h"
+
 static int fd_write(BIO *h, const char *buf, int num);
 static int fd_read(BIO *h, char *buf, int size);
 static int fd_puts(BIO *h, const char *str);
@@ -74,7 +76,7 @@ static int fd_new(BIO *h);
 static int fd_free(BIO *data);
 int BIO_fd_should_retry(int s);
 
-static BIO_METHOD methods_fdp = {
+static const BIO_METHOD methods_fdp = {
 	.type = BIO_TYPE_FD,
 	.name = "file descriptor",
 	.bwrite = fd_write,
@@ -86,11 +88,12 @@ static BIO_METHOD methods_fdp = {
 	.destroy = fd_free
 };
 
-BIO_METHOD *
+const BIO_METHOD *
 BIO_s_fd(void)
 {
 	return (&methods_fdp);
 }
+LCRYPTO_ALIAS(BIO_s_fd);
 
 BIO *
 BIO_new_fd(int fd, int close_flag)
@@ -102,6 +105,7 @@ BIO_new_fd(int fd, int close_flag)
 	BIO_set_fd(ret, fd, close_flag);
 	return (ret);
 }
+LCRYPTO_ALIAS(BIO_new_fd);
 
 static int
 fd_new(BIO *bi)
@@ -249,6 +253,7 @@ BIO_fd_should_retry(int i)
 	}
 	return (0);
 }
+LCRYPTO_ALIAS(BIO_fd_should_retry);
 
 int
 BIO_fd_non_fatal_error(int err)
@@ -265,3 +270,4 @@ BIO_fd_non_fatal_error(int err)
 	}
 	return (0);
 }
+LCRYPTO_ALIAS(BIO_fd_non_fatal_error);

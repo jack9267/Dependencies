@@ -1,4 +1,4 @@
-/* $OpenBSD: asn1evp.c,v 1.2 2017/12/09 14:34:09 jsing Exp $ */
+/* $OpenBSD: asn1evp.c,v 1.5 2022/09/05 21:06:31 tb Exp $ */
 /*
  * Copyright (c) 2017 Joel Sing <jsing@openbsd.org>
  *
@@ -36,12 +36,12 @@ unsigned char test_octetstring[] = {
 static void
 hexdump(const unsigned char *buf, size_t len)
 {
-        size_t i;
+	size_t i;
 
-        for (i = 1; i <= len; i++)
-                fprintf(stderr, " 0x%02hhx,%s", buf[i - 1], i % 8 ? "" : "\n");
+	for (i = 1; i <= len; i++)
+		fprintf(stderr, " 0x%02hhx,%s", buf[i - 1], i % 8 ? "" : "\n");
 
-        fprintf(stderr, "\n");
+	fprintf(stderr, "\n");
 }
 
 static int
@@ -69,41 +69,44 @@ main(int argc, char **argv)
 {
 	unsigned char data[16];
 	long num = TEST_NUM;
+	ASN1_TYPE *at = NULL;
 	int failed = 1;
-	ASN1_TYPE at;
 	int len;
 
-	memset(&at, 0, sizeof(at));
+	if ((at = ASN1_TYPE_new()) == NULL) {
+		fprintf(stderr, "FAIL: ASN1_TYPE_new returned NULL\n");
+		goto done;
+	}
 
-	if (!ASN1_TYPE_set_int_octetstring(&at, num, test_octetstring,
+	if (!ASN1_TYPE_set_int_octetstring(at, num, test_octetstring,
 	    sizeof(test_octetstring))) {
 		fprintf(stderr, "FAIL: ASN1_TYPE_set_int_octetstring failed\n");
 		goto done;
 	}
-	if (at.type != V_ASN1_SEQUENCE) {
-		fprintf(stderr, "FAIL: not a V_ASN1_SEQUENCE (%i != %i)\n",
-		    at.type, V_ASN1_SEQUENCE);
+	if (at->type != V_ASN1_SEQUENCE) {
+		fprintf(stderr, "FAIL: not a V_ASN1_SEQUENCE (%d != %d)\n",
+		    at->type, V_ASN1_SEQUENCE);
 		goto done;
 	}
-	if (at.value.sequence->type != V_ASN1_OCTET_STRING) {
-		fprintf(stderr, "FAIL: not a V_ASN1_OCTET_STRING (%i != %i)\n",
-		    at.type, V_ASN1_OCTET_STRING);
+	if (at->value.sequence->type != V_ASN1_OCTET_STRING) {
+		fprintf(stderr, "FAIL: not a V_ASN1_OCTET_STRING (%d != %d)\n",
+		    at->type, V_ASN1_OCTET_STRING);
 		goto done;
 	}
-	if (compare_data("sequence", at.value.sequence->data,
-	    at.value.sequence->length, asn1_atios, sizeof(asn1_atios)) == -1)
+	if (compare_data("sequence", at->value.sequence->data,
+	    at->value.sequence->length, asn1_atios, sizeof(asn1_atios)) == -1)
 		goto done;
 
 	memset(&data, 0, sizeof(data));
 	num = 0;
 
-	if ((len = ASN1_TYPE_get_int_octetstring(&at, &num, data,
+	if ((len = ASN1_TYPE_get_int_octetstring(at, &num, data,
 	    sizeof(data))) < 0) {
 		fprintf(stderr, "FAIL: ASN1_TYPE_get_int_octetstring failed\n");
 		goto done;
 	}
 	if (num != TEST_NUM) {
-		fprintf(stderr, "FAIL: got num %li, want %li\n", num, TEST_NUM);
+		fprintf(stderr, "FAIL: got num %ld, want %ld\n", num, TEST_NUM);
 		goto done;
 	}
 	if (compare_data("octet string", data, len,
@@ -118,16 +121,16 @@ main(int argc, char **argv)
 	num = 0;
 
 	/* With a limit buffer, the output should be truncated... */
-	if ((len = ASN1_TYPE_get_int_octetstring(&at, &num, data, 4)) < 0) {
+	if ((len = ASN1_TYPE_get_int_octetstring(at, &num, data, 4)) < 0) {
 		fprintf(stderr, "FAIL: ASN1_TYPE_get_int_octetstring failed\n");
 		goto done;
 	}
 	if (num != TEST_NUM) {
-		fprintf(stderr, "FAIL: got num %li, want %li\n", num, TEST_NUM);
+		fprintf(stderr, "FAIL: got num %ld, want %ld\n", num, TEST_NUM);
 		goto done;
 	}
 	if (len != sizeof(test_octetstring)) {
-		fprintf(stderr, "FAIL: got length mismatch (%i != %zu)\n",
+		fprintf(stderr, "FAIL: got length mismatch (%d != %zu)\n",
 		    len, sizeof(test_octetstring));
 		goto done;
 	}
@@ -141,5 +144,7 @@ main(int argc, char **argv)
 	failed = 0;
 
  done:
+	ASN1_TYPE_free(at);
+
 	return failed;
 }

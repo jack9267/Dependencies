@@ -1,3 +1,4 @@
+/* $OpenBSD: ssl_init.c,v 1.6 2023/11/22 15:53:53 tb Exp $ */
 /*
  * Copyright (c) 2018 Bob Beck <beck@openbsd.org>
  *
@@ -21,16 +22,22 @@
 
 #include <openssl/objects.h>
 
-#include "ssl_locl.h"
+#include "ssl_local.h"
 
 static pthread_t ssl_init_thread;
+
+int
+SSL_library_init(void)
+{
+	return OPENSSL_init_ssl(0, NULL);
+}
+LSSL_ALIAS(SSL_library_init);
 
 static void
 OPENSSL_init_ssl_internal(void)
 {
 	ssl_init_thread = pthread_self();
 	SSL_load_error_strings();
-	SSL_library_init();
 }
 
 int
@@ -48,3 +55,4 @@ OPENSSL_init_ssl(uint64_t opts, const void *settings)
 
 	return 1;
 }
+LSSL_ALIAS(OPENSSL_init_ssl);

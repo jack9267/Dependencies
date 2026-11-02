@@ -1,4 +1,4 @@
-.\"	$OpenBSD: SSL_get_shared_ciphers.3,v 1.2 2018/03/21 05:07:04 schwarze Exp $
+.\" $OpenBSD: SSL_get_shared_ciphers.3,v 1.6 2025/06/08 22:52:00 schwarze Exp $
 .\"
 .\" Copyright (c) 2016 Ingo Schwarze <schwarze@openbsd.org>
 .\"
@@ -14,13 +14,14 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: March 21 2018 $
+.Dd $Mdocdate: June 8 2025 $
 .Dt SSL_GET_SHARED_CIPHERS 3
 .Os
 .Sh NAME
 .Nm SSL_get_shared_ciphers
 .Nd ciphers supported by both client and server
 .Sh SYNOPSIS
+.Lb libssl libcrypto
 .In openssl/ssl.h
 .Ft char *
 .Fo SSL_get_shared_ciphers
@@ -29,12 +30,14 @@
 .Fa "int len"
 .Fc
 .Sh DESCRIPTION
-.Fn SSL_get_shared_ciphers
-puts the names of the ciphers that are supported by both the client
-and the server of
+If
 .Fa ssl
-into the buffer
-.Fa buf .
+contains a session in server mode,
+.Fn SSL_get_shared_ciphers
+puts as many names of ciphers that are supported by both the client
+and the server into the buffer
+.Fa buf
+as the buffer is long enough to contain.
 Names are separated by colons.
 At most
 .Fa len
@@ -42,20 +45,50 @@ bytes are written to
 .Fa buf
 including the terminating NUL character.
 .Sh RETURN VALUES
-If
-.Fa ssl
-contains no session, if the session contains no shared ciphers,
-or if
-.Fa len
-is less than 2,
 .Fn SSL_get_shared_ciphers
 returns
-.Dv NULL .
-Otherwise, it returns
-.Fa buf .
+.Fa buf
+on success or
+.Dv NULL
+on failure.
+The following situations cause failure:
+.Bl -bullet
+.It
+.Xr SSL_is_server 3
+is false, i.e.,
+.Ar ssl
+is not set to server mode.
+.It
+.Xr SSL_get_ciphers 3
+is
+.Dv NULL
+or empty, i.e., no ciphers are available for use by the server.
+.It
+.Xr SSL_get_session 3
+is
+.Dv NULL ,
+i.e.,
+.Ar ssl
+contains no session.
+.It
+.Xr SSL_get_client_ciphers 3
+is
+.Dv NULL
+or empty, i.e.,
+.Ar ssl
+contains no information about ciphers supported by the client,
+or the client does not support any ciphers.
+.It
+The
+.Fa len
+argument is less than 2.
+.El
+.Sh SEE ALSO
+.Xr ssl 3 ,
+.Xr SSL_get_ciphers 3
 .Sh HISTORY
 .Fn SSL_get_shared_ciphers
-appeared before SSLeay 0.8 and has been available since
+first appeared in SSLeay 0.4.5b and has been available since
 .Ox 2.4 .
 .Sh BUGS
 If the list is too long to fit into

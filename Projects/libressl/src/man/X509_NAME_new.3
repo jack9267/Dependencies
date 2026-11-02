@@ -1,4 +1,4 @@
-.\"	$OpenBSD: X509_NAME_new.3,v 1.4 2018/03/21 03:16:08 schwarze Exp $
+.\" $OpenBSD: X509_NAME_new.3,v 1.10 2025/06/08 22:40:30 schwarze Exp $
 .\"
 .\" Copyright (c) 2016 Ingo Schwarze <schwarze@openbsd.org>
 .\"
@@ -14,7 +14,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: March 21 2018 $
+.Dd $Mdocdate: June 8 2025 $
 .Dt X509_NAME_NEW 3
 .Os
 .Sh NAME
@@ -25,6 +25,7 @@
 .\" The type in called "Name" with capital "N", not "name".
 .Nd X.501 Name object
 .Sh SYNOPSIS
+.Lb libcrypto
 .In openssl/x509.h
 .Ft X509_NAME *
 .Fn X509_NAME_new void
@@ -62,6 +63,11 @@ frees
 and all the
 .Vt X509_NAME_ENTRY
 objects contained in it.
+If
+.Fa name
+is a
+.Dv NULL
+pointer, no action occurs.
 .Sh RETURN VALUES
 .Fn X509_NAME_new
 returns a new
@@ -76,9 +82,13 @@ if an error occurred.
 .Xr SSL_load_client_CA_file 3 ,
 .Xr X509_get_subject_name 3 ,
 .Xr X509_NAME_add_entry_by_txt 3 ,
+.Xr X509_NAME_cmp 3 ,
+.Xr X509_NAME_digest 3 ,
 .Xr X509_NAME_ENTRY_new 3 ,
 .Xr X509_NAME_get_index_by_NID 3 ,
-.Xr X509_NAME_print_ex 3
+.Xr X509_NAME_hash 3 ,
+.Xr X509_NAME_print_ex 3 ,
+.Xr X509_new 3
 .Sh STANDARDS
 RFC 5280: Internet X.509 Public Key Infrastructure Certificate and
 Certificate Revocation List (CRL) Profile
@@ -90,5 +100,5 @@ The Directory: Models, section 9: Names
 .Fn X509_NAME_new
 and
 .Fn X509_NAME_free
-appeared before SSLeay 0.8 and have been available since
+appeared in SSLeay 0.4 or earlier and have been available since
 .Ox 2.4 .

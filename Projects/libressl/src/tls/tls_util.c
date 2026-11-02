@@ -1,4 +1,4 @@
-/* $OpenBSD: tls_util.c,v 1.12 2018/02/08 07:55:29 jsing Exp $ */
+/* $OpenBSD: tls_util.c,v 1.19 2026/09/19 16:56:13 tb Exp $ */
 /*
  * Copyright (c) 2014 Joel Sing <jsing@openbsd.org>
  * Copyright (c) 2014 Ted Unangst <tedu@openbsd.org>
@@ -17,17 +17,15 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifdef _MSC_VER
-#define NO_REDEF_POSIX_FUNCTIONS
-#endif
-
 #include <sys/stat.h>
 
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "tls.h"
+#include <tls.h>
+
 #include "tls_internal.h"
 
 static void *
@@ -47,10 +45,11 @@ tls_set_mem(char **dest, size_t *destlen, const void *src, size_t srclen)
 	free(*dest);
 	*dest = NULL;
 	*destlen = 0;
-	if (src != NULL)
+	if (src != NULL) {
 		if ((*dest = memdup(src, srclen)) == NULL)
 			return -1;
-	*destlen = srclen;
+		*destlen = srclen;
+	}
 	return 0;
 }
 
@@ -95,7 +94,7 @@ tls_host_port(const char *hostport, char **host, char **port)
 		*p++ = '\0';
 	}
 
-	/* Find the port seperator. */
+	/* Find the port separator. */
 	if ((p = strchr(p, ':')) == NULL)
 		goto done;
 
@@ -105,10 +104,14 @@ tls_host_port(const char *hostport, char **host, char **port)
 
 	*p++ = '\0';
 
-	if (asprintf(host, "%s", h) == -1)
+	if (asprintf(host, "%s", h) == -1) {
+		*host = NULL;
 		goto err;
-	if (asprintf(port, "%s", p) == -1)
+	}
+	if (asprintf(port, "%s", p) == -1) {
+		*port = NULL;
 		goto err;
+	}
 
 	rv = 0;
 	goto done;
@@ -160,7 +163,7 @@ tls_load_file(const char *name, size_t *len, char *password)
 
 	*len = 0;
 
-	if ((fd = open(name, O_RDONLY)) == -1)
+	if ((fd = open(name, O_RDONLY|O_CLOEXEC)) == -1)
 		return (NULL);
 
 	/* Just load the file into memory without decryption */

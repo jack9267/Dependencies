@@ -1,4 +1,4 @@
-/* $OpenBSD: tls_config.c,v 1.51.2.1 2018/04/18 16:29:11 jsing Exp $ */
+/* $OpenBSD: tls_config.c,v 1.75 2026/09/19 16:56:13 tb Exp $ */
 /*
  * Copyright (c) 2014 Joel Sing <jsing@openbsd.org>
  *
@@ -15,21 +15,33 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifdef _MSC_VER
-#define NO_REDEF_POSIX_FUNCTIONS
-#endif
-
 #include <sys/stat.h>
+#include <sys/types.h>
 
-#include <ctype.h>
-#include <errno.h>
+#include <arpa/inet.h>
+
 #include <fcntl.h>
+#include <pthread.h>
+#include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
+#include <time.h>
 #include <unistd.h>
+
+#include <openssl/ec.h>
+#include <openssl/objects.h>
 
 #include <tls.h>
 
 #include "tls_internal.h"
+
+static const char default_ca_file[] = TLS_DEFAULT_CA_FILE;
+
+const char *
+tls_default_ca_cert_file(void)
+{
+	return default_ca_file;
+}
 
 int
 tls_config_load_file(struct tls_error *error, const char *filetype,
@@ -43,13 +55,15 @@ tls_config_load_file(struct tls_error *error, const char *filetype,
 	*buf = NULL;
 	*len = 0;
 
-	if ((fd = open(filename, O_RDONLY)) == -1) {
-		tls_error_set(error, "failed to open %s file '%s'",
+	if ((fd = open(filename, O_RDONLY|O_CLOEXEC)) == -1) {
+		tls_error_set(error, TLS_ERROR_UNKNOWN,
+		    "failed to open %s file '%s'",
 		    filetype, filename);
 		goto err;
 	}
 	if (fstat(fd, &st) != 0) {
-		tls_error_set(error, "failed to stat %s file '%s'",
+		tls_error_set(error, TLS_ERROR_UNKNOWN,
+		    "failed to stat %s file '%s'",
 		    filetype, filename);
 		goto err;
 	}
@@ -57,13 +71,15 @@ tls_config_load_file(struct tls_error *error, const char *filetype,
 		goto err;
 	*len = (size_t)st.st_size;
 	if ((*buf = malloc(*len)) == NULL) {
-		tls_error_set(error, "failed to allocate buffer for "
-		    "%s file", filetype);
+		tls_error_setx(error, TLS_ERROR_OUT_OF_MEMORY,
+		    "failed to allocate buffer for %s file",
+		    filetype);
 		goto err;
 	}
 	n = read(fd, *buf, *len);
 	if (n < 0 || (size_t)n != *len) {
-		tls_error_set(error, "failed to read %s file '%s'",
+		tls_error_set(error, TLS_ERROR_UNKNOWN,
+		    "failed to read %s file '%s'",
 		    filetype, filename);
 		goto err;
 	}
@@ -89,11 +105,14 @@ tls_config_new_internal(void)
 	if ((config = calloc(1, sizeof(*config))) == NULL)
 		return (NULL);
 
-	if ((config->keypair = tls_keypair_new()) == NULL)
+	if (pthread_mutex_init(&config->mutex, NULL) != 0)
 		goto err;
 
 	config->refcount = 1;
 	config->session_fd = -1;
+
+	if ((config->keypair = tls_keypair_new()) == NULL)
+		goto err;
 
 	/*
 	 * Default configuration.
@@ -145,11 +164,16 @@ void
 tls_config_free(struct tls_config *config)
 {
 	struct tls_keypair *kp, *nkp;
+	int refcount;
 
 	if (config == NULL)
 		return;
 
-	if (--config->refcount > 0)
+	pthread_mutex_lock(&config->mutex);
+	refcount = --config->refcount;
+	pthread_mutex_unlock(&config->mutex);
+
+	if (refcount > 0)
 		return;
 
 	for (kp = config->keypair; kp != NULL; kp = nkp) {
@@ -165,6 +189,8 @@ tls_config_free(struct tls_config *config)
 	free((char *)config->ciphers);
 	free((char *)config->crl_mem);
 	free(config->ecdhecurves);
+
+	pthread_mutex_destroy(&config->mutex);
 
 	free(config);
 }
@@ -185,6 +211,12 @@ const char *
 tls_config_error(struct tls_config *config)
 {
 	return config->error.msg;
+}
+
+int
+tls_config_error_code(struct tls_config *config)
+{
+	return config->error.code;
 }
 
 void
@@ -240,6 +272,8 @@ tls_config_parse_protocols(uint32_t *protocols, const char *protostr)
 			proto = TLS_PROTOCOL_TLSv1_1;
 		else if (strcasecmp(p, "tlsv1.2") == 0)
 			proto = TLS_PROTOCOL_TLSv1_2;
+		else if (strcasecmp(p, "tlsv1.3") == 0)
+			proto = TLS_PROTOCOL_TLSv1_3;
 
 		if (proto == 0) {
 			free(s);
@@ -273,17 +307,20 @@ tls_config_parse_alpn(struct tls_config *config, const char *alpn,
 	*alpn_len = 0;
 
 	if ((buf_len = strlen(alpn) + 1) > 65535) {
-		tls_config_set_errorx(config, "alpn too large");
+		tls_config_set_errorx(config, TLS_ERROR_INVALID_ARGUMENT,
+		    "alpn too large");
 		goto err;
 	}
 
 	if ((buf = malloc(buf_len)) == NULL) {
-		tls_config_set_errorx(config, "out of memory");
+		tls_config_set_errorx(config, TLS_ERROR_OUT_OF_MEMORY,
+		    "out of memory");
 		goto err;
 	}
 
 	if ((s = strdup(alpn)) == NULL) {
-		tls_config_set_errorx(config, "out of memory");
+		tls_config_set_errorx(config, TLS_ERROR_OUT_OF_MEMORY,
+		    "out of memory");
 		goto err;
 	}
 
@@ -291,12 +328,12 @@ tls_config_parse_alpn(struct tls_config *config, const char *alpn,
 	q = s;
 	while ((p = strsep(&q, ",")) != NULL) {
 		if ((len = strlen(p)) == 0) {
-			tls_config_set_errorx(config,
+			tls_config_set_errorx(config, TLS_ERROR_INVALID_ARGUMENT,
 			    "alpn protocol with zero length");
 			goto err;
 		}
 		if (len > 255) {
-			tls_config_set_errorx(config,
+			tls_config_set_errorx(config, TLS_ERROR_INVALID_ARGUMENT,
 			    "alpn protocol too long");
 			goto err;
 		}
@@ -336,7 +373,8 @@ tls_config_add_keypair_file_internal(struct tls_config *config,
 		return (-1);
 	if (tls_keypair_set_cert_file(keypair, &config->error, cert_file) != 0)
 		goto err;
-	if (tls_keypair_set_key_file(keypair, &config->error, key_file) != 0)
+	if (key_file != NULL &&
+	    tls_keypair_set_key_file(keypair, &config->error, key_file) != 0)
 		goto err;
 	if (ocsp_file != NULL &&
 	    tls_keypair_set_ocsp_staple_file(keypair, &config->error,
@@ -363,7 +401,8 @@ tls_config_add_keypair_mem_internal(struct tls_config *config, const uint8_t *ce
 		return (-1);
 	if (tls_keypair_set_cert_mem(keypair, &config->error, cert, cert_len) != 0)
 		goto err;
-	if (tls_keypair_set_key_mem(keypair, &config->error, key, key_len) != 0)
+	if (key != NULL &&
+	    tls_keypair_set_key_mem(keypair, &config->error, key, key_len) != 0)
 		goto err;
 	if (staple != NULL &&
 	    tls_keypair_set_ocsp_staple_mem(keypair, &config->error, staple,
@@ -464,11 +503,13 @@ tls_config_set_ciphers(struct tls_config *config, const char *ciphers)
 		ciphers = TLS_CIPHERS_ALL;
 
 	if ((ssl_ctx = SSL_CTX_new(SSLv23_method())) == NULL) {
-		tls_config_set_errorx(config, "out of memory");
+		tls_config_set_errorx(config, TLS_ERROR_OUT_OF_MEMORY,
+		    "out of memory");
 		goto err;
 	}
 	if (SSL_CTX_set_cipher_list(ssl_ctx, ciphers) != 1) {
-		tls_config_set_errorx(config, "no ciphers for '%s'", ciphers);
+		tls_config_set_errorx(config, TLS_ERROR_UNKNOWN,
+		    "no ciphers for '%s'", ciphers);
 		goto err;
 	}
 
@@ -506,7 +547,8 @@ tls_config_set_dheparams(struct tls_config *config, const char *params)
 	else if (strcasecmp(params, "legacy") == 0)
 		keylen = 1024;
 	else {
-		tls_config_set_errorx(config, "invalid dhe param '%s'", params);
+		tls_config_set_errorx(config, TLS_ERROR_UNKNOWN,
+		    "invalid dhe param '%s'", params);
 		return (-1);
 	}
 
@@ -523,8 +565,8 @@ tls_config_set_ecdhecurve(struct tls_config *config, const char *curve)
 	    strcasecmp(curve, "auto") == 0) {
 		curve = TLS_ECDHE_CURVES;
 	} else if (strchr(curve, ',') != NULL || strchr(curve, ':') != NULL) {
-		tls_config_set_errorx(config, "invalid ecdhe curve '%s'",
-		    curve);
+		tls_config_set_errorx(config, TLS_ERROR_UNKNOWN,
+		    "invalid ecdhe curve '%s'", curve);
 		return (-1);
 	}
 
@@ -549,7 +591,8 @@ tls_config_set_ecdhecurves(struct tls_config *config, const char *curves)
 		curves = TLS_ECDHE_CURVES;
 
 	if ((cs = strdup(curves)) == NULL) {
-		tls_config_set_errorx(config, "out of memory");
+		tls_config_set_errorx(config, TLS_ERROR_OUT_OF_MEMORY,
+		    "out of memory");
 		goto err;
 	}
 
@@ -564,14 +607,15 @@ tls_config_set_ecdhecurves(struct tls_config *config, const char *curves)
 		if (nid == NID_undef)
 			nid = EC_curve_nist2nid(p);
 		if (nid == NID_undef) {
-			tls_config_set_errorx(config,
+			tls_config_set_errorx(config, TLS_ERROR_UNKNOWN,
 			    "invalid ecdhe curve '%s'", p);
 			goto err;
 		}
 
 		if ((curves_new = reallocarray(curves_list, curves_num + 1,
 		    sizeof(int))) == NULL) {
-			tls_config_set_errorx(config, "out of memory");
+			tls_config_set_errorx(config, TLS_ERROR_OUT_OF_MEMORY,
+			    "out of memory");
 			goto err;
 		}
 		curves_list = curves_new;
@@ -612,8 +656,6 @@ tls_config_set_keypair_file_internal(struct tls_config *config,
     const char *cert_file, const char *key_file, const char *ocsp_file)
 {
 	if (tls_config_set_cert_file(config, cert_file) != 0)
-		return (-1);
-	if (tls_config_set_key_file(config, key_file) != 0)
 		return (-1);
 	if (tls_config_set_key_file(config, key_file) != 0)
 		return (-1);
@@ -694,28 +736,41 @@ tls_config_set_session_fd(struct tls_config *config, int session_fd)
 	}
 
 	if (fstat(session_fd, &sb) == -1) {
-		tls_config_set_error(config, "failed to stat session file");
+		tls_config_set_error(config, TLS_ERROR_UNKNOWN,
+		    "failed to stat session file");
 		return (-1);
 	}
 	if (!S_ISREG(sb.st_mode)) {
-		tls_config_set_errorx(config,
+		tls_config_set_errorx(config, TLS_ERROR_UNKNOWN,
 		    "session file is not a regular file");
 		return (-1);
 	}
 
 	if (sb.st_uid != getuid()) {
-		tls_config_set_errorx(config, "session file has incorrect "
-		    "owner (uid %i != %i)", sb.st_uid, getuid());
+		tls_config_set_errorx(config, TLS_ERROR_UNKNOWN,
+		    "session file has incorrect owner (uid %llu != %llu)",
+		    (unsigned long long)sb.st_uid, (unsigned long long)getuid());
 		return (-1);
 	}
 	mugo = sb.st_mode & (S_IRWXU|S_IRWXG|S_IRWXO);
 	if (mugo != (S_IRUSR|S_IWUSR)) {
-		tls_config_set_errorx(config, "session file has incorrect "
-		    "permissions (%o != 600)", mugo);
+		tls_config_set_errorx(config, TLS_ERROR_UNKNOWN,
+		    "session file has incorrect permissions (%o != 600)", mugo);
 		return (-1);
 	}
 
 	config->session_fd = session_fd;
+
+	return (0);
+}
+
+int
+tls_config_set_sign_cb(struct tls_config *config, tls_sign_cb cb, void *cb_arg)
+{
+	config->use_fake_private_key = 1;
+	config->skip_private_key_check = 1;
+	config->sign_cb = cb;
+	config->sign_cb_arg = cb_arg;
 
 	return (0);
 }
@@ -790,6 +845,13 @@ tls_config_skip_private_key_check(struct tls_config *config)
 	config->skip_private_key_check = 1;
 }
 
+void
+tls_config_use_fake_private_key(struct tls_config *config)
+{
+	config->use_fake_private_key = 1;
+	config->skip_private_key_check = 1;
+}
+
 int
 tls_config_set_ocsp_staple_file(struct tls_config *config, const char *staple_file)
 {
@@ -810,7 +872,8 @@ tls_config_set_session_id(struct tls_config *config,
     const unsigned char *session_id, size_t len)
 {
 	if (len > TLS_MAX_SESSION_ID_LENGTH) {
-		tls_config_set_errorx(config, "session ID too large");
+		tls_config_set_errorx(config, TLS_ERROR_INVALID_ARGUMENT,
+		    "session ID too large");
 		return (-1);
 	}
 	memset(config->session_id, 0, sizeof(config->session_id));
@@ -822,11 +885,13 @@ int
 tls_config_set_session_lifetime(struct tls_config *config, int lifetime)
 {
 	if (lifetime > TLS_MAX_SESSION_TIMEOUT) {
-		tls_config_set_errorx(config, "session lifetime too large");
+		tls_config_set_errorx(config, TLS_ERROR_INVALID_ARGUMENT,
+		    "session lifetime too large");
 		return (-1);
 	}
 	if (lifetime != 0 && lifetime < TLS_MIN_SESSION_TIMEOUT) {
-		tls_config_set_errorx(config, "session lifetime too small");
+		tls_config_set_errorx(config, TLS_ERROR_INVALID_ARGUMENT,
+		    "session lifetime too small");
 		return (-1);
 	}
 
@@ -843,7 +908,7 @@ tls_config_add_ticket_key(struct tls_config *config, uint32_t keyrev,
 
 	if (TLS_TICKET_KEY_SIZE != keylen ||
 	    sizeof(newkey.aes_key) + sizeof(newkey.hmac_key) > keylen) {
-		tls_config_set_errorx(config,
+		tls_config_set_errorx(config, TLS_ERROR_UNKNOWN,
 		    "wrong amount of ticket key data");
 		return (-1);
 	}
@@ -867,7 +932,8 @@ tls_config_add_ticket_key(struct tls_config *config, uint32_t keyrev,
 		    sizeof(tk->aes_key)) == 0 && memcmp(newkey.hmac_key,
 		    tk->hmac_key, sizeof(tk->hmac_key)) == 0)
 			return (0);
-		tls_config_set_errorx(config, "ticket key already present");
+		tls_config_set_errorx(config, TLS_ERROR_UNKNOWN,
+		    "ticket key already present");
 		return (-1);
 	}
 

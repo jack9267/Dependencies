@@ -1,7 +1,24 @@
-.\" $OpenBSD: RSA_get0_key.3,v 1.4 2018/03/23 23:18:17 schwarze Exp $
+.\" $OpenBSD: RSA_get0_key.3,v 1.10 2025/06/13 18:34:00 schwarze Exp $
 .\" selective merge up to: OpenSSL 665d899f Aug 2 02:19:43 2017 +0800
 .\"
-.\" This file was written by Richard Levitte <levitte@openssl.org>
+.\" This file is a derived work.
+.\" The changes are covered by the following Copyright and license:
+.\"
+.\" Copyright (c) 2019 Ingo Schwarze <schwarze@openbsd.org>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.\" The original file was written by Richard Levitte <levitte@openssl.org>
 .\" Copyright (c) 2016 The OpenSSL Project.  All rights reserved.
 .\"
 .\" Redistribution and use in source and binary forms, with or without
@@ -48,21 +65,30 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: March 23 2018 $
+.Dd $Mdocdate: June 13 2025 $
 .Dt RSA_GET0_KEY 3
 .Os
 .Sh NAME
 .Nm RSA_get0_key ,
+.Nm RSA_get0_n ,
+.Nm RSA_get0_e ,
+.Nm RSA_get0_d ,
 .Nm RSA_set0_key ,
 .Nm RSA_get0_factors ,
+.Nm RSA_get0_p ,
+.Nm RSA_get0_q ,
 .Nm RSA_set0_factors ,
 .Nm RSA_get0_crt_params ,
+.Nm RSA_get0_dmp1 ,
+.Nm RSA_get0_dmq1 ,
+.Nm RSA_get0_iqmp ,
 .Nm RSA_set0_crt_params ,
 .Nm RSA_clear_flags ,
 .Nm RSA_test_flags ,
 .Nm RSA_set_flags
 .Nd get and set data in an RSA object
 .Sh SYNOPSIS
+.Lb libcrypto
 .In openssl/rsa.h
 .Ft void
 .Fo RSA_get0_key
@@ -70,6 +96,18 @@
 .Fa "const BIGNUM **n"
 .Fa "const BIGNUM **e"
 .Fa "const BIGNUM **d"
+.Fc
+.Ft const BIGNUM *
+.Fo RSA_get0_n
+.Fa "const RSA *r"
+.Fc
+.Ft const BIGNUM *
+.Fo RSA_get0_e
+.Fa "const RSA *r"
+.Fc
+.Ft const BIGNUM *
+.Fo RSA_get0_d
+.Fa "const RSA *r"
 .Fc
 .Ft int
 .Fo RSA_set0_key
@@ -84,6 +122,14 @@
 .Fa "const BIGNUM **p"
 .Fa "const BIGNUM **q"
 .Fc
+.Ft const BIGNUM *
+.Fo RSA_get0_p
+.Fa "const RSA *r"
+.Fc
+.Ft const BIGNUM *
+.Fo RSA_get0_q
+.Fa "const RSA *r"
+.Fc
 .Ft int
 .Fo RSA_set0_factors
 .Fa "RSA *r"
@@ -96,6 +142,18 @@
 .Fa "const BIGNUM **dmp1"
 .Fa "const BIGNUM **dmq1"
 .Fa "const BIGNUM **iqmp"
+.Fc
+.Ft const BIGNUM *
+.Fo RSA_get0_dmp1
+.Fa "const RSA *r"
+.Fc
+.Ft const BIGNUM *
+.Fo RSA_get0_dmq1
+.Fa "const RSA *r"
+.Fc
+.Ft const BIGNUM *
+.Fo RSA_get0_iqmp
+.Fa "const RSA *r"
 .Fc
 .Ft int
 .Fo RSA_set0_crt_params
@@ -146,7 +204,8 @@ are the first and second factor of
 .Fa dmq1 ,
 and
 .Fa iqmp
-are the exponents and coefficient for CRT calculations.
+are the exponents and coefficient
+for Chinese Remainder Theorem (CRT) calculations.
 .Pp
 The
 .Fa n ,
@@ -245,6 +304,31 @@ If needed, duplicate the received value using
 .Xr BN_dup 3
 and pass the duplicate.
 .Pp
+Any of the values
+.Fa n ,
+.Fa e ,
+.Fa d ,
+.Fa p ,
+.Fa q ,
+.Fa dmp1 ,
+.Fa dmq1 ,
+and
+.Fa iqmp
+can also be retrieved separately by the corresponding functions
+.Fn RSA_get0_n ,
+.Fn RSA_get0_e ,
+.Fn RSA_get0_d ,
+.Fn RSA_get0_p ,
+.Fn RSA_get0_q ,
+.Fn RSA_get0_dmp1 ,
+.Fn RSA_get0_dmq1 ,
+and
+.Fn RSA_get0_iqmp ,
+respectively.
+The pointers are owned by the
+.Vt RSA
+object.
+.Pp
 .Fn RSA_clear_flags
 clears the specified
 .Fa flags
@@ -263,7 +347,71 @@ in
 any flags already set remain set.
 For all three functions, multiple flags can be passed in one call,
 OR'ed together bitwise.
+.Pp
+The following flags are supported:
+.Bl -tag -width Ds
+.It Dv RSA_FLAG_CACHE_PRIVATE No and Dv RSA_FLAG_CACHE_PUBLIC
+Precompute information needed for Montgomery multiplication
+from the private and public key, respectively, and cache it in
+.Fa r
+for repeated use.
+These two flags are set by default for the default RSA implementation,
+.Xr RSA_PKCS1_SSLeay 3 .
+.It Dv RSA_FLAG_EXT_PKEY
+The function set with
+.Xr RSA_meth_set_mod_exp 3
+is used for private key operations even if
+.Fa p ,
+.Fa q ,
+.Fa dmp1 ,
+.Fa dmq1 ,
+and
+.Fa iqmp
+are all
+.Dv NULL .
+This flag may be useful with RSA implementations that do not use the
+private key components stored in the standard fields, for example
+because they store the private key in external hardware.
+If this flag is unset, the function set with
+.Xr RSA_meth_set_bn_mod_exp 3
+is used with
+.Fa n
+and
+.Fa d
+instead.
+.It Dv RSA_FLAG_NO_BLINDING
+Turn off blinding during private key encryption and decryption.
+This flag is set by
+.Xr RSA_blinding_off 3 .
+.It Dv RSA_FLAG_SIGN_VER
+This flag has no effect.
+It is provided only for backward compatibility with legacy applications.
+.El
+.Pp
+The flags
+.Dv RSA_FLAG_BLINDING ,
+.Dv RSA_FLAG_CHECKED ,
+.Dv RSA_FLAG_FIPS_METHOD ,
+.Dv RSA_FLAG_NON_FIPS_ALLOW ,
+and
+.Dv RSA_FLAG_THREAD_SAFE
+are defined for compatibility with existing code but have no effect.
 .Sh RETURN VALUES
+.Fn RSA_get0_n ,
+.Fn RSA_get0_e ,
+.Fn RSA_get0_d ,
+.Fn RSA_get0_p ,
+.Fn RSA_get0_q ,
+.Fn RSA_get0_dmp1 ,
+.Fn RSA_get0_dmq1 ,
+and
+.Fn RSA_get0_iqmp
+return a pointer owned by the
+.Vt RSA
+object if the corresponding value has been set,
+otherwise they return
+.Dv NULL .
+.Pp
 .Fn RSA_set0_key ,
 .Fn RSA_set0_factors ,
 and
@@ -285,6 +433,29 @@ are set.
 .Xr RSA_print 3 ,
 .Xr RSA_size 3
 .Sh HISTORY
-These functions first appeared in OpenSSL 1.1.0
+.Fn RSA_get0_key ,
+.Fn RSA_set0_key ,
+.Fn RSA_get0_factors ,
+.Fn RSA_set0_factors ,
+.Fn RSA_get0_crt_params ,
+.Fn RSA_set0_crt_params ,
+.Fn RSA_clear_flags ,
+.Fn RSA_test_flags ,
+and
+.Fn RSA_set_flags
+first appeared in OpenSSL 1.1.0
 and have been available since
 .Ox 6.3 .
+.Pp
+.Fn RSA_get0_n ,
+.Fn RSA_get0_e ,
+.Fn RSA_get0_d ,
+.Fn RSA_get0_p ,
+.Fn RSA_get0_q ,
+.Fn RSA_get0_dmp1 ,
+.Fn RSA_get0_dmq1 ,
+and
+.Fn RSA_get0_iqmp
+first appeared in OpenSSL 1.1.1
+and have been available since
+.Ox 7.1 .

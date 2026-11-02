@@ -1,4 +1,4 @@
-/* $OpenBSD: openssl.c,v 1.26 2018/02/07 05:47:55 jsing Exp $ */
+/* $OpenBSD: openssl.c,v 1.43 2026/09/14 23:36:58 kenjiro Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -127,17 +127,12 @@
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 
-#include "progs.h"
-#include "s_apps.h"
-
 #define FUNC_TYPE_GENERAL       1
 #define FUNC_TYPE_MD            2
 #define FUNC_TYPE_CIPHER        3
 #define FUNC_TYPE_PKEY          4
 #define FUNC_TYPE_MD_ALG        5
 #define FUNC_TYPE_CIPHER_ALG    6
-
-int single_execution = 0;
 
 typedef struct {
         int type;
@@ -154,13 +149,15 @@ FUNCTION functions[] = {
 	{ FUNC_TYPE_GENERAL, "ca", ca_main },
 	{ FUNC_TYPE_GENERAL, "certhash", certhash_main },
 	{ FUNC_TYPE_GENERAL, "ciphers", ciphers_main },
+#ifndef OPENSSL_NO_CMS
+	{ FUNC_TYPE_GENERAL, "cms", cms_main },
+#endif
 	{ FUNC_TYPE_GENERAL, "crl2pkcs7", crl2pkcs7_main },
 	{ FUNC_TYPE_GENERAL, "crl", crl_main },
 	{ FUNC_TYPE_GENERAL, "dgst", dgst_main },
 	{ FUNC_TYPE_GENERAL, "enc", enc_main },
 	{ FUNC_TYPE_GENERAL, "errstr", errstr_main },
 	{ FUNC_TYPE_GENERAL, "genpkey", genpkey_main },
-	{ FUNC_TYPE_GENERAL, "nseq", nseq_main },
 #ifndef OPENSSL_NO_OCSP
 	{ FUNC_TYPE_GENERAL, "ocsp", ocsp_main },
 #endif
@@ -184,7 +181,6 @@ FUNCTION functions[] = {
 #ifndef OPENSSL_NO_SPEED
 	{ FUNC_TYPE_GENERAL, "speed", speed_main },
 #endif
-	{ FUNC_TYPE_GENERAL, "spkac", spkac_main },
 	{ FUNC_TYPE_GENERAL, "ts", ts_main },
 	{ FUNC_TYPE_GENERAL, "verify", verify_main },
 	{ FUNC_TYPE_GENERAL, "version", version_main },
@@ -211,12 +207,6 @@ FUNCTION functions[] = {
 #endif
 
 	/* Message Digests. */
-#ifndef OPENSSL_NO_GOST
-	{ FUNC_TYPE_MD, "gost-mac", dgst_main },
-	{ FUNC_TYPE_MD, "md_gost94", dgst_main },
-	{ FUNC_TYPE_MD, "streebog256", dgst_main },
-	{ FUNC_TYPE_MD, "streebog512", dgst_main },
-#endif
 #ifndef OPENSSL_NO_MD4
 	{ FUNC_TYPE_MD, "md4", dgst_main },
 #endif
@@ -241,8 +231,13 @@ FUNCTION functions[] = {
 #ifndef OPENSSL_NO_SHA512
 	{ FUNC_TYPE_MD, "sha512", dgst_main },
 #endif
-#ifndef OPENSSL_NO_WHIRLPOOL
-	{ FUNC_TYPE_MD, "whirlpool", dgst_main },
+	{ FUNC_TYPE_MD, "sha3-224", dgst_main },
+	{ FUNC_TYPE_MD, "sha3-256", dgst_main },
+	{ FUNC_TYPE_MD, "sha3-384", dgst_main },
+	{ FUNC_TYPE_MD, "sha3-512", dgst_main },
+#ifndef OPENSSL_NO_SM3
+	{ FUNC_TYPE_MD, "sm3", dgst_main },
+	{ FUNC_TYPE_MD, "sm3WithRSAEncryption", dgst_main },
 #endif
 
 	/* Ciphers. */
@@ -318,10 +313,13 @@ FUNCTION functions[] = {
 	{ FUNC_TYPE_CIPHER, "rc4", enc_main },
 	{ FUNC_TYPE_CIPHER, "rc4-40", enc_main },
 #endif
-#ifdef ZLIB
-	{ FUNC_TYPE_CIPHER, "zlib", enc_main },
+#ifndef OPENSSL_NO_SM4
+	{ FUNC_TYPE_CIPHER, "sm4", enc_main },
+	{ FUNC_TYPE_CIPHER, "sm4-ecb", enc_main },
+	{ FUNC_TYPE_CIPHER, "sm4-cbc", enc_main },
+	{ FUNC_TYPE_CIPHER, "sm4-ofb", enc_main },
+	{ FUNC_TYPE_CIPHER, "sm4-cfb", enc_main },
 #endif
-
 	{ 0, NULL, NULL }
 };
 
@@ -335,6 +333,7 @@ static void openssl_shutdown(void);
 
 static LHASH_OF(FUNCTION) *prog_init(void);
 static int do_cmd(LHASH_OF(FUNCTION) *prog, int argc, char *argv[]);
+static void print_help(void);
 static void list_pkey(BIO * out);
 static void list_cipher(BIO * out);
 static void list_md(BIO * out);
@@ -344,63 +343,12 @@ CONF *config = NULL;
 BIO *bio_err = NULL;
 
 static void
-lock_dbg_cb(int mode, int type, const char *file, int line)
-{
-	static int modes[CRYPTO_NUM_LOCKS];	/* = {0, 0, ... } */
-	const char *errstr = NULL;
-	int rw;
-
-	rw = mode & (CRYPTO_READ | CRYPTO_WRITE);
-	if (!((rw == CRYPTO_READ) || (rw == CRYPTO_WRITE))) {
-		errstr = "invalid mode";
-		goto err;
-	}
-	if (type < 0 || type >= CRYPTO_NUM_LOCKS) {
-		errstr = "type out of bounds";
-		goto err;
-	}
-	if (mode & CRYPTO_LOCK) {
-		if (modes[type]) {
-			errstr = "already locked";
-			/*
-			 * must not happen in a single-threaded program
-			 * (would deadlock)
-			 */
-			goto err;
-		}
-		modes[type] = rw;
-	} else if (mode & CRYPTO_UNLOCK) {
-		if (!modes[type]) {
-			errstr = "not locked";
-			goto err;
-		}
-		if (modes[type] != rw) {
-			errstr = (rw == CRYPTO_READ) ?
-			    "CRYPTO_r_unlock on write lock" :
-			    "CRYPTO_w_unlock on read lock";
-		}
-		modes[type] = 0;
-	} else {
-		errstr = "invalid mode";
-		goto err;
-	}
-
- err:
-	if (errstr) {
-		/* we cannot use bio_err here */
-		fprintf(stderr, "openssl (lock_dbg_cb): %s (mode=%d, type=%d) at %s:%d\n",
-		    errstr, mode, type, file, line);
-	}
-}
-
-static void
 openssl_startup(void)
 {
 #ifndef _WIN32
 	signal(SIGPIPE, SIG_IGN);
 #endif
 
-	OpenSSL_add_all_algorithms();
 	SSL_library_init();
 	SSL_load_error_strings();
 
@@ -413,29 +361,16 @@ openssl_shutdown(void)
 	CONF_modules_unload(1);
 	destroy_ui();
 	OBJ_cleanup();
-	EVP_cleanup();
-	CRYPTO_cleanup_all_ex_data();
-	ERR_remove_thread_state(NULL);
-	ERR_free_strings();
 }
 
 int
 main(int argc, char **argv)
 {
-	ARGS arg;
-#define PROG_NAME_SIZE	39
-	char pname[PROG_NAME_SIZE + 1];
-	FUNCTION f, *fp;
-	const char *prompt;
-	char buf[1024];
 	char *to_free = NULL;
-	int n, i, ret = 0;
+	int i, ret = 0;
 	char *p;
 	LHASH_OF(FUNCTION) * prog = NULL;
 	long errline;
-
-	arg.data = NULL;
-	arg.count = 0;
 
 	if (pledge("stdio cpath wpath rpath inet dns proc flock tty", NULL) == -1) {
 		fprintf(stderr, "openssl: pledge: %s\n", strerror(errno));
@@ -452,8 +387,6 @@ main(int argc, char **argv)
 		BIO_printf(bio_err, "BIO_sock_init failed\n");
 		exit(1);
 	}
-
-	CRYPTO_set_locking_callback(lock_dbg_cb);
 
 	openssl_startup();
 
@@ -493,74 +426,21 @@ main(int argc, char **argv)
 
 	prog = prog_init();
 
-	/* first check the program name */
-	program_name(argv[0], pname, sizeof pname);
-
-	f.name = pname;
-	fp = lh_FUNCTION_retrieve(prog, &f);
-	if (fp != NULL) {
-		argv[0] = pname;
-
-		single_execution = 1;
-		ret = fp->func(argc, argv);
-		goto end;
-	}
 	/*
 	 * ok, now check that there are not arguments, if there are, run with
-	 * them, shifting the ssleay off the front
+	 * them, shifting the executable name off the front
 	 */
-	if (argc != 1) {
-		argc--;
-		argv++;
+	argc--;
+	argv++;
 
-		single_execution = 1;
-		ret = do_cmd(prog, argc, argv);
-		if (ret < 0)
-			ret = 0;
+	if (argc < 1) {
+		print_help();
 		goto end;
 	}
-	/* ok, lets enter the old 'OpenSSL>' mode */
 
-	for (;;) {
+	ret = do_cmd(prog, argc, argv);
+	if (ret < 0)
 		ret = 0;
-		p = buf;
-		n = sizeof buf;
-		i = 0;
-		for (;;) {
-			p[0] = '\0';
-			if (i++)
-				prompt = ">";
-			else
-				prompt = "OpenSSL> ";
-			fputs(prompt, stdout);
-			fflush(stdout);
-			if (!fgets(p, n, stdin))
-				goto end;
-			if (p[0] == '\0')
-				goto end;
-			i = strlen(p);
-			if (i <= 1)
-				break;
-			if (p[i - 2] != '\\')
-				break;
-			i -= 2;
-			p += i;
-			n -= i;
-		}
-		if (!chopup_args(&arg, buf, &argc, &argv))
-			break;
-
-		ret = do_cmd(prog, argc, argv);
-		if (ret < 0) {
-			ret = 0;
-			goto end;
-		}
-		if (ret != 0)
-			BIO_printf(bio_err, "error in %s\n", argv[0]);
-		(void) BIO_flush(bio_err);
-	}
-	BIO_printf(bio_err, "bad exit\n");
-	ret = 1;
 
  end:
 	free(to_free);
@@ -571,7 +451,6 @@ main(int argc, char **argv)
 	}
 	if (prog != NULL)
 		lh_FUNCTION_free(prog);
-	free(arg.data);
 
 	openssl_shutdown();
 
@@ -579,6 +458,9 @@ main(int argc, char **argv)
 		BIO_free(bio_err);
 		bio_err = NULL;
 	}
+	ERR_remove_thread_state(NULL);
+	OPENSSL_cleanup();
+
 	return (ret);
 }
 
@@ -594,12 +476,11 @@ static int
 do_cmd(LHASH_OF(FUNCTION) * prog, int argc, char *argv[])
 {
 	FUNCTION f, *fp;
-	int i, ret = 1, tp, nl;
+	int ret = 1;
 
-	if ((argc <= 0) || (argv[0] == NULL)) {
-		ret = 0;
-		goto end;
-	}
+	if (argc <= 0 || argv[0] == NULL)
+		return 0;
+
 	f.name = argv[0];
 	fp = lh_FUNCTION_retrieve(prog, &f);
 	if (fp == NULL) {
@@ -613,9 +494,16 @@ do_cmd(LHASH_OF(FUNCTION) * prog, int argc, char *argv[])
 			fp = &f;
 		}
 	}
-	if (fp != NULL) {
-		ret = fp->func(argc, argv);
-	} else if ((strncmp(argv[0], "no-", 3)) == 0) {
+
+	if (fp != NULL)
+		return fp->func(argc, argv);
+
+	if (strcmp(argv[0], "help") == 0) {
+		print_help();
+		return 0;
+	}
+
+	if ((strncmp(argv[0], "no-", 3)) == 0) {
 		BIO *bio_stdout = BIO_new_fp(stdout, BIO_NOCLOSE);
 		f.name = argv[0] + 3;
 		ret = (lh_FUNCTION_retrieve(prog, &f) != NULL);
@@ -624,14 +512,10 @@ do_cmd(LHASH_OF(FUNCTION) * prog, int argc, char *argv[])
 		else
 			BIO_printf(bio_stdout, "%s\n", argv[0] + 3);
 		BIO_free_all(bio_stdout);
-		goto end;
-	} else if ((strcmp(argv[0], "quit") == 0) ||
-	    (strcmp(argv[0], "q") == 0) ||
-	    (strcmp(argv[0], "exit") == 0) ||
-	    (strcmp(argv[0], "bye") == 0)) {
-		ret = -1;
-		goto end;
-	} else if ((strcmp(argv[0], LIST_STANDARD_COMMANDS) == 0) ||
+		return ret;
+	}
+
+	if ((strcmp(argv[0], LIST_STANDARD_COMMANDS) == 0) ||
 	    (strcmp(argv[0], LIST_MESSAGE_DIGEST_COMMANDS) == 0) ||
 	    (strcmp(argv[0], LIST_MESSAGE_DIGEST_ALGORITHMS) == 0) ||
 	    (strcmp(argv[0], LIST_CIPHER_COMMANDS) == 0) ||
@@ -667,50 +551,58 @@ do_cmd(LHASH_OF(FUNCTION) * prog, int argc, char *argv[])
 					    fp->name);
 		}
 		BIO_free_all(bio_stdout);
-		ret = 0;
-		goto end;
-	} else {
-		BIO_printf(bio_err,
-		    "openssl:Error: '%s' is an invalid command.\n",
-		    argv[0]);
-		BIO_printf(bio_err, "\nStandard commands");
-		i = 0;
-		tp = 0;
-		for (fp = functions; fp->name != NULL; fp++) {
-			nl = 0;
-#ifdef OPENSSL_NO_CAMELLIA
-			if (((i++) % 5) == 0)
-#else
-			if (((i++) % 4) == 0)
-#endif
-			{
-				BIO_printf(bio_err, "\n");
-				nl = 1;
-			}
-			if (fp->type != tp) {
-				tp = fp->type;
-				if (!nl)
-					BIO_printf(bio_err, "\n");
-				if (tp == FUNC_TYPE_MD) {
-					i = 1;
-					BIO_printf(bio_err,
-					    "\nMessage Digest commands (see the `dgst' command for more details)\n");
-				} else if (tp == FUNC_TYPE_CIPHER) {
-					i = 1;
-					BIO_printf(bio_err, "\nCipher commands (see the `enc' command for more details)\n");
-				}
-			}
-#ifdef OPENSSL_NO_CAMELLIA
-			BIO_printf(bio_err, "%-15s", fp->name);
-#else
-			BIO_printf(bio_err, "%-18s", fp->name);
-#endif
-		}
-		BIO_printf(bio_err, "\n\n");
-		ret = 0;
+		return 0;
 	}
- end:
-	return (ret);
+
+	BIO_printf(bio_err,
+	    "openssl:Error: '%s' is an invalid command.\n",
+	    argv[0]);
+	print_help();
+
+	return 1;
+}
+
+static void
+print_help(void)
+{
+	FUNCTION *fp;
+	int i = 0;
+	int tp = 0;
+	int nl;
+
+	BIO_printf(bio_err, "\nStandard commands");
+	for (fp = functions; fp->name != NULL; fp++) {
+		nl = 0;
+#ifdef OPENSSL_NO_CAMELLIA
+		if (((i++) % 5) == 0)
+#else
+		if (((i++) % 4) == 0)
+#endif
+		{
+			BIO_printf(bio_err, "\n");
+			nl = 1;
+		}
+		if (fp->type != tp) {
+			tp = fp->type;
+			if (!nl)
+				BIO_printf(bio_err, "\n");
+			if (tp == FUNC_TYPE_MD) {
+				i = 1;
+				BIO_printf(bio_err,
+				    "\nMessage Digest commands (see the `dgst' command for more details)\n");
+			} else if (tp == FUNC_TYPE_CIPHER) {
+				i = 1;
+				BIO_printf(bio_err, "\nCipher commands (see the `enc' command for more details)\n");
+			}
+		}
+#ifdef OPENSSL_NO_CAMELLIA
+		BIO_printf(bio_err, "%-15s", fp->name);
+#else
+		BIO_printf(bio_err, "%-18s", fp->name);
+#endif
+	}
+
+	BIO_printf(bio_err, "\n\n");
 }
 
 static int

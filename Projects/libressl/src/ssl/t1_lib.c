@@ -1,4 +1,4 @@
-/* $OpenBSD: t1_lib.c,v 1.141 2018/02/08 11:30:30 jsing Exp $ */
+/* $OpenBSD: t1_lib.c,v 1.209 2026/06/06 08:45:41 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -116,46 +116,21 @@
 #include <openssl/objects.h>
 #include <openssl/ocsp.h>
 
-#include "ssl_locl.h"
-
 #include "bytestring.h"
+#include "ssl_local.h"
+#include "ssl_sigalgs.h"
 #include "ssl_tlsext.h"
 
-static int tls_decrypt_ticket(SSL *s, const unsigned char *tick, int ticklen,
-    const unsigned char *sess_id, int sesslen,
+static int tls_decrypt_ticket(SSL *s, CBS *ticket, int *alert,
     SSL_SESSION **psess);
-
-SSL3_ENC_METHOD TLSv1_enc_data = {
-	.enc = tls1_enc,
-	.enc_flags = 0,
-};
-
-SSL3_ENC_METHOD TLSv1_1_enc_data = {
-	.enc = tls1_enc,
-	.enc_flags = SSL_ENC_FLAG_EXPLICIT_IV,
-};
-
-SSL3_ENC_METHOD TLSv1_2_enc_data = {
-	.enc = tls1_enc,
-	.enc_flags = SSL_ENC_FLAG_EXPLICIT_IV|SSL_ENC_FLAG_SIGALGS|
-	    SSL_ENC_FLAG_SHA256_PRF|SSL_ENC_FLAG_TLS1_2_CIPHERS,
-};
-
-long
-tls1_default_timeout(void)
-{
-	/* 2 hours, the 24 hours mentioned in the TLSv1 spec
-	 * is way too long for http, the cache would over fill */
-	return (60 * 60 * 2);
-}
 
 int
 tls1_new(SSL *s)
 {
 	if (!ssl3_new(s))
-		return (0);
-	s->method->internal->ssl_clear(s);
-	return (1);
+		return 0;
+	s->method->ssl_clear(s);
+	return 1;
 }
 
 void
@@ -164,7 +139,7 @@ tls1_free(SSL *s)
 	if (s == NULL)
 		return;
 
-	free(s->internal->tlsext_session_ticket);
+	free(s->tlsext_session_ticket);
 	ssl3_free(s);
 }
 
@@ -172,40 +147,175 @@ void
 tls1_clear(SSL *s)
 {
 	ssl3_clear(s);
-	s->version = s->method->internal->version;
+	s->version = s->method->version;
 }
 
-static int nid_list[] = {
-	NID_sect163k1,		/* sect163k1 (1) */
-	NID_sect163r1,		/* sect163r1 (2) */
-	NID_sect163r2,		/* sect163r2 (3) */
-	NID_sect193r1,		/* sect193r1 (4) */
-	NID_sect193r2,		/* sect193r2 (5) */
-	NID_sect233k1,		/* sect233k1 (6) */
-	NID_sect233r1,		/* sect233r1 (7) */
-	NID_sect239k1,		/* sect239k1 (8) */
-	NID_sect283k1,		/* sect283k1 (9) */
-	NID_sect283r1,		/* sect283r1 (10) */
-	NID_sect409k1,		/* sect409k1 (11) */
-	NID_sect409r1,		/* sect409r1 (12) */
-	NID_sect571k1,		/* sect571k1 (13) */
-	NID_sect571r1,		/* sect571r1 (14) */
-	NID_secp160k1,		/* secp160k1 (15) */
-	NID_secp160r1,		/* secp160r1 (16) */
-	NID_secp160r2,		/* secp160r2 (17) */
-	NID_secp192k1,		/* secp192k1 (18) */
-	NID_X9_62_prime192v1,	/* secp192r1 (19) */
-	NID_secp224k1,		/* secp224k1 (20) */
-	NID_secp224r1,		/* secp224r1 (21) */
-	NID_secp256k1,		/* secp256k1 (22) */
-	NID_X9_62_prime256v1,	/* secp256r1 (23) */
-	NID_secp384r1,		/* secp384r1 (24) */
-	NID_secp521r1,		/* secp521r1 (25) */
-	NID_brainpoolP256r1,	/* brainpoolP256r1 (26) */
-	NID_brainpoolP384r1,	/* brainpoolP384r1 (27) */
-	NID_brainpoolP512r1,	/* brainpoolP512r1 (28) */
-	NID_X25519,		/* X25519 (29) */
+struct supported_group {
+	uint16_t group_id;
+	int nid;
+	int bits;
+	uint16_t min_version;
 };
+
+/*
+ * Supported groups (formerly known as named curves)
+ * https://www.iana.org/assignments/tls-parameters/#tls-parameters-8
+ */
+static const struct supported_group nid_list[] = {
+	{
+		.group_id = 1,
+		.nid = NID_sect163k1,
+		.bits = 80,
+	},
+	{
+		.group_id = 2,
+		.nid = NID_sect163r1,
+		.bits = 80,
+	},
+	{
+		.group_id = 3,
+		.nid = NID_sect163r2,
+		.bits = 80,
+	},
+	{
+		.group_id = 4,
+		.nid = NID_sect193r1,
+		.bits = 80,
+	},
+	{
+		.group_id = 5,
+		.nid = NID_sect193r2,
+		.bits = 80,
+	},
+	{
+		.group_id = 6,
+		.nid = NID_sect233k1,
+		.bits = 112,
+	},
+	{
+		.group_id = 7,
+		.nid = NID_sect233r1,
+		.bits = 112,
+	},
+	{
+		.group_id = 8,
+		.nid = NID_sect239k1,
+		.bits = 112,
+	},
+	{
+		.group_id = 9,
+		.nid = NID_sect283k1,
+		.bits = 128,
+	},
+	{
+		.group_id = 10,
+		.nid = NID_sect283r1,
+		.bits = 128,
+	},
+	{
+		.group_id = 11,
+		.nid = NID_sect409k1,
+		.bits = 192,
+	},
+	{
+		.group_id = 12,
+		.nid = NID_sect409r1,
+		.bits = 192,
+	},
+	{
+		.group_id = 13,
+		.nid = NID_sect571k1,
+		.bits = 256,
+	},
+	{
+		.group_id = 14,
+		.nid = NID_sect571r1,
+		.bits = 256,
+	},
+	{
+		.group_id = 15,
+		.nid = NID_secp160k1,
+		.bits = 80,
+	},
+	{
+		.group_id = 16,
+		.nid = NID_secp160r1,
+		.bits = 80,
+	},
+	{
+		.group_id = 17,
+		.nid = NID_secp160r2,
+		.bits = 80,
+	},
+	{
+		.group_id = 18,
+		.nid = NID_secp192k1,
+		.bits = 80,
+	},
+	{
+		.group_id = 19,
+		.nid = NID_X9_62_prime192v1,	/* aka secp192r1 */
+		.bits = 80,
+	},
+	{
+		.group_id = 20,
+		.nid = NID_secp224k1,
+		.bits = 112,
+	},
+	{
+		.group_id = 21,
+		.nid = NID_secp224r1,
+		.bits = 112,
+	},
+	{
+		.group_id = 22,
+		.nid = NID_secp256k1,
+		.bits = 128,
+	},
+	{
+		.group_id = 23,
+		.nid = NID_X9_62_prime256v1,	/* aka secp256r1 */
+		.bits = 128,
+	},
+	{
+		.group_id = 24,
+		.nid = NID_secp384r1,
+		.bits = 192,
+	},
+	{
+		.group_id = 25,
+		.nid = NID_secp521r1,
+		.bits = 256,
+	},
+	{
+		.group_id = 26,
+		.nid = NID_brainpoolP256r1,
+		.bits = 128,
+	},
+	{
+		.group_id = 27,
+		.nid = NID_brainpoolP384r1,
+		.bits = 192,
+	},
+	{
+		.group_id = 28,
+		.nid = NID_brainpoolP512r1,
+		.bits = 256,
+	},
+	{
+		.group_id = 29,
+		.nid = NID_X25519,
+		.bits = 128,
+	},
+	{
+		.group_id = 4588,
+		.nid = NID_X25519MLKEM768,
+		.bits = 128,
+		.min_version = TLS1_3_VERSION,
+	},
+};
+
+#define NID_LIST_LEN (sizeof(nid_list) / sizeof(nid_list[0]))
 
 #if 0
 static const uint8_t ecformats_list[] = {
@@ -219,122 +329,97 @@ static const uint8_t ecformats_default[] = {
 	TLSEXT_ECPOINTFORMAT_uncompressed,
 };
 
-#if 0
-static const uint16_t eccurves_list[] = {
+static const uint16_t ecgroups_tls12_client_default[] = {
 	29,			/* X25519 (29) */
-	14,			/* sect571r1 (14) */
-	13,			/* sect571k1 (13) */
+	23,			/* secp256r1 (23) */
+	24,			/* secp384r1 (24) */
 	25,			/* secp521r1 (25) */
-	28,			/* brainpoolP512r1 (28) */
-	11,			/* sect409k1 (11) */
-	12,			/* sect409r1 (12) */
-	27,			/* brainpoolP384r1 (27) */
-	24,			/* secp384r1 (24) */
-	9,			/* sect283k1 (9) */
-	10,			/* sect283r1 (10) */
-	26,			/* brainpoolP256r1 (26) */
-	22,			/* secp256k1 (22) */
-	23,			/* secp256r1 (23) */
-	8,			/* sect239k1 (8) */
-	6,			/* sect233k1 (6) */
-	7,			/* sect233r1 (7) */
-	20,			/* secp224k1 (20) */
-	21,			/* secp224r1 (21) */
-	4,			/* sect193r1 (4) */
-	5,			/* sect193r2 (5) */
-	18,			/* secp192k1 (18) */
-	19,			/* secp192r1 (19) */
-	1,			/* sect163k1 (1) */
-	2,			/* sect163r1 (2) */
-	3,			/* sect163r2 (3) */
-	15,			/* secp160k1 (15) */
-	16,			/* secp160r1 (16) */
-	17,			/* secp160r2 (17) */
 };
-#endif
 
-static const uint16_t eccurves_default[] = {
+static const uint16_t ecgroups_tls12_server_default[] = {
 	29,			/* X25519 (29) */
 	23,			/* secp256r1 (23) */
 	24,			/* secp384r1 (24) */
 };
 
-int
-tls1_ec_curve_id2nid(const uint16_t curve_id)
+static const uint16_t ecgroups_client_default[] = {
+	4588,			/* X25519MLKEM768 (4588) */
+	29,			/* X25519 (29) */
+	23,			/* secp256r1 (23) */
+	24,			/* secp384r1 (24) */
+	25,			/* secp521r1 (25) */
+};
+
+static const uint16_t ecgroups_server_default[] = {
+	4588,			/* X25519MLKEM768 (4588) */
+	29,			/* X25519 (29) */
+	23,			/* secp256r1 (23) */
+	24,			/* secp384r1 (24) */
+};
+
+static const struct supported_group *
+tls1_supported_group_by_id(uint16_t group_id)
 {
-	/* ECC curves from draft-ietf-tls-ecc-12.txt (Oct. 17, 2005) */
-	if ((curve_id < 1) ||
-	    ((unsigned int)curve_id > sizeof(nid_list) / sizeof(nid_list[0])))
-		return 0;
-	return nid_list[curve_id - 1];
+	int i;
+
+	for (i = 0; i < NID_LIST_LEN; i++) {
+		if (group_id == nid_list[i].group_id)
+			return &nid_list[i];
+	}
+
+	return NULL;
 }
 
-uint16_t
-tls1_ec_nid2curve_id(const int nid)
+static const struct supported_group *
+tls1_supported_group_by_nid(int nid)
 {
-	/* ECC curves from draft-ietf-tls-ecc-12.txt (Oct. 17, 2005) */
-	switch (nid) {
-	case NID_sect163k1: /* sect163k1 (1) */
-		return 1;
-	case NID_sect163r1: /* sect163r1 (2) */
-		return 2;
-	case NID_sect163r2: /* sect163r2 (3) */
-		return 3;
-	case NID_sect193r1: /* sect193r1 (4) */
-		return 4;
-	case NID_sect193r2: /* sect193r2 (5) */
-		return 5;
-	case NID_sect233k1: /* sect233k1 (6) */
-		return 6;
-	case NID_sect233r1: /* sect233r1 (7) */
-		return 7;
-	case NID_sect239k1: /* sect239k1 (8) */
-		return 8;
-	case NID_sect283k1: /* sect283k1 (9) */
-		return 9;
-	case NID_sect283r1: /* sect283r1 (10) */
-		return 10;
-	case NID_sect409k1: /* sect409k1 (11) */
-		return 11;
-	case NID_sect409r1: /* sect409r1 (12) */
-		return 12;
-	case NID_sect571k1: /* sect571k1 (13) */
-		return 13;
-	case NID_sect571r1: /* sect571r1 (14) */
-		return 14;
-	case NID_secp160k1: /* secp160k1 (15) */
-		return 15;
-	case NID_secp160r1: /* secp160r1 (16) */
-		return 16;
-	case NID_secp160r2: /* secp160r2 (17) */
-		return 17;
-	case NID_secp192k1: /* secp192k1 (18) */
-		return 18;
-	case NID_X9_62_prime192v1: /* secp192r1 (19) */
-		return 19;
-	case NID_secp224k1: /* secp224k1 (20) */
-		return 20;
-	case NID_secp224r1: /* secp224r1 (21) */
-		return 21;
-	case NID_secp256k1: /* secp256k1 (22) */
-		return 22;
-	case NID_X9_62_prime256v1: /* secp256r1 (23) */
-		return 23;
-	case NID_secp384r1: /* secp384r1 (24) */
-		return 24;
-	case NID_secp521r1: /* secp521r1 (25) */
-		return 25;
-	case NID_brainpoolP256r1: /* brainpoolP256r1 (26) */
-		return 26;
-	case NID_brainpoolP384r1: /* brainpoolP384r1 (27) */
-		return 27;
-	case NID_brainpoolP512r1: /* brainpoolP512r1 (28) */
-		return 28;
-	case NID_X25519:		/* X25519 (29) */
-		return 29;
-	default:
-		return 0;
+	int i;
+
+	for (i = 0; i < NID_LIST_LEN; i++) {
+		if (nid == nid_list[i].nid)
+			return &nid_list[i];
 	}
+
+	return NULL;
+}
+
+int
+tls1_ec_group_id2nid(uint16_t group_id, int *out_nid)
+{
+	const struct supported_group *sg;
+
+	if ((sg = tls1_supported_group_by_id(group_id)) == NULL)
+		return 0;
+
+	*out_nid = sg->nid;
+
+	return 1;
+}
+
+int
+tls1_ec_group_id2bits(uint16_t group_id, int *out_bits)
+{
+	const struct supported_group *sg;
+
+	if ((sg = tls1_supported_group_by_id(group_id)) == NULL)
+		return 0;
+
+	*out_bits = sg->bits;
+
+	return 1;
+}
+
+int
+tls1_ec_nid2group_id(int nid, uint16_t *out_group_id)
+{
+	const struct supported_group *sg;
+
+	if ((sg = tls1_supported_group_by_nid(nid)) == NULL)
+		return 0;
+
+	*out_group_id = sg->group_id;
+
+	return 1;
 }
 
 /*
@@ -343,17 +428,17 @@ tls1_ec_nid2curve_id(const int nid)
  * exists, or the default formats if a custom list has not been specified.
  */
 void
-tls1_get_formatlist(SSL *s, int client_formats, const uint8_t **pformats,
+tls1_get_formatlist(const SSL *s, int client_formats, const uint8_t **pformats,
     size_t *pformatslen)
 {
 	if (client_formats != 0) {
-		*pformats = SSI(s)->tlsext_ecpointformatlist;
-		*pformatslen = SSI(s)->tlsext_ecpointformatlist_length;
+		*pformats = s->session->tlsext_ecpointformatlist;
+		*pformatslen = s->session->tlsext_ecpointformatlist_length;
 		return;
 	}
 
-	*pformats = s->internal->tlsext_ecpointformatlist;
-	*pformatslen = s->internal->tlsext_ecpointformatlist_length;
+	*pformats = s->tlsext_ecpointformatlist;
+	*pformatslen = s->tlsext_ecpointformatlist_length;
 	if (*pformats == NULL) {
 		*pformats = ecformats_default;
 		*pformatslen = sizeof(ecformats_default);
@@ -361,26 +446,153 @@ tls1_get_formatlist(SSL *s, int client_formats, const uint8_t **pformats,
 }
 
 /*
- * Return the appropriate curve list. If client_curves is non-zero, return
- * the client/session curves. Otherwise return the custom curve list if one
- * exists, or the default curves if a custom list has not been specified.
+ * Return the appropriate group list. If client_groups is non-zero, return
+ * the client/session groups. Otherwise return the custom group list if one
+ * exists, or the default groups if a custom list has not been specified.
  */
 void
-tls1_get_curvelist(SSL *s, int client_curves, const uint16_t **pcurves,
-    size_t *pcurveslen)
+tls1_get_group_list(const SSL *s, int client_groups, const uint16_t **pgroups,
+    size_t *pgroupslen)
 {
-	if (client_curves != 0) {
-		*pcurves = SSI(s)->tlsext_supportedgroups;
-		*pcurveslen = SSI(s)->tlsext_supportedgroups_length;
+	if (client_groups != 0) {
+		*pgroups = s->session->tlsext_supportedgroups;
+		*pgroupslen = s->session->tlsext_supportedgroups_length;
 		return;
 	}
 
-	*pcurves = s->internal->tlsext_supportedgroups;
-	*pcurveslen = s->internal->tlsext_supportedgroups_length;
-	if (*pcurves == NULL) {
-		*pcurves = eccurves_default;
-		*pcurveslen = sizeof(eccurves_default) / 2;
+	*pgroups = s->tlsext_supportedgroups;
+	*pgroupslen = s->tlsext_supportedgroups_length;
+	if (*pgroups != NULL)
+		return;
+
+	if (!s->server) {
+		if (s->s3->hs.our_max_tls_version >= TLS1_3_VERSION) {
+			*pgroups = ecgroups_client_default;
+			*pgroupslen = sizeof(ecgroups_client_default) / 2;
+		} else {
+			*pgroups = ecgroups_tls12_client_default;
+			*pgroupslen = sizeof(ecgroups_tls12_client_default) / 2;
+		}
+	} else {
+		if (s->s3->hs.our_max_tls_version >= TLS1_3_VERSION) {
+			*pgroups = ecgroups_server_default;
+			*pgroupslen = sizeof(ecgroups_server_default) / 2;
+		} else {
+			*pgroups = ecgroups_tls12_server_default;
+			*pgroupslen = sizeof(ecgroups_tls12_server_default) / 2;
+		}
 	}
+}
+
+static int
+tls1_get_group_lists(const SSL *ssl, const uint16_t **pref, size_t *preflen,
+    const uint16_t **supp, size_t *supplen)
+{
+	unsigned long server_pref;
+
+	/* Cannot do anything on the client side. */
+	if (!ssl->server)
+		return 0;
+
+	server_pref = (ssl->options & SSL_OP_CIPHER_SERVER_PREFERENCE);
+	tls1_get_group_list(ssl, (server_pref == 0), pref, preflen);
+	tls1_get_group_list(ssl, (server_pref != 0), supp, supplen);
+
+	return 1;
+}
+
+static int
+tls1_group_id_present(uint16_t group_id, const uint16_t *list, size_t list_len)
+{
+	size_t i;
+
+	for (i = 0; i < list_len; i++) {
+		if (group_id == list[i])
+			return 1;
+	}
+
+	return 0;
+}
+
+static int
+tls1_group_id_allowed(const SSL *ssl, uint16_t group_id)
+{
+	const struct supported_group *sg;
+
+	if ((sg = tls1_supported_group_by_id(group_id)) == NULL)
+		return 0;
+
+	return ssl_effective_tls_version(ssl) >= sg->min_version;
+}
+
+int
+tls1_count_shared_groups(const SSL *ssl, size_t *out_count)
+{
+	size_t count, preflen, supplen, i;
+	const uint16_t *pref, *supp;
+
+	if (!tls1_get_group_lists(ssl, &pref, &preflen, &supp, &supplen))
+		return 0;
+
+	count = 0;
+	for (i = 0; i < preflen; i++) {
+		if (!tls1_group_id_present(pref[i], supp, supplen))
+			continue;
+
+		if (!ssl_security_shared_group(ssl, pref[i]))
+			continue;
+
+		if (!tls1_group_id_allowed(ssl, pref[i]))
+			continue;
+
+		count++;
+	}
+
+	*out_count = count;
+
+	return 1;
+}
+
+static int
+tls1_group_by_index(const SSL *ssl, size_t n, int *out_nid,
+    int (*ssl_security_fn)(const SSL *, uint16_t))
+{
+	size_t count, preflen, supplen, i;
+	const uint16_t *pref, *supp;
+
+	if (!tls1_get_group_lists(ssl, &pref, &preflen, &supp, &supplen))
+		return 0;
+
+	count = 0;
+	for (i = 0; i < preflen; i++) {
+		if (!tls1_group_id_present(pref[i], supp, supplen))
+			continue;
+
+		if (!ssl_security_fn(ssl, pref[i]))
+			continue;
+
+		if (!tls1_group_id_allowed(ssl, pref[i]))
+			continue;
+
+		if (count++ == n)
+			return tls1_ec_group_id2nid(pref[i], out_nid);
+	}
+
+	return 0;
+}
+
+int
+tls1_get_shared_group_by_index(const SSL *ssl, size_t index, int *out_nid)
+{
+	return tls1_group_by_index(ssl, index, out_nid,
+	    ssl_security_shared_group);
+}
+
+int
+tls1_get_supported_group(const SSL *ssl, int *out_nid)
+{
+	return tls1_group_by_index(ssl, 0, out_nid,
+	    ssl_security_supported_group);
 }
 
 int
@@ -390,13 +602,11 @@ tls1_set_groups(uint16_t **out_group_ids, size_t *out_group_ids_len,
 	uint16_t *group_ids;
 	size_t i;
 
-	group_ids = calloc(ngroups, sizeof(uint16_t));
-	if (group_ids == NULL)
+	if ((group_ids = calloc(ngroups, sizeof(uint16_t))) == NULL)
 		return 0;
 
 	for (i = 0; i < ngroups; i++) {
-		group_ids[i] = tls1_ec_nid2curve_id(groups[i]);
-		if (group_ids[i] == 0) {
+		if (!tls1_ec_nid2group_id(groups[i], &group_ids[i])) {
 			free(group_ids);
 			return 0;
 		}
@@ -410,7 +620,7 @@ tls1_set_groups(uint16_t **out_group_ids, size_t *out_group_ids_len,
 }
 
 int
-tls1_set_groups_list(uint16_t **out_group_ids, size_t *out_group_ids_len,
+tls1_set_group_list(uint16_t **out_group_ids, size_t *out_group_ids_len,
     const char *groups)
 {
 	uint16_t *new_group_ids, *group_ids = NULL;
@@ -436,8 +646,7 @@ tls1_set_groups_list(uint16_t **out_group_ids, size_t *out_group_ids_len,
 			goto err;
 		group_ids = new_group_ids;
 
-		group_ids[ngroups] = tls1_ec_nid2curve_id(nid);
-		if (group_ids[ngroups] == 0)
+		if (!tls1_ec_nid2group_id(nid, &group_ids[ngroups]))
 			goto err;
 
 		ngroups++;
@@ -457,99 +666,60 @@ tls1_set_groups_list(uint16_t **out_group_ids, size_t *out_group_ids_len,
 	return 0;
 }
 
-/* Check that a curve is one of our preferences. */
+/* Check that a group is one of our preferences. */
 int
-tls1_check_curve(SSL *s, const uint16_t curve_id)
+tls1_check_group(SSL *s, uint16_t group_id)
 {
-	const uint16_t *curves;
-	size_t curveslen, i;
+	const uint16_t *groups;
+	size_t groupslen, i;
 
-	tls1_get_curvelist(s, 0, &curves, &curveslen);
+	tls1_get_group_list(s, 0, &groups, &groupslen);
 
-	for (i = 0; i < curveslen; i++) {
-		if (curves[i] == curve_id)
-			return (1);
+	for (i = 0; i < groupslen; i++) {
+		if (!ssl_security_supported_group(s, groups[i]))
+			continue;
+
+		if (!tls1_group_id_allowed(s, groups[i]))
+			continue;
+
+		if (groups[i] == group_id)
+			return 1;
 	}
-	return (0);
-}
-
-int
-tls1_get_shared_curve(SSL *s)
-{
-	size_t preflen, supplen, i, j;
-	const uint16_t *pref, *supp;
-	unsigned long server_pref;
-
-	/* Cannot do anything on the client side. */
-	if (s->server == 0)
-		return (NID_undef);
-
-	/* Return first preference shared curve. */
-	server_pref = (s->internal->options & SSL_OP_CIPHER_SERVER_PREFERENCE);
-	tls1_get_curvelist(s, (server_pref == 0), &pref, &preflen);
-	tls1_get_curvelist(s, (server_pref != 0), &supp, &supplen);
-
-	for (i = 0; i < preflen; i++) {
-		for (j = 0; j < supplen; j++) {
-			if (pref[i] == supp[j])
-				return (tls1_ec_curve_id2nid(pref[i]));
-		}
-	}
-	return (NID_undef);
+	return 0;
 }
 
 /* For an EC key set TLS ID and required compression based on parameters. */
 static int
-tls1_set_ec_id(uint16_t *curve_id, uint8_t *comp_id, EC_KEY *ec)
+tls1_set_ec_id(uint16_t *group_id, uint8_t *comp_id, EC_KEY *ec)
 {
-	const EC_GROUP *grp;
-	const EC_METHOD *meth;
-	int is_prime = 0;
-	int nid, id;
+	const EC_GROUP *group;
+	int nid;
 
-	if (ec == NULL)
-		return (0);
+	if ((group = EC_KEY_get0_group(ec)) == NULL)
+		return 0;
 
-	/* Determine if it is a prime field. */
-	if ((grp = EC_KEY_get0_group(ec)) == NULL)
-		return (0);
-	if ((meth = EC_GROUP_method_of(grp)) == NULL)
-		return (0);
-	if (EC_METHOD_get_field_type(meth) == NID_X9_62_prime_field)
-		is_prime = 1;
-
-	/* Determine curve ID. */
-	nid = EC_GROUP_get_curve_name(grp);
-	id = tls1_ec_nid2curve_id(nid);
-
-	/* If we have an ID set it, otherwise set arbitrary explicit curve. */
-	if (id != 0)
-		*curve_id = id;
-	else
-		*curve_id = is_prime ? 0xff01 : 0xff02;
+	/* Determine group ID. */
+	nid = EC_GROUP_get_curve_name(group);
+	if (!tls1_ec_nid2group_id(nid, group_id))
+		return 0;
 
 	/* Specify the compression identifier. */
-	if (comp_id != NULL) {
-		if (EC_KEY_get0_public_key(ec) == NULL)
-			return (0);
-
-		if (EC_KEY_get_conv_form(ec) == POINT_CONVERSION_COMPRESSED) {
-			*comp_id = is_prime ?
-			    TLSEXT_ECPOINTFORMAT_ansiX962_compressed_prime :
-			    TLSEXT_ECPOINTFORMAT_ansiX962_compressed_char2;
-		} else {
-			*comp_id = TLSEXT_ECPOINTFORMAT_uncompressed;
-		}
+	if (EC_KEY_get0_public_key(ec) == NULL)
+		return 0;
+	*comp_id = TLSEXT_ECPOINTFORMAT_uncompressed;
+	if (EC_KEY_get_conv_form(ec) == POINT_CONVERSION_COMPRESSED) {
+		*comp_id = TLSEXT_ECPOINTFORMAT_ansiX962_compressed_prime;
 	}
-	return (1);
+
+	return 1;
 }
 
 /* Check that an EC key is compatible with extensions. */
 static int
-tls1_check_ec_key(SSL *s, const uint16_t *curve_id, const uint8_t *comp_id)
+tls1_check_ec_key(SSL *s, const uint16_t group_id, const uint8_t comp_id)
 {
-	size_t curveslen, formatslen, i;
-	const uint16_t *curves;
+	size_t groupslen, formatslen, i;
+	const uint16_t *groups;
 	const uint8_t *formats;
 
 	/*
@@ -557,108 +727,51 @@ tls1_check_ec_key(SSL *s, const uint16_t *curve_id, const uint8_t *comp_id)
 	 * is supported (see RFC4492).
 	 */
 	tls1_get_formatlist(s, 1, &formats, &formatslen);
-	if (comp_id != NULL && formats != NULL) {
+	if (formats != NULL) {
 		for (i = 0; i < formatslen; i++) {
-			if (formats[i] == *comp_id)
+			if (formats[i] == comp_id)
 				break;
 		}
 		if (i == formatslen)
-			return (0);
+			return 0;
 	}
 
 	/*
-	 * Check curve list if present, otherwise everything is supported.
+	 * Check group list if present, otherwise everything is supported.
 	 */
-	tls1_get_curvelist(s, 1, &curves, &curveslen);
-	if (curve_id != NULL && curves != NULL) {
-		for (i = 0; i < curveslen; i++) {
-			if (curves[i] == *curve_id)
+	tls1_get_group_list(s, 1, &groups, &groupslen);
+	if (groups != NULL) {
+		for (i = 0; i < groupslen; i++) {
+			if (groups[i] == group_id)
 				break;
 		}
-		if (i == curveslen)
-			return (0);
+		if (i == groupslen)
+			return 0;
 	}
 
-	return (1);
+	return 1;
 }
 
 /* Check EC server key is compatible with client extensions. */
 int
 tls1_check_ec_server_key(SSL *s)
 {
-	CERT_PKEY *cpk = s->cert->pkeys + SSL_PKEY_ECC;
-	uint16_t curve_id;
+	SSL_CERT_PKEY *cpk = s->cert->pkeys + SSL_PKEY_ECC;
+	uint16_t group_id;
 	uint8_t comp_id;
+	EC_KEY *eckey;
 	EVP_PKEY *pkey;
-	int rv;
 
 	if (cpk->x509 == NULL || cpk->privatekey == NULL)
-		return (0);
-	if ((pkey = X509_get_pubkey(cpk->x509)) == NULL)
-		return (0);
-	rv = tls1_set_ec_id(&curve_id, &comp_id, pkey->pkey.ec);
-	EVP_PKEY_free(pkey);
-	if (rv != 1)
-		return (0);
+		return 0;
+	if ((pkey = X509_get0_pubkey(cpk->x509)) == NULL)
+		return 0;
+	if ((eckey = EVP_PKEY_get0_EC_KEY(pkey)) == NULL)
+		return 0;
+	if (!tls1_set_ec_id(&group_id, &comp_id, eckey))
+		return 0;
 
-	return tls1_check_ec_key(s, &curve_id, &comp_id);
-}
-
-/* Check EC temporary key is compatible with client extensions. */
-int
-tls1_check_ec_tmp_key(SSL *s)
-{
-	EC_KEY *ec = s->cert->ecdh_tmp;
-	uint16_t curve_id;
-
-	/* Need a shared curve. */
-	if (tls1_get_shared_curve(s) != NID_undef)
-		return (1);
-
-	if (ec == NULL)
-		return (0);
-
-	if (tls1_set_ec_id(&curve_id, NULL, ec) != 1)
-		return (0);
-
-	return tls1_check_ec_key(s, &curve_id, NULL);
-}
-
-/*
- * List of supported signature algorithms and hashes. Should make this
- * customisable at some point, for now include everything we support.
- */
-
-static unsigned char tls12_sigalgs[] = {
-	TLSEXT_hash_sha512, TLSEXT_signature_rsa,
-	TLSEXT_hash_sha512, TLSEXT_signature_ecdsa,
-#ifndef OPENSSL_NO_GOST
-	TLSEXT_hash_streebog_512, TLSEXT_signature_gostr12_512,
-#endif
-
-	TLSEXT_hash_sha384, TLSEXT_signature_rsa,
-	TLSEXT_hash_sha384, TLSEXT_signature_ecdsa,
-
-	TLSEXT_hash_sha256, TLSEXT_signature_rsa,
-	TLSEXT_hash_sha256, TLSEXT_signature_ecdsa,
-
-#ifndef OPENSSL_NO_GOST
-	TLSEXT_hash_streebog_256, TLSEXT_signature_gostr12_256,
-	TLSEXT_hash_gost94, TLSEXT_signature_gostr01,
-#endif
-
-	TLSEXT_hash_sha224, TLSEXT_signature_rsa,
-	TLSEXT_hash_sha224, TLSEXT_signature_ecdsa,
-
-	TLSEXT_hash_sha1, TLSEXT_signature_rsa,
-	TLSEXT_hash_sha1, TLSEXT_signature_ecdsa,
-};
-
-void
-tls12_get_req_sig_algs(SSL *s, unsigned char **sigalgs, size_t *sigalgs_len)
-{
-	*sigalgs = tls12_sigalgs;
-	*sigalgs_len = sizeof(tls12_sigalgs);
+	return tls1_check_ec_key(s, group_id, comp_id);
 }
 
 int
@@ -674,12 +787,12 @@ ssl_check_clienthello_tlsext_early(SSL *s)
 	 * ssl3_choose_cipher in s3_lib.c.
 	 */
 
-	if (s->ctx != NULL && s->ctx->internal->tlsext_servername_callback != 0)
-		ret = s->ctx->internal->tlsext_servername_callback(s, &al,
-		    s->ctx->internal->tlsext_servername_arg);
-	else if (s->initial_ctx != NULL && s->initial_ctx->internal->tlsext_servername_callback != 0)
-		ret = s->initial_ctx->internal->tlsext_servername_callback(s, &al,
-		    s->initial_ctx->internal->tlsext_servername_arg);
+	if (s->ctx != NULL && s->ctx->tlsext_servername_callback != 0)
+		ret = s->ctx->tlsext_servername_callback(s, &al,
+		    s->ctx->tlsext_servername_arg);
+	else if (s->initial_ctx != NULL && s->initial_ctx->tlsext_servername_callback != 0)
+		ret = s->initial_ctx->tlsext_servername_callback(s, &al,
+		    s->initial_ctx->tlsext_servername_arg);
 
 	switch (ret) {
 	case SSL_TLSEXT_ERR_ALERT_FATAL:
@@ -689,7 +802,6 @@ ssl_check_clienthello_tlsext_early(SSL *s)
 		ssl3_send_alert(s, SSL3_AL_WARNING, al);
 		return 1;
 	case SSL_TLSEXT_ERR_NOACK:
-		s->internal->servername_done = 0;
 	default:
 		return 1;
 	}
@@ -699,7 +811,7 @@ int
 ssl_check_clienthello_tlsext_late(SSL *s)
 {
 	int ret = SSL_TLSEXT_ERR_OK;
-	int al = 0;	/* XXX gcc3 */
+	int al;
 
 	/* If status request then ask callback what to do.
  	 * Note: this must be called after servername callbacks in case
@@ -707,32 +819,32 @@ ssl_check_clienthello_tlsext_late(SSL *s)
 	 * has been chosen because this may influence which certificate is sent
  	 */
 	if ((s->tlsext_status_type != -1) &&
-	    s->ctx && s->ctx->internal->tlsext_status_cb) {
+	    s->ctx && s->ctx->tlsext_status_cb) {
 		int r;
-		CERT_PKEY *certpkey;
+		SSL_CERT_PKEY *certpkey;
 		certpkey = ssl_get_server_send_pkey(s);
 		/* If no certificate can't return certificate status */
 		if (certpkey == NULL) {
-			s->internal->tlsext_status_expected = 0;
+			s->tlsext_status_expected = 0;
 			return 1;
 		}
 		/* Set current certificate to one we will use so
 		 * SSL_get_certificate et al can pick it up.
 		 */
 		s->cert->key = certpkey;
-		r = s->ctx->internal->tlsext_status_cb(s,
-		    s->ctx->internal->tlsext_status_arg);
+		r = s->ctx->tlsext_status_cb(s,
+		    s->ctx->tlsext_status_arg);
 		switch (r) {
 			/* We don't want to send a status request response */
 		case SSL_TLSEXT_ERR_NOACK:
-			s->internal->tlsext_status_expected = 0;
+			s->tlsext_status_expected = 0;
 			break;
 			/* status request response should be sent */
 		case SSL_TLSEXT_ERR_OK:
-			if (s->internal->tlsext_ocsp_resp)
-				s->internal->tlsext_status_expected = 1;
+			if (s->tlsext_ocsp_resp)
+				s->tlsext_status_expected = 1;
 			else
-				s->internal->tlsext_status_expected = 0;
+				s->tlsext_status_expected = 0;
 			break;
 			/* something bad happened */
 		case SSL_TLSEXT_ERR_ALERT_FATAL:
@@ -741,9 +853,9 @@ ssl_check_clienthello_tlsext_late(SSL *s)
 			goto err;
 		}
 	} else
-		s->internal->tlsext_status_expected = 0;
+		s->tlsext_status_expected = 0;
 
-err:
+ err:
 	switch (ret) {
 	case SSL_TLSEXT_ERR_ALERT_FATAL:
 		ssl3_send_alert(s, SSL3_AL_FATAL, al);
@@ -764,27 +876,26 @@ ssl_check_serverhello_tlsext(SSL *s)
 
 	ret = SSL_TLSEXT_ERR_OK;
 
-	if (s->ctx != NULL && s->ctx->internal->tlsext_servername_callback != 0)
-		ret = s->ctx->internal->tlsext_servername_callback(s, &al,
-		    s->ctx->internal->tlsext_servername_arg);
-	else if (s->initial_ctx != NULL && s->initial_ctx->internal->tlsext_servername_callback != 0)
-		ret = s->initial_ctx->internal->tlsext_servername_callback(s, &al,
-		    s->initial_ctx->internal->tlsext_servername_arg);
+	if (s->ctx != NULL && s->ctx->tlsext_servername_callback != 0)
+		ret = s->ctx->tlsext_servername_callback(s, &al,
+		    s->ctx->tlsext_servername_arg);
+	else if (s->initial_ctx != NULL && s->initial_ctx->tlsext_servername_callback != 0)
+		ret = s->initial_ctx->tlsext_servername_callback(s, &al,
+		    s->initial_ctx->tlsext_servername_arg);
 
 	/* If we've requested certificate status and we wont get one
  	 * tell the callback
  	 */
-	if ((s->tlsext_status_type != -1) && !(s->internal->tlsext_status_expected) &&
-	    s->ctx && s->ctx->internal->tlsext_status_cb) {
+	if ((s->tlsext_status_type != -1) && !(s->tlsext_status_expected) &&
+	    s->ctx && s->ctx->tlsext_status_cb) {
 		int r;
-		/* Set resp to NULL, resplen to -1 so callback knows
- 		 * there is no response.
- 		 */
-		free(s->internal->tlsext_ocsp_resp);
-		s->internal->tlsext_ocsp_resp = NULL;
-		s->internal->tlsext_ocsp_resplen = -1;
-		r = s->ctx->internal->tlsext_status_cb(s,
-		    s->ctx->internal->tlsext_status_arg);
+
+		free(s->tlsext_ocsp_resp);
+		s->tlsext_ocsp_resp = NULL;
+		s->tlsext_ocsp_resp_len = 0;
+
+		r = s->ctx->tlsext_status_cb(s,
+		    s->ctx->tlsext_status_arg);
 		if (r == 0) {
 			al = SSL_AD_BAD_CERTIFICATE_STATUS_RESPONSE;
 			ret = SSL_TLSEXT_ERR_ALERT_FATAL;
@@ -798,14 +909,11 @@ ssl_check_serverhello_tlsext(SSL *s)
 	switch (ret) {
 	case SSL_TLSEXT_ERR_ALERT_FATAL:
 		ssl3_send_alert(s, SSL3_AL_FATAL, al);
-
 		return -1;
 	case SSL_TLSEXT_ERR_ALERT_WARNING:
 		ssl3_send_alert(s, SSL3_AL_WARNING, al);
-
 		return 1;
 	case SSL_TLSEXT_ERR_NOACK:
-		s->internal->servername_done = 0;
 	default:
 		return 1;
 	}
@@ -815,426 +923,261 @@ ssl_check_serverhello_tlsext(SSL *s)
  * ClientHello, and other operations depend on the result, we need to handle
  * any TLS session ticket extension at the same time.
  *
- *   session_id: points at the session ID in the ClientHello. This code will
- *       read past the end of this in order to parse out the session ticket
- *       extension, if any.
- *   len: the length of the session ID.
- *   limit: a pointer to the first byte after the ClientHello.
+ *   ext_block: a CBS for the ClientHello extensions block.
  *   ret: (output) on return, if a ticket was decrypted, then this is set to
  *       point to the resulting session.
  *
- * If s->internal->tls_session_secret_cb is set then we are expecting a pre-shared key
+ * If s->tls_session_secret_cb is set then we are expecting a pre-shared key
  * ciphersuite, in which case we have no use for session tickets and one will
- * never be decrypted, nor will s->internal->tlsext_ticket_expected be set to 1.
+ * never be decrypted, nor will s->tlsext_ticket_expected be set to 1.
  *
  * Returns:
- *   -1: fatal error, either from parsing or decrypting the ticket.
- *    0: no ticket was found (or was ignored, based on settings).
- *    1: a zero length extension was found, indicating that the client supports
- *       session tickets but doesn't currently have one to offer.
- *    2: either s->internal->tls_session_secret_cb was set, or a ticket was offered but
- *       couldn't be decrypted because of a non-fatal error.
- *    3: a ticket was successfully decrypted and *ret was set.
+ *    TLS1_TICKET_FATAL_ERROR: error from parsing or decrypting the ticket.
+ *    TLS1_TICKET_NONE: no ticket was found (or was ignored, based on settings).
+ *    TLS1_TICKET_EMPTY: a zero length extension was found, indicating that the
+ *       client supports session tickets but doesn't currently have one to offer.
+ *    TLS1_TICKET_NOT_DECRYPTED: either s->tls_session_secret_cb was
+ *       set, or a ticket was offered but couldn't be decrypted because of a
+ *       non-fatal error.
+ *    TLS1_TICKET_DECRYPTED: a ticket was successfully decrypted and *ret was set.
  *
  * Side effects:
- *   Sets s->internal->tlsext_ticket_expected to 1 if the server will have to issue
+ *   Sets s->tlsext_ticket_expected to 1 if the server will have to issue
  *   a new session ticket to the client because the client indicated support
- *   (and s->internal->tls_session_secret_cb is NULL) but the client either doesn't have
+ *   (and s->tls_session_secret_cb is NULL) but the client either doesn't have
  *   a session ticket or we couldn't use the one it gave us, or if
  *   s->ctx->tlsext_ticket_key_cb asked to renew the client's ticket.
- *   Otherwise, s->internal->tlsext_ticket_expected is set to 0.
+ *   Otherwise, s->tlsext_ticket_expected is set to 0.
  */
 int
-tls1_process_ticket(SSL *s, const unsigned char *session, int session_len,
-    const unsigned char *limit, SSL_SESSION **ret)
+tls1_process_ticket(SSL *s, CBS *ext_block, int *alert, SSL_SESSION **ret)
 {
-	/* Point after session ID in client hello */
-	CBS session_id, cookie, cipher_list, compress_algo, extensions;
+	CBS extensions, ext_data;
+	uint16_t ext_type = 0;
 
+	s->tlsext_ticket_expected = 0;
 	*ret = NULL;
-	s->internal->tlsext_ticket_expected = 0;
 
-	/* If tickets disabled behave as if no ticket present
-	 * to permit stateful resumption.
+	/*
+	 * If tickets disabled behave as if no ticket present to permit stateful
+	 * resumption.
 	 */
 	if (SSL_get_options(s) & SSL_OP_NO_TICKET)
-		return 0;
-	if (!limit)
-		return 0;
+		return TLS1_TICKET_NONE;
 
-	if (limit < session)
-		return -1;
+	/*
+	 * An empty extensions block is valid, but obviously does not contain
+	 * a session ticket.
+	 */
+	if (CBS_len(ext_block) == 0)
+		return TLS1_TICKET_NONE;
 
-	CBS_init(&session_id, session, limit - session);
-
-	/* Skip past the session id */
-	if (!CBS_skip(&session_id, session_len))
-		return -1;
-
-	/* Skip past DTLS cookie */
-	if (SSL_IS_DTLS(s)) {
-		if (!CBS_get_u8_length_prefixed(&session_id, &cookie))
-			return -1;
+	if (!CBS_get_u16_length_prefixed(ext_block, &extensions)) {
+		*alert = SSL_AD_DECODE_ERROR;
+		return TLS1_TICKET_FATAL_ERROR;
 	}
-
-	/* Skip past cipher list */
-	if (!CBS_get_u16_length_prefixed(&session_id, &cipher_list))
-		return -1;
-
-	/* Skip past compression algorithm list */
-	if (!CBS_get_u8_length_prefixed(&session_id, &compress_algo))
-		return -1;
-
-	/* Now at start of extensions */
-	if (CBS_len(&session_id) == 0)
-		return 0;
-	if (!CBS_get_u16_length_prefixed(&session_id, &extensions))
-		return -1;
 
 	while (CBS_len(&extensions) > 0) {
-		CBS ext_data;
-		uint16_t ext_type;
-
 		if (!CBS_get_u16(&extensions, &ext_type) ||
-		    !CBS_get_u16_length_prefixed(&extensions, &ext_data))
-			return -1;
-
-		if (ext_type == TLSEXT_TYPE_session_ticket) {
-			int r;
-			if (CBS_len(&ext_data) == 0) {
-				/* The client will accept a ticket but doesn't
-				 * currently have one. */
-				s->internal->tlsext_ticket_expected = 1;
-				return 1;
-			}
-			if (s->internal->tls_session_secret_cb) {
-				/* Indicate that the ticket couldn't be
-				 * decrypted rather than generating the session
-				 * from ticket now, trigger abbreviated
-				 * handshake based on external mechanism to
-				 * calculate the master secret later. */
-				return 2;
-			}
-
-			r = tls_decrypt_ticket(s, CBS_data(&ext_data),
-			    CBS_len(&ext_data), session, session_len, ret);
-
-			switch (r) {
-			case 2: /* ticket couldn't be decrypted */
-				s->internal->tlsext_ticket_expected = 1;
-				return 2;
-			case 3: /* ticket was decrypted */
-				return r;
-			case 4: /* ticket decrypted but need to renew */
-				s->internal->tlsext_ticket_expected = 1;
-				return 3;
-			default: /* fatal error */
-				return -1;
-			}
+		    !CBS_get_u16_length_prefixed(&extensions, &ext_data)) {
+			*alert = SSL_AD_DECODE_ERROR;
+			return TLS1_TICKET_FATAL_ERROR;
 		}
+
+		if (ext_type == TLSEXT_TYPE_session_ticket)
+			break;
 	}
-	return 0;
+
+	if (ext_type != TLSEXT_TYPE_session_ticket)
+		return TLS1_TICKET_NONE;
+
+	if (CBS_len(&ext_data) == 0) {
+		/*
+		 * The client will accept a ticket but does not currently
+		 * have one.
+		 */
+		s->tlsext_ticket_expected = 1;
+		return TLS1_TICKET_EMPTY;
+	}
+
+	if (s->tls_session_secret_cb != NULL) {
+		/*
+		 * Indicate that the ticket could not be decrypted rather than
+		 * generating the session from ticket now, trigger abbreviated
+		 * handshake based on external mechanism to calculate the master
+		 * secret later.
+		 */
+		return TLS1_TICKET_NOT_DECRYPTED;
+	}
+
+	return tls_decrypt_ticket(s, &ext_data, alert, ret);
 }
 
 /* tls_decrypt_ticket attempts to decrypt a session ticket.
  *
- *   etick: points to the body of the session ticket extension.
- *   eticklen: the length of the session tickets extenion.
- *   sess_id: points at the session ID.
- *   sesslen: the length of the session ID.
+ *   ticket: a CBS containing the body of the session ticket extension.
  *   psess: (output) on return, if a ticket was decrypted, then this is set to
  *       point to the resulting session.
  *
  * Returns:
- *   -1: fatal error, either from parsing or decrypting the ticket.
- *    2: the ticket couldn't be decrypted.
- *    3: a ticket was successfully decrypted and *psess was set.
- *    4: same as 3, but the ticket needs to be renewed.
+ *    TLS1_TICKET_FATAL_ERROR: error from parsing or decrypting the ticket.
+ *    TLS1_TICKET_NOT_DECRYPTED: the ticket couldn't be decrypted.
+ *    TLS1_TICKET_DECRYPTED: a ticket was decrypted and *psess was set.
  */
 static int
-tls_decrypt_ticket(SSL *s, const unsigned char *etick, int eticklen,
-    const unsigned char *sess_id, int sesslen, SSL_SESSION **psess)
+tls_decrypt_ticket(SSL *s, CBS *ticket, int *alert, SSL_SESSION **psess)
 {
-	SSL_SESSION *sess;
-	unsigned char *sdec;
+	CBS ticket_name, ticket_iv, ticket_encdata, ticket_hmac;
+	SSL_SESSION *sess = NULL;
+	unsigned char *sdec = NULL;
+	size_t sdec_len = 0;
 	const unsigned char *p;
-	int slen, mlen, renew_ticket = 0;
-	unsigned char tick_hmac[EVP_MAX_MD_SIZE];
-	HMAC_CTX hctx;
-	EVP_CIPHER_CTX ctx;
+	unsigned char hmac[EVP_MAX_MD_SIZE];
+	HMAC_CTX *hctx = NULL;
+	EVP_CIPHER_CTX *cctx = NULL;
 	SSL_CTX *tctx = s->initial_ctx;
+	int slen, hlen, iv_len;
+	int alert_desc = SSL_AD_INTERNAL_ERROR;
+	int ret = TLS1_TICKET_FATAL_ERROR;
+
+	*psess = NULL;
+
+	if (!CBS_get_bytes(ticket, &ticket_name, 16))
+		goto derr;
 
 	/*
-	 * The API guarantees EVP_MAX_IV_LENGTH bytes of space for
-	 * the iv to tlsext_ticket_key_cb().  Since the total space
-	 * required for a session cookie is never less than this,
-	 * this check isn't too strict.  The exact check comes later.
+	 * Initialize session ticket encryption and HMAC contexts.
 	 */
-	if (eticklen < 16 + EVP_MAX_IV_LENGTH)
-		return 2;
+	if ((cctx = EVP_CIPHER_CTX_new()) == NULL)
+		goto err;
+	if ((hctx = HMAC_CTX_new()) == NULL)
+		goto err;
 
-	/* Initialize session ticket encryption and HMAC contexts */
-	HMAC_CTX_init(&hctx);
-	EVP_CIPHER_CTX_init(&ctx);
-	if (tctx->internal->tlsext_ticket_key_cb) {
-		unsigned char *nctick = (unsigned char *)etick;
-		int rv = tctx->internal->tlsext_ticket_key_cb(s,
-		    nctick, nctick + 16, &ctx, &hctx, 0);
-		if (rv < 0) {
-			HMAC_CTX_cleanup(&hctx);
-			EVP_CIPHER_CTX_cleanup(&ctx);
-			return -1;
-		}
-		if (rv == 0) {
-			HMAC_CTX_cleanup(&hctx);
-			EVP_CIPHER_CTX_cleanup(&ctx);
-			return 2;
-		}
-		if (rv == 2)
-			renew_ticket = 1;
-	} else {
-		/* Check key name matches */
-		if (timingsafe_memcmp(etick,
-		    tctx->internal->tlsext_tick_key_name, 16))
-			return 2;
-		HMAC_Init_ex(&hctx, tctx->internal->tlsext_tick_hmac_key,
-		    16, tlsext_tick_md(), NULL);
-		EVP_DecryptInit_ex(&ctx, EVP_aes_128_cbc(), NULL,
-		    tctx->internal->tlsext_tick_aes_key, etick + 16);
-	}
+	if (tctx->tlsext_ticket_key_cb != NULL) {
+		int rv;
 
-	/*
-	 * Attempt to process session ticket, first conduct sanity and
-	 * integrity checks on ticket.
-	 */
-	mlen = HMAC_size(&hctx);
-	if (mlen < 0) {
-		HMAC_CTX_cleanup(&hctx);
-		EVP_CIPHER_CTX_cleanup(&ctx);
-		return -1;
-	}
-
-	/* Sanity check ticket length: must exceed keyname + IV + HMAC */
-	if (eticklen <= 16 + EVP_CIPHER_CTX_iv_length(&ctx) + mlen) {
-		HMAC_CTX_cleanup(&hctx);
-		EVP_CIPHER_CTX_cleanup(&ctx);
-		return 2;
-	}
-	eticklen -= mlen;
-
-	/* Check HMAC of encrypted ticket */
-	if (HMAC_Update(&hctx, etick, eticklen) <= 0 ||
-	    HMAC_Final(&hctx, tick_hmac, NULL) <= 0) {
-		HMAC_CTX_cleanup(&hctx);
-		EVP_CIPHER_CTX_cleanup(&ctx);
-		return -1;
-	}
-
-	HMAC_CTX_cleanup(&hctx);
-	if (timingsafe_memcmp(tick_hmac, etick + eticklen, mlen)) {
-		EVP_CIPHER_CTX_cleanup(&ctx);
-		return 2;
-	}
-
-	/* Attempt to decrypt session data */
-	/* Move p after IV to start of encrypted ticket, update length */
-	p = etick + 16 + EVP_CIPHER_CTX_iv_length(&ctx);
-	eticklen -= 16 + EVP_CIPHER_CTX_iv_length(&ctx);
-	sdec = malloc(eticklen);
-	if (sdec == NULL ||
-	    EVP_DecryptUpdate(&ctx, sdec, &slen, p, eticklen) <= 0) {
-		free(sdec);
-		EVP_CIPHER_CTX_cleanup(&ctx);
-		return -1;
-	}
-	if (EVP_DecryptFinal_ex(&ctx, sdec + slen, &mlen) <= 0) {
-		free(sdec);
-		EVP_CIPHER_CTX_cleanup(&ctx);
-		return 2;
-	}
-	slen += mlen;
-	EVP_CIPHER_CTX_cleanup(&ctx);
-	p = sdec;
-
-	sess = d2i_SSL_SESSION(NULL, &p, slen);
-	free(sdec);
-	if (sess) {
-		/* The session ID, if non-empty, is used by some clients to
-		 * detect that the ticket has been accepted. So we copy it to
-		 * the session structure. If it is empty set length to zero
-		 * as required by standard.
+		/*
+		 * The API guarantees EVP_MAX_IV_LENGTH bytes of space for
+		 * the iv to tlsext_ticket_key_cb().  Since the total space
+		 * required for a session cookie is never less than this,
+		 * this check isn't too strict.  The exact check comes later.
 		 */
-		if (sesslen)
-			memcpy(sess->session_id, sess_id, sesslen);
-		sess->session_id_length = sesslen;
-		*psess = sess;
-		if (renew_ticket)
-			return 4;
-		else
-			return 3;
-	}
-	ERR_clear_error();
-	/* For session parse failure, indicate that we need to send a new
-	 * ticket. */
-	return 2;
-}
+		if (CBS_len(ticket) < EVP_MAX_IV_LENGTH)
+			goto derr;
 
-/* Tables to translate from NIDs to TLS v1.2 ids */
-
-typedef struct {
-	int nid;
-	int id;
-} tls12_lookup;
-
-static tls12_lookup tls12_md[] = {
-	{NID_md5, TLSEXT_hash_md5},
-	{NID_sha1, TLSEXT_hash_sha1},
-	{NID_sha224, TLSEXT_hash_sha224},
-	{NID_sha256, TLSEXT_hash_sha256},
-	{NID_sha384, TLSEXT_hash_sha384},
-	{NID_sha512, TLSEXT_hash_sha512},
-	{NID_id_GostR3411_94, TLSEXT_hash_gost94},
-	{NID_id_tc26_gost3411_2012_256, TLSEXT_hash_streebog_256},
-	{NID_id_tc26_gost3411_2012_512, TLSEXT_hash_streebog_512}
-};
-
-static tls12_lookup tls12_sig[] = {
-	{EVP_PKEY_RSA, TLSEXT_signature_rsa},
-	{EVP_PKEY_EC, TLSEXT_signature_ecdsa},
-	{EVP_PKEY_GOSTR01, TLSEXT_signature_gostr01},
-};
-
-static int
-tls12_find_id(int nid, tls12_lookup *table, size_t tlen)
-{
-	size_t i;
-	for (i = 0; i < tlen; i++) {
-		if (table[i].nid == nid)
-			return table[i].id;
-	}
-	return -1;
-}
-
-int
-tls12_get_sigandhash(unsigned char *p, const EVP_PKEY *pk, const EVP_MD *md)
-{
-	int sig_id, md_id;
-	if (!md)
-		return 0;
-	md_id = tls12_find_id(EVP_MD_type(md), tls12_md,
-	    sizeof(tls12_md) / sizeof(tls12_lookup));
-	if (md_id == -1)
-		return 0;
-	sig_id = tls12_get_sigid(pk);
-	if (sig_id == -1)
-		return 0;
-	p[0] = (unsigned char)md_id;
-	p[1] = (unsigned char)sig_id;
-	return 1;
-}
-
-int
-tls12_get_sigid(const EVP_PKEY *pk)
-{
-	return tls12_find_id(pk->type, tls12_sig,
-	    sizeof(tls12_sig) / sizeof(tls12_lookup));
-}
-
-const EVP_MD *
-tls12_get_hash(unsigned char hash_alg)
-{
-	switch (hash_alg) {
-	case TLSEXT_hash_sha1:
-		return EVP_sha1();
-	case TLSEXT_hash_sha224:
-		return EVP_sha224();
-	case TLSEXT_hash_sha256:
-		return EVP_sha256();
-	case TLSEXT_hash_sha384:
-		return EVP_sha384();
-	case TLSEXT_hash_sha512:
-		return EVP_sha512();
-#ifndef OPENSSL_NO_GOST
-	case TLSEXT_hash_gost94:
-		return EVP_gostr341194();
-	case TLSEXT_hash_streebog_256:
-		return EVP_streebog256();
-	case TLSEXT_hash_streebog_512:
-		return EVP_streebog512();
-#endif
-	default:
-		return NULL;
-	}
-}
-
-/* Set preferred digest for each key type */
-
-int
-tls1_process_sigalgs(SSL *s, CBS *cbs)
-{
-	const EVP_MD *md;
-	CERT *c = s->cert;
-	int idx;
-
-	/* Extension ignored for inappropriate versions */
-	if (!SSL_USE_SIGALGS(s))
-		return 1;
-
-	/* Should never happen */
-	if (c == NULL)
-		return 0;
-
-	c->pkeys[SSL_PKEY_RSA_SIGN].digest = NULL;
-	c->pkeys[SSL_PKEY_RSA_ENC].digest = NULL;
-	c->pkeys[SSL_PKEY_ECC].digest = NULL;
-	c->pkeys[SSL_PKEY_GOST01].digest = NULL;
-
-	while (CBS_len(cbs) > 0) {
-		uint8_t hash_alg, sig_alg;
-
-		if (!CBS_get_u8(cbs, &hash_alg) || !CBS_get_u8(cbs, &sig_alg))
-			return 0;
-
-		switch (sig_alg) {
-		case TLSEXT_signature_rsa:
-			idx = SSL_PKEY_RSA_SIGN;
-			break;
-		case TLSEXT_signature_ecdsa:
-			idx = SSL_PKEY_ECC;
-			break;
-		case TLSEXT_signature_gostr01:
-		case TLSEXT_signature_gostr12_256:
-		case TLSEXT_signature_gostr12_512:
-			idx = SSL_PKEY_GOST01;
-			break;
-		default:
-			continue;
+		if ((rv = tctx->tlsext_ticket_key_cb(s,
+		    (unsigned char *)CBS_data(&ticket_name),
+		    (unsigned char *)CBS_data(ticket), cctx, hctx, 0)) < 0)
+			goto err;
+		if (rv == 0)
+			goto derr;
+		if (rv == 2) {
+			/* Renew ticket. */
+			s->tlsext_ticket_expected = 1;
 		}
 
-		if (c->pkeys[idx].digest == NULL) {
-			md = tls12_get_hash(hash_alg);
-			if (md) {
-				c->pkeys[idx].digest = md;
-				if (idx == SSL_PKEY_RSA_SIGN)
-					c->pkeys[SSL_PKEY_RSA_ENC].digest = md;
-			}
-		}
-
+		if ((iv_len = EVP_CIPHER_CTX_iv_length(cctx)) < 0)
+			goto err;
+		/*
+		 * Now that the cipher context is initialised, we can extract
+		 * the IV since its length is known.
+		 */
+		if (!CBS_get_bytes(ticket, &ticket_iv, iv_len))
+			goto derr;
+	} else {
+		/* Check that the key name matches. */
+		if (!CBS_mem_equal(&ticket_name,
+		    tctx->tlsext_tick_key_name,
+		    sizeof(tctx->tlsext_tick_key_name)))
+			goto derr;
+		if ((iv_len = EVP_CIPHER_iv_length(EVP_aes_128_cbc())) < 0)
+			goto err;
+		if (!CBS_get_bytes(ticket, &ticket_iv, iv_len))
+			goto derr;
+		if (!EVP_DecryptInit_ex(cctx, EVP_aes_128_cbc(), NULL,
+		    tctx->tlsext_tick_aes_key, CBS_data(&ticket_iv)))
+			goto err;
+		if (!HMAC_Init_ex(hctx, tctx->tlsext_tick_hmac_key,
+		    sizeof(tctx->tlsext_tick_hmac_key), EVP_sha256(),
+		    NULL))
+			goto err;
 	}
 
 	/*
-	 * Set any remaining keys to default values. NOTE: if alg is not
-	 * supported it stays as NULL.
+	 * Attempt to process session ticket.
 	 */
-	if (!c->pkeys[SSL_PKEY_RSA_SIGN].digest) {
-		c->pkeys[SSL_PKEY_RSA_SIGN].digest = EVP_sha1();
-		c->pkeys[SSL_PKEY_RSA_ENC].digest = EVP_sha1();
+
+	if ((hlen = HMAC_size(hctx)) < 0)
+		goto err;
+
+	if (hlen > CBS_len(ticket))
+		goto derr;
+	if (!CBS_get_bytes(ticket, &ticket_encdata, CBS_len(ticket) - hlen))
+		goto derr;
+	if (!CBS_get_bytes(ticket, &ticket_hmac, hlen))
+		goto derr;
+	if (CBS_len(ticket) != 0) {
+		alert_desc = SSL_AD_DECODE_ERROR;
+		goto err;
 	}
-	if (!c->pkeys[SSL_PKEY_ECC].digest)
-		c->pkeys[SSL_PKEY_ECC].digest = EVP_sha1();
-#ifndef OPENSSL_NO_GOST
-	if (!c->pkeys[SSL_PKEY_GOST01].digest)
-		c->pkeys[SSL_PKEY_GOST01].digest = EVP_gostr341194();
-#endif
-	return 1;
+
+	/* Check HMAC of encrypted ticket. */
+	if (HMAC_Update(hctx, CBS_data(&ticket_name),
+	    CBS_len(&ticket_name)) <= 0)
+		goto err;
+	if (HMAC_Update(hctx, CBS_data(&ticket_iv),
+	    CBS_len(&ticket_iv)) <= 0)
+		goto err;
+	if (HMAC_Update(hctx, CBS_data(&ticket_encdata),
+	    CBS_len(&ticket_encdata)) <= 0)
+		goto err;
+	if (HMAC_Final(hctx, hmac, &hlen) <= 0)
+		goto err;
+
+	if (!CBS_mem_equal(&ticket_hmac, hmac, hlen))
+		goto derr;
+
+	/* Attempt to decrypt session data. */
+	sdec_len = CBS_len(&ticket_encdata);
+	if ((sdec = calloc(1, sdec_len)) == NULL)
+		goto err;
+	if (EVP_DecryptUpdate(cctx, sdec, &slen, CBS_data(&ticket_encdata),
+	    CBS_len(&ticket_encdata)) <= 0)
+		goto derr;
+	if (EVP_DecryptFinal_ex(cctx, sdec + slen, &hlen) <= 0)
+		goto derr;
+
+	slen += hlen;
+
+	/*
+	 * For session parse failures, indicate that we need to send a new
+	 * ticket.
+	 */
+	p = sdec;
+	if ((sess = d2i_SSL_SESSION(NULL, &p, slen)) == NULL)
+		goto derr;
+	*psess = sess;
+	sess = NULL;
+
+	ret = TLS1_TICKET_DECRYPTED;
+	goto done;
+
+ derr:
+	ERR_clear_error();
+	s->tlsext_ticket_expected = 1;
+	ret = TLS1_TICKET_NOT_DECRYPTED;
+	goto done;
+
+ err:
+	*alert = alert_desc;
+	ret = TLS1_TICKET_FATAL_ERROR;
+	goto done;
+
+ done:
+	freezero(sdec, sdec_len);
+	EVP_CIPHER_CTX_free(cctx);
+	HMAC_CTX_free(hctx);
+	SSL_SESSION_free(sess);
+
+	return ret;
 }

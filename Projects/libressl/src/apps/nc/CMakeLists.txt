@@ -1,11 +1,19 @@
-if(BUILD_NC)
+#
+# Copyright (c) 2016 Kinichiro Inoguchi
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-include_directories(
-	.
-	./compat
-	../../include
-	../../include/compat
-)
+if(BUILD_NC)
 
 set(
 	NC_SRC
@@ -29,28 +37,25 @@ else()
 	set(NC_SRC ${NC_SRC} compat/accept4.c)
 endif()
 
-check_function_exists(readpassphrase HAVE_READPASSPHRASE)
+check_symbol_exists(readpassphrase "readpassphrase.h" HAVE_READPASSPHRASE)
 if(HAVE_READPASSPHRASE)
 	add_definitions(-DHAVE_READPASSPHRASE)
 else()
 	set(NC_SRC ${NC_SRC} compat/readpassphrase.c)
 endif()
 
-check_function_exists(strtonum HAVE_STRTONUM)
-if(HAVE_STRTONUM)
-	add_definitions(-DHAVE_STRTONUM)
-else()
-	set(NC_SRC ${NC_SRC} compat/strtonum.c)
-endif()
-
-if(NOT "${OPENSSLDIR}" STREQUAL "")
-	add_definitions(-DDEFAULT_CA_FILE=\"${OPENSSLDIR}/cert.pem\")
-else()
-	add_definitions(-DDEFAULT_CA_FILE=\"${CMAKE_INSTALL_PREFIX}/etc/ssl/cert.pem\")
-endif()
+add_definitions(-DDEFAULT_CA_FILE=\"${OPENSSLDIR}/cert.pem\")
 
 add_executable(nc ${NC_SRC})
-target_link_libraries(nc tls ${OPENSSL_LIBS})
+target_include_directories(nc
+	PRIVATE
+		.
+		./compat
+		../../include/compat
+	PUBLIC
+		../../include
+		${CMAKE_BINARY_DIR}/include)
+target_link_libraries(nc ${LIBTLS_LIBS} compat_obj)
 
 if(ENABLE_NC)
 	if(ENABLE_LIBRESSL_INSTALL)

@@ -1,4 +1,4 @@
-.\"	$OpenBSD: OCSP_CRLID_new.3,v 1.4 2018/03/22 21:08:22 schwarze Exp $
+.\"	$OpenBSD: OCSP_CRLID_new.3,v 1.9 2025/06/08 22:40:30 schwarze Exp $
 .\"
 .\" Copyright (c) 2016 Ingo Schwarze <schwarze@openbsd.org>
 .\"
@@ -14,7 +14,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: March 22 2018 $
+.Dd $Mdocdate: June 8 2025 $
 .Dt OCSP_CRLID_NEW 3
 .Os
 .Sh NAME
@@ -23,14 +23,15 @@
 .Nm OCSP_crlID_new
 .Nd OCSP CRL extension
 .Sh SYNOPSIS
-.In opsenssl/ocsp.h
+.Lb libcrypto
+.In openssl/ocsp.h
 .Ft OCSP_CRLID *
 .Fn OCSP_CRLID_new void
 .Ft void
 .Fn OCSP_CRLID_free "OCSP_CRLID *crlid"
 .Ft X509_EXTENSION *
 .Fo OCSP_crlID_new
-.Fa "char *url"
+.Fa "const char *url"
 .Fa "long *number"
 .Fa "char *time"
 .Fc
@@ -91,6 +92,7 @@ object or
 .Dv NULL
 if an error occurred.
 .Sh SEE ALSO
+.Xr OCSP_REQUEST_new 3 ,
 .Xr OCSP_resp_find_status 3 ,
 .Xr OCSP_response_status 3 ,
 .Xr X509_EXTENSION_new 3
@@ -102,7 +104,7 @@ Status Protocol, section 4.4.2: CRL References
 .Fn OCSP_CRLID_free ,
 and
 .Fn OCSP_crlID_new
-first appeared in OpenSSL 0.9.7 and has been available since
+first appeared in OpenSSL 0.9.7 and have been available since
 .Ox 3.2 .
 .Sh CAVEATS
 The function names

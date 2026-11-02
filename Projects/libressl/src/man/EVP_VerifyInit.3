@@ -1,5 +1,5 @@
-.\"	$OpenBSD: EVP_VerifyInit.3,v 1.6 2018/03/22 21:08:22 schwarze Exp $
-.\"	OpenSSL b97fdb57 Nov 11 09:33:09 2016 +0100
+.\" $OpenBSD: EVP_VerifyInit.3,v 1.14 2025/06/08 22:40:29 schwarze Exp $
+.\" full merge up to: OpenSSL 24a535ea Sep 22 13:14:20 2020 +0100
 .\"
 .\" This file was written by Dr. Stephen Henson <steve@openssl.org>.
 .\" Copyright (c) 2000, 2001, 2006, 2016 The OpenSSL Project.
@@ -49,7 +49,7 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: March 22 2018 $
+.Dd $Mdocdate: June 8 2025 $
 .Dt EVP_VERIFYINIT 3
 .Os
 .Sh NAME
@@ -59,12 +59,13 @@
 .Nm EVP_VerifyInit
 .Nd EVP signature verification functions
 .Sh SYNOPSIS
+.Lb libcrypto
 .In openssl/evp.h
 .Ft int
 .Fo EVP_VerifyInit_ex
 .Fa "EVP_MD_CTX *ctx"
 .Fa "const EVP_MD *type"
-.Fa "ENGINE *impl"
+.Fa "ENGINE *engine"
 .Fc
 .Ft int
 .Fo EVP_VerifyUpdate
@@ -85,21 +86,26 @@
 .Fa "const EVP_MD *type"
 .Fc
 .Sh DESCRIPTION
-The EVP signature verification routines are a high level interface to
+The EVP signature verification routines are a high-level interface to
 digital signatures.
 .Pp
 .Fn EVP_VerifyInit_ex
-sets up a verification context
+sets up the verification context
 .Fa ctx
 to use the digest
-.Fa type
-from
-.Vt ENGINE
-.Fa impl .
+.Fa type .
+Before calling this function, obtain
 .Fa ctx
-must be initialized by calling
-.Xr EVP_MD_CTX_init 3
-before calling this function.
+from
+.Xr EVP_MD_CTX_new 3
+or call
+.Xr EVP_MD_CTX_reset 3
+on it.
+The
+.Fa engine
+argument is always ignored and passing
+.Dv NULL
+is recommended.
 .Pp
 .Fn EVP_VerifyUpdate
 hashes
@@ -129,14 +135,9 @@ to use the default implementation of digest
 .Fa type .
 .Pp
 The EVP interface to digital signatures should almost always be
-used in preference to the low level interfaces.
+used in preference to the low-level interfaces.
 This is because the code then becomes transparent to the algorithm used
 and much more flexible.
-.Pp
-Due to the link between message digests and public key algorithms, the
-correct digest algorithm must be used with the correct public key type.
-A list of algorithms and associated public key algorithms appears in
-.Xr EVP_DigestInit 3 .
 .Pp
 The call to
 .Fn EVP_VerifyFinal
@@ -149,8 +150,14 @@ can be called later to digest and verify additional data.
 .Pp
 Since only a copy of the digest context is ever finalized, the context
 must be cleaned up after use by calling
-.Xr EVP_MD_CTX_cleanup 3 ,
+.Xr EVP_MD_CTX_free 3 ,
 or a memory leak will occur.
+.Pp
+.Fn EVP_VerifyInit_ex ,
+.Fn EVP_VerifyUpdate ,
+and
+.Fn EVP_VerifyInit
+are implemented as macros.
 .Sh RETURN VALUES
 .Fn EVP_VerifyInit_ex
 and
@@ -164,7 +171,6 @@ error occurred.
 The error codes can be obtained by
 .Xr ERR_get_error 3 .
 .Sh SEE ALSO
-.Xr ERR 3 ,
 .Xr evp 3 ,
 .Xr EVP_DigestInit 3 ,
 .Xr EVP_SignInit 3
@@ -173,7 +179,7 @@ The error codes can be obtained by
 .Fn EVP_VerifyUpdate ,
 and
 .Fn EVP_VerifyFinal
-appeared in SSLeay 0.8.1b or earlier and have been available since
+first appeared in SSLeay 0.5.1 and have been available since
 .Ox 2.4 .
 .Pp
 .Fn EVP_VerifyInit_ex

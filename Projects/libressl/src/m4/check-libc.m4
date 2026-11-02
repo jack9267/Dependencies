@@ -1,17 +1,35 @@
+#
+# Copyright (c) 2014 Brent Cook
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
 AC_DEFUN([CHECK_LIBC_COMPAT], [
 # Check for libc headers
-AC_CHECK_HEADERS([err.h readpassphrase.h])
+AC_CHECK_HEADERS([endian.h machine/endian.h err.h readpassphrase.h])
+AC_CHECK_HEADERS([netinet/ip.h], [], [],
+[#include <sys/types.h>
+#include <arpa/inet.h>
+])
+AC_HEADER_RESOLV
 # Check for general libc functions
-AC_CHECK_FUNCS([asprintf freezero memmem])
+AC_CHECK_FUNCS([asprintf freezero ftruncate getdelim getline memmem])
 AC_CHECK_FUNCS([readpassphrase reallocarray recallocarray])
-AC_CHECK_FUNCS([strlcat strlcpy strndup strnlen strsep strtonum])
-AC_CHECK_FUNCS([timegm _mkgmtime])
+AC_CHECK_FUNCS([strcasecmp strlcat strlcpy strndup strnlen strsep strtonum])
+AC_CHECK_FUNCS([timegm _mkgmtime timespecsub])
+AC_CHECK_FUNCS([getopt getprogname syslog syslog_r vsyslog])
 AC_CACHE_CHECK([for getpagesize], ac_cv_func_getpagesize, [
 	AC_LINK_IFELSE([AC_LANG_PROGRAM([[
-// Since Android NDK v16 getpagesize is defined as inline inside unistd.h
-#ifdef __ANDROID__
-#	include <unistd.h>
-#endif
+#include <unistd.h>
 		]], [[
 	getpagesize();
 ]])],
@@ -21,22 +39,60 @@ AC_CACHE_CHECK([for getpagesize], ac_cv_func_getpagesize, [
 ])
 AM_CONDITIONAL([HAVE_ASPRINTF], [test "x$ac_cv_func_asprintf" = xyes])
 AM_CONDITIONAL([HAVE_FREEZERO], [test "x$ac_cv_func_freezero" = xyes])
+AM_CONDITIONAL([HAVE_GETDELIM], [test "x$ac_cv_func_getdelim" = xyes])
+AM_CONDITIONAL([HAVE_GETLINE], [test "x$ac_cv_func_getline" = xyes])
 AM_CONDITIONAL([HAVE_GETPAGESIZE], [test "x$ac_cv_func_getpagesize" = xyes])
+AM_CONDITIONAL([HAVE_GETOPT], [test "x$ac_cv_func_getopt" = xyes])
 AM_CONDITIONAL([HAVE_MEMMEM], [test "x$ac_cv_func_memmem" = xyes])
 AM_CONDITIONAL([HAVE_READPASSPHRASE], [test "x$ac_cv_func_readpassphrase" = xyes])
 AM_CONDITIONAL([HAVE_REALLOCARRAY], [test "x$ac_cv_func_reallocarray" = xyes])
 AM_CONDITIONAL([HAVE_RECALLOCARRAY], [test "x$ac_cv_func_recallocarray" = xyes])
+AM_CONDITIONAL([HAVE_STRCASECMP], [test "x$ac_cv_func_strcasecmp" = xyes])
 AM_CONDITIONAL([HAVE_STRLCAT], [test "x$ac_cv_func_strlcat" = xyes])
 AM_CONDITIONAL([HAVE_STRLCPY], [test "x$ac_cv_func_strlcpy" = xyes])
 AM_CONDITIONAL([HAVE_STRNDUP], [test "x$ac_cv_func_strndup" = xyes])
 AM_CONDITIONAL([HAVE_STRNLEN], [test "x$ac_cv_func_strnlen" = xyes])
 AM_CONDITIONAL([HAVE_STRSEP], [test "x$ac_cv_func_strsep" = xyes])
 AM_CONDITIONAL([HAVE_STRTONUM], [test "x$ac_cv_func_strtonum" = xyes])
-AM_CONDITIONAL([HAVE_TIMEGM], [test "x$ac_cv_func_timegm" = xyes])
+AM_CONDITIONAL([HAVE_GETPROGNAME], [test "x$ac_cv_func_getprogname" = xyes])
+AM_CONDITIONAL([HAVE_SYSLOG], [test "x$ac_cv_func_syslog" = xyes])
+AM_CONDITIONAL([HAVE_SYSLOG_R], [test "x$ac_cv_func_syslog_r" = xyes])
 ])
 
 AC_DEFUN([CHECK_SYSCALL_COMPAT], [
-AC_CHECK_FUNCS([accept4 pipe2 pledge poll socketpair])
+AC_CHECK_FUNCS([accept4 pledge poll socketpair unveil])
+dnl Apple platforms declare and export pipe2 even if the build OS doesn't
+dnl implement it, which links fine but traps at runtime.
+AC_CACHE_CHECK([for working pipe2], ac_cv_func_pipe2, [
+	AC_RUN_IFELSE([AC_LANG_PROGRAM([[
+#include <unistd.h>
+#include <fcntl.h>
+	]], [[
+	int fildes[2];
+	return pipe2(fildes, O_CLOEXEC) != 0;
+]])],
+	[ ac_cv_func_pipe2="yes" ],
+	[ ac_cv_func_pipe2="no" ],
+	[ ac_cv_func_pipe2="no" ])
+])
+if test "x$ac_cv_func_pipe2" = xyes; then
+	AC_DEFINE([HAVE_PIPE2], [1], [Define if there is a working pipe2 function.])
+fi
+
+dnl Build bsd_socketpair() whenever the platform's <sys/socket.h> is missing
+dnl SOCK_NONBLOCK or SOCK_CLOEXEC
+AC_CACHE_CHECK([whether sys/socket.h defines SOCK_NONBLOCK and SOCK_CLOEXEC],
+	ac_cv_have_sock_flags, [
+	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#include <sys/socket.h>
+#if !defined(SOCK_NONBLOCK) || !defined(SOCK_CLOEXEC)
+#error missing socket flags
+#endif
+	]], [[]])],
+	[ ac_cv_have_sock_flags="yes" ],
+	[ ac_cv_have_sock_flags="no" ])
+])
+AM_CONDITIONAL([NEED_SOCKET_FLAGS], [test "x$ac_cv_have_sock_flags" = xno])
 AM_CONDITIONAL([HAVE_ACCEPT4], [test "x$ac_cv_func_accept4" = xyes])
 AM_CONDITIONAL([HAVE_PIPE2], [test "x$ac_cv_func_pipe2" = xyes])
 AM_CONDITIONAL([HAVE_PLEDGE], [test "x$ac_cv_func_pledge" = xyes])
@@ -130,6 +186,8 @@ AC_CHECK_FUNCS([getauxval])
 AC_SEARCH_LIBS([dl_iterate_phdr],[dl])
 AC_CHECK_FUNCS([dl_iterate_phdr])
 
+AC_SEARCH_LIBS([pthread_once],[pthread])
+AC_SEARCH_LIBS([pthread_mutex_lock],[pthread])
 AC_SEARCH_LIBS([clock_gettime],[rt posix4])
 AC_CHECK_FUNCS([clock_gettime])
 AM_CONDITIONAL([HAVE_CLOCK_GETTIME], [test "x$ac_cv_func_clock_gettime" = xyes])

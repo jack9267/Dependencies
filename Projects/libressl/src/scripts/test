@@ -1,0 +1,228 @@
+#!/bin/sh
+set -e
+set -x
+
+if [ "$ARCH" = "" ]; then
+	ARCH=`uname -m`
+fi
+
+if [ "$ARCH" = "mingw32" -o "$ARCH" = "mingw64" -o "$ARCH" = "arm32" ]; then
+	unset CC
+fi
+
+ENABLE_ASM="${ENABLE_ASM:=ON}"
+export CTEST_PARALLEL_LEVEL="${CTEST_PARALLEL_LEVEL-}"
+
+# setup_cross_compiler sets up environment variables for cross-compilation with the given prefix.
+setup_cross_compiler() {
+	cross_prefix=$1
+
+	CC=${cross_prefix}-gcc
+	CXX=${cross_prefix}-g++
+	AR=${cross_prefix}-ar
+	STRIP=${cross_prefix}-strip
+	RANLIB=${cross_prefix}-ranlib
+
+	# If the unversioned symlink for gcc doesn't exist, find versioned binary.
+	if ! command -v "$CC" >/dev/null 2>&1; then
+		gcc_ver=$(find /usr/bin -name "${CC}-[0-9]*" -prune 2>/dev/null \
+			| sed "s/.*${CC}-//" | sort -n | tail -n 1)
+		CC=${CC}-${gcc_ver}
+		CXX=${CXX}-${gcc_ver}
+	fi
+
+	# Check all binaries actually exist.
+	for c in "$CC" "$CXX" "$AR" "$STRIP" "$RANLIB"; do
+		if ! command -v "$c" >/dev/null 2>&1; then
+			echo "##### Error: $c not found"
+			exit 1
+		fi
+	done
+
+	echo "##### Using $($CC --version | head -n 1)"
+}
+
+# generate source tree
+./autogen.sh
+
+VERSION=`cat VERSION`
+
+# test macOS
+if [ `uname` = "Darwin" ]; then
+	# test autotools
+	./configure
+
+	# make distribution
+	make -j 4 distcheck
+
+	# test cmake
+	tar zxvf libressl-$VERSION.tar.gz
+	cd libressl-$VERSION
+
+	(
+		mkdir build-static
+		cd build-static
+		cmake -DCMAKE_OSX_ARCHITECTURES=$ARCH ..
+		make -j 4
+		if [ "$ARCH" = "arm64" ] && [ "$OS" = "macos-12" ] || [ "$OS" = "macos-13" ]; then
+			echo "##### skip tests"
+		else
+			make test
+		fi
+	)
+
+	(
+		mkdir build-shared
+		cd build-shared
+		cmake -DBUILD_SHARED_LIBS=ON -DCMAKE_OSX_ARCHITECTURES=$ARCH ..
+		make -j 4
+		if [ "$ARCH" = "arm64" ] && [ "$OS" = "macos-12" ] || [ "$OS" = "macos-13" ]; then
+			echo "##### skip tests"
+		else
+			make test
+		fi
+	)
+
+# assuming Linux below
+elif [ "$ARCH" = "native" ]; then
+	# test autotools
+	./configure
+
+	# make distribution
+	make -j 4 distcheck
+
+	tar zxvf libressl-$VERSION.tar.gz
+	cd libressl-$VERSION
+
+
+	# test cmake and ninja
+	(
+		mkdir build-static
+		cd build-static
+		cmake -GNinja -DENABLE_ASM=${ENABLE_ASM} ..
+		ninja
+		ninja test
+	)
+
+	(
+		mkdir build-shared
+		cd build-shared
+		cmake -GNinja -DBUILD_SHARED_LIBS=ON -DENABLE_ASM=${ENABLE_ASM} ..
+		ninja
+		ninja test
+	)
+
+elif [ "$ARCH" = "mingw32" ] || [ "$ARCH" = "mingw64" ]; then
+	CPU=i686
+	if [ "$ARCH" = "mingw64" ]; then
+		CPU=x86_64
+	fi
+
+	./configure --host=$CPU-w64-mingw32
+	make -j 4
+
+	(
+	 rm -fr build-static
+	 mkdir build-static
+	 cd build-static
+	 cmake -GNinja -DCMAKE_TOOLCHAIN_FILE=../scripts/$CPU-w64-mingw32.cmake -DENABLE_ASM=${ENABLE_ASM} ..
+	 ninja -j 4
+	)
+	(
+	 rm -fr build-shared
+	 mkdir build-shared
+	 cd build-shared
+	 cmake -GNinja -DCMAKE_TOOLCHAIN_FILE=../scripts/$CPU-w64-mingw32.cmake -DBUILD_SHARED_LIBS=ON -DENABLE_ASM=${ENABLE_ASM} ..
+	 ninja -j 4
+	)
+
+elif [ "$ARCH" = "arm32" ] || [ "$ARCH" = "arm64" ]; then
+	if [ "$ARCH" = "arm32" ]; then
+		sudo ln -sf /usr/arm-linux-gnueabihf/lib/ld-linux-armhf.so.3 /lib/
+		setup_cross_compiler arm-linux-gnueabihf
+
+		./configure --host=arm-linux-gnueabihf
+		LD_LIBRARY_PATH=/usr/arm-linux-gnueabihf/lib make -j 4 check
+	else
+		sudo ln -sf /usr/aarch64-linux-gnu/lib/ld-linux-aarch64.so.1 /lib/
+		setup_cross_compiler aarch64-linux-gnu
+
+		./configure --host=aarch64-linux-gnu
+		LD_LIBRARY_PATH=/usr/aarch64-linux-gnu/lib make -j 4 check
+	fi
+
+	file apps/openssl/openssl
+
+elif [ "$ARCH" = "loong64" ]; then
+	sudo ln -sf /usr/loongarch64-linux-gnu/lib64/ld-linux-loongarch-lp64d.so.1 /lib64
+	setup_cross_compiler loongarch64-linux-gnu
+
+	./configure --host=loongarch64-linux-gnu
+	LD_LIBRARY_PATH=/usr/loongarch64-linux-gnu/lib make -j 4 check
+
+	file apps/openssl/openssl
+
+elif [ "$ARCH" = "riscv64" ]; then
+	sudo ln -sf /usr/riscv64-linux-gnu/lib/ld-linux-riscv64-lp64d.so.1 /lib/
+	setup_cross_compiler riscv64-linux-gnu
+
+	./configure --host=riscv64-linux-gnu
+	LD_LIBRARY_PATH=/usr/riscv64-linux-gnu/lib make -j 4 check
+
+	file apps/openssl/openssl
+
+elif [ "$ARCH" = "mips32" ] || [ "$ARCH" = "mips64" ]; then
+	if [ "$ARCH" = "mips32" ]; then
+		sudo ln -sf /usr/mipsel-linux-gnu/lib/ld.so.1 /lib/
+		setup_cross_compiler mipsel-linux-gnu
+
+		# MIPS32 assembly is disabled by default, so enable it for CI coverage.
+		./configure --host=mipsel-linux-gnu --enable-asm
+		LD_LIBRARY_PATH=/usr/mipsel-linux-gnu/lib make -j 4 check
+	else
+		sudo ln -sf /usr/mips64el-linux-gnuabi64/lib64/ld.so.1 /lib64
+		setup_cross_compiler mips64el-linux-gnuabi64
+
+		# MIPS assembly is disabled by default, so enable it for CI coverage.
+		./configure --host=mips64el-linux-gnuabi64 --enable-asm
+		LD_LIBRARY_PATH=/usr/mips64el-linux-gnuabi64/lib make -j 4 check
+	fi
+
+	file apps/openssl/openssl
+
+elif [ "$ARCH" = "android" ]; then
+	export TC_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake
+
+	# ANDROID_PLATFORM is the native minSdkVersion, not the Android version used
+	# to run tests. "latest" selects the newest API provided by the NDK.
+	if [ "$ANDROID_API_LEVEL" = "latest" ]; then
+		ANDROID_PLATFORM=latest
+	else
+		ANDROID_PLATFORM=android-$ANDROID_API_LEVEL
+	fi
+
+	# Build each architecture for the selected API level.
+	for ABI in x86_64 x86 arm64-v8a
+	do
+		echo ""
+		echo "##### Date: `date`, Native API level: $ANDROID_API_LEVEL, ABI: $ABI"
+
+		(
+		 build_dir=build-${ANDROID_API_LEVEL}_${ABI}
+		 rm -fr $build_dir
+		 mkdir $build_dir
+		 cd $build_dir
+		 echo "##### cmake -GNinja -DCMAKE_MAKE_PROGRAM=ninja -DANDROID_NDK=$ANDROID_NDK_HOME -DCMAKE_TOOLCHAIN_FILE=$TC_FILE -DANDROID_ABI=$ABI -DANDROID_PLATFORM=$ANDROID_PLATFORM .."
+		 cmake -GNinja -DCMAKE_MAKE_PROGRAM=ninja \
+		 -DANDROID_NDK=$ANDROID_NDK_HOME \
+		 -DCMAKE_TOOLCHAIN_FILE=$TC_FILE \
+		 -DANDROID_ABI=$ABI -DANDROID_PLATFORM=$ANDROID_PLATFORM \
+		 -DENABLE_ASM=${ENABLE_ASM} ..
+
+		 ninja -j 4
+
+		 echo ""
+		 file apps/openssl/openssl
+		)
+	done
+fi

@@ -1,3 +1,18 @@
+#
+# Copyright (c) 2014 Brent Cook
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
 AC_DEFUN([CHECK_OS_OPTIONS], [
 
 CFLAGS="$CFLAGS -Wall -std=gnu99 -fno-strict-aliasing"
@@ -9,7 +24,7 @@ case $host_os in
 		if test "`echo $CC | cut -d ' ' -f 1`" != "gcc" ; then
 			CFLAGS="-qnoansialias $USER_CFLAGS"
 		fi
-		AC_SUBST([PLATFORM_LDADD], ['-lperfstat -lpthread'])
+		AC_SUBST([PLATFORM_LDADD], ['-lperfstat'])
 		;;
 	*cygwin*)
 		HOST_OS=cygwin
@@ -22,7 +37,7 @@ case $host_os in
 		# Don't use arc4random on systems before 10.12 because of
 		# weak seed on failure to open /dev/random, based on latest
 		# public source:
-		# http://www.opensource.apple.com/source/Libc/Libc-997.90.3/gen/FreeBSD/arc4random.c
+		# https://www.opensource.apple.com/source/Libc/Libc-997.90.3/gen/FreeBSD/arc4random.c
 		#
 		# We use the presence of getentropy() to detect 10.12. The
 		# following check take into account that:
@@ -61,26 +76,39 @@ char buf[1]; getentropy(buf, 1);
 	*freebsd*)
 		HOST_OS=freebsd
 		HOST_ABI=elf
-		# fork detection missing, weak seed on failure
-		# https://svnweb.freebsd.org/base/head/lib/libc/gen/arc4random.c?revision=268642&view=markup
-		USE_BUILTIN_ARC4RANDOM=yes
+		AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#include <sys/param.h>
+#if __FreeBSD_version < 1200000
+        undefined
+#endif
+                       ]], [[]])],
+                       [ USE_BUILTIN_ARC4RANDOM=no ],
+                       [ USE_BUILTIN_ARC4RANDOM=yes ]
+		)
 		AC_SUBST([PROG_LDADD], ['-lthr'])
 		;;
 	*hpux*)
 		HOST_OS=hpux;
-		if test "`echo $CC | cut -d ' ' -f 1`" = "gcc" ; then
-			CFLAGS="$CFLAGS -mlp64"
-		else
-			CFLAGS="-g -O2 +DD64 +Otype_safety=off $USER_CFLAGS"
+		if test "`echo $host_os | cut -c 1-4`" = "ia64" ; then
+			if test "`echo $CC | cut -d ' ' -f 1`" = "gcc" ; then
+				CFLAGS="$CFLAGS -mlp64"
+			else
+				CFLAGS="+DD64"
+			fi
+		fi
+		if ! test "`echo $CC | cut -d ' ' -f 1`" = "gcc" ; then
+			CFLAGS="-g -O2 +Otype_safety=off $CFLAGS $USER_CFLAGS"
 		fi
 		CPPFLAGS="$CPPFLAGS -D_XOPEN_SOURCE=600 -D__STRICT_ALIGNMENT"
-		AC_SUBST([PLATFORM_LDADD], ['-lpthread'])
 		;;
 	*linux*)
 		HOST_OS=linux
 		HOST_ABI=elf
 		CPPFLAGS="$CPPFLAGS -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_SOURCE -D_GNU_SOURCE"
-		AC_SUBST([PLATFORM_LDADD], ['-lpthread'])
+		;;
+	*midipix*)
+		HOST_OS=midipix
+		CPPFLAGS="$CPPFLAGS -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_SOURCE -D_GNU_SOURCE"
 		;;
 	*netbsd*)
 		HOST_OS=netbsd
@@ -96,33 +124,48 @@ char buf[1]; getentropy(buf, 1);
 		)
 		CPPFLAGS="$CPPFLAGS -D_OPENBSD_SOURCE"
 		;;
-	*openbsd* | *bitrig*)
+	*openbsd*)
 		HOST_OS=openbsd
 		HOST_ABI=elf
 		AC_DEFINE([HAVE_ATTRIBUTE__BOUNDED__], [1], [OpenBSD gcc has bounded])
+		AC_DEFINE([HAVE_ATTRIBUTE__DEAD], [1], [OpenBSD gcc has __dead])
 		;;
 	*mingw*)
 		HOST_OS=win
+		HOST_ABI=mingw64
 		BUILD_NC=no
 		CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE -D_POSIX -D_POSIX_SOURCE -D__USE_MINGW_ANSI_STDIO"
 		CPPFLAGS="$CPPFLAGS -D_REENTRANT -D_POSIX_THREAD_SAFE_FUNCTIONS"
 		CPPFLAGS="$CPPFLAGS -DWIN32_LEAN_AND_MEAN -D_WIN32_WINNT=0x0600"
-		CPPFLAGS="$CPPFLAGS -DOPENSSL_NO_SPEED"
-		AC_SUBST([PLATFORM_LDADD], ['-lws2_32'])
+		CPPFLAGS="$CPPFLAGS"
+		AC_SUBST([PLATFORM_LDADD], ['-lws2_32 -lbcrypt'])
 		;;
 	*solaris*)
 		HOST_OS=solaris
 		HOST_ABI=elf
 		CPPFLAGS="$CPPFLAGS -D__EXTENSIONS__ -D_XOPEN_SOURCE=600 -DBSD_COMP"
-		AC_SUBST([PLATFORM_LDADD], ['-lnsl -lsocket'])
+		AC_SUBST([PLATFORM_LDADD], ['-ldl -lmd -lnsl -lsocket'])
 		;;
-	*) ;;
+	*)
+		HOST_OS=unsupported
+		HOST_ABI=elf
+		;;
 esac
 
-AC_ARG_ENABLE([nc],
-	AS_HELP_STRING([--enable-nc], [Enable installing TLS-enabled nc(1)]))
-AM_CONDITIONAL([ENABLE_NC], [test "x$enable_nc" = xyes])
-AM_CONDITIONAL([BUILD_NC],  [test x$BUILD_NC = xyes -o "x$enable_nc" = xyes])
+# Check if time_t is sized correctly
+AC_CHECK_SIZEOF([time_t], [time.h])
+AM_CONDITIONAL([SMALL_TIME_T], [test "$ac_cv_sizeof_time_t" = "4"])
+if test "$ac_cv_sizeof_time_t" = "4"; then
+    AC_DEFINE([SMALL_TIME_T])
+    echo " ** Warning, this system is unable to represent times past 2038"
+    echo " ** It will behave incorrectly when handling valid RFC5280 dates"
+
+    if test "$host_os" = "mingw32" ; then
+        echo " **"
+        echo " ** You can solve this by adjusting the build flags in your"
+        echo " ** mingw-w64 toolchain. Refer to README.mingw.md for details."
+    fi
+fi
 
 AM_CONDITIONAL([HOST_AIX],     [test x$HOST_OS = xaix])
 AM_CONDITIONAL([HOST_CYGWIN],  [test x$HOST_OS = xcygwin])
@@ -130,6 +173,7 @@ AM_CONDITIONAL([HOST_DARWIN],  [test x$HOST_OS = xdarwin])
 AM_CONDITIONAL([HOST_FREEBSD], [test x$HOST_OS = xfreebsd])
 AM_CONDITIONAL([HOST_HPUX],    [test x$HOST_OS = xhpux])
 AM_CONDITIONAL([HOST_LINUX],   [test x$HOST_OS = xlinux])
+AM_CONDITIONAL([HOST_MIDIPIX], [test x$HOST_OS = xmidipix])
 AM_CONDITIONAL([HOST_NETBSD],  [test x$HOST_OS = xnetbsd])
 AM_CONDITIONAL([HOST_OPENBSD], [test x$HOST_OS = xopenbsd])
 AM_CONDITIONAL([HOST_SOLARIS], [test x$HOST_OS = xsolaris])

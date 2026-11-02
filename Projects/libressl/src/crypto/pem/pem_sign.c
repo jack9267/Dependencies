@@ -1,4 +1,4 @@
-/* $OpenBSD: pem_sign.c,v 1.13 2017/01/29 17:49:23 beck Exp $ */
+/* $OpenBSD: pem_sign.c,v 1.16 2025/05/10 05:54:38 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -58,24 +58,27 @@
 
 #include <stdio.h>
 
-#include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/objects.h>
 #include <openssl/pem.h>
 #include <openssl/x509.h>
 
-void
+#include "err_local.h"
+
+int
 PEM_SignInit(EVP_MD_CTX *ctx, EVP_MD *type)
 {
-	EVP_DigestInit_ex(ctx, type, NULL);
+	return EVP_DigestInit_ex(ctx, type, NULL);
 }
+LCRYPTO_ALIAS(PEM_SignInit);
 
-void
+int
 PEM_SignUpdate(EVP_MD_CTX *ctx, unsigned char *data,
     unsigned int count)
 {
-	EVP_DigestUpdate(ctx, data, count);
+	return EVP_DigestUpdate(ctx, data, count);
 }
+LCRYPTO_ALIAS(PEM_SignUpdate);
 
 int
 PEM_SignFinal(EVP_MD_CTX *ctx, unsigned char *sigret, unsigned int *siglen,
@@ -103,3 +106,4 @@ err:
 	free(m);
 	return (ret);
 }
+LCRYPTO_ALIAS(PEM_SignFinal);

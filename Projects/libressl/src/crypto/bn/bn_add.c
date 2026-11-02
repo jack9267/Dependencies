@@ -1,4 +1,4 @@
-/* $OpenBSD: bn_add.c,v 1.11 2017/01/29 17:49:22 beck Exp $ */
+/* $OpenBSD: bn_add.c,v 1.30 2026/09/28 02:18:36 kenjiro Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,258 +56,240 @@
  * [including the GNU Public Licence.]
  */
 
+#include <assert.h>
+#include <limits.h>
 #include <stdio.h>
 
-#include <openssl/err.h>
+#include "bn_arch.h"
+#include "bn_local.h"
+#include "bn_internal.h"
+#include "err_local.h"
 
-#include "bn_lcl.h"
-
-/* r can == a or b */
-int
-BN_add(BIGNUM *r, const BIGNUM *a, const BIGNUM *b)
+/*
+ * bn_add() computes (carry:r[i]) = a[i] + b[i] + carry, where a and b are both
+ * arrays of words (r may be the same as a or b). The length of a and b may
+ * differ, while r must be at least max(a_len, b_len) in length. Any carry
+ * resulting from the addition is returned.
+ */
+#ifndef HAVE_BN_ADD
+BN_ULONG
+bn_add(BN_ULONG *r, int r_len, const BN_ULONG *a, int a_len, const BN_ULONG *b,
+    int b_len)
 {
-	const BIGNUM *tmp;
-	int a_neg = a->neg, ret;
+	int min_len, diff_len;
+	BN_ULONG carry = 0;
 
-	bn_check_top(a);
-	bn_check_top(b);
+	if ((min_len = a_len) > b_len)
+		min_len = b_len;
 
-	/*  a +  b	a+b
-	 *  a + -b	a-b
-	 * -a +  b	b-a
-	 * -a + -b	-(a+b)
-	 */
-	if (a_neg ^ b->neg) {
-		/* only one is negative */
-		if (a_neg)
-				{ tmp = a;
-			a = b;
-			b = tmp;
-		}
+	diff_len = a_len - b_len;
 
-		/* we are now a - b */
+	carry = bn_add_words(r, a, b, min_len);
 
-		if (BN_ucmp(a, b) < 0) {
-			if (!BN_usub(r, b, a))
-				return (0);
-			r->neg = 1;
-		} else {
-			if (!BN_usub(r, a, b))
-				return (0);
-			r->neg = 0;
-		}
-		return (1);
+	a += min_len;
+	b += min_len;
+	r += min_len;
+
+	/* XXX - consider doing four at a time to match bn_add_words(). */
+	while (diff_len < 0) {
+		/* Compute r[0] = 0 + b[0] + carry. */
+		bn_addw(b[0], carry, &carry, &r[0]);
+		diff_len++;
+		b++;
+		r++;
 	}
 
-	ret = BN_uadd(r, a, b);
-	r->neg = a_neg;
-	bn_check_top(r);
-	return ret;
-}
+	/* XXX - consider doing four at a time to match bn_add_words(). */
+	while (diff_len > 0) {
+		/* Compute r[0] = a[0] + 0 + carry. */
+		bn_addw(a[0], carry, &carry, &r[0]);
+		diff_len--;
+		a++;
+		r++;
+	}
 
-/* unsigned add of b to a */
+	return carry;
+}
+#endif
+
+/*
+ * bn_sub() computes (borrow:r[i]) = a[i] - b[i] - borrow, where a and b are both
+ * arrays of words (r may be the same as a or b). The length of a and b may
+ * differ, while r must be at least max(a_len, b_len) in length. Any borrow
+ * resulting from the subtraction is returned.
+ */
+#ifndef HAVE_BN_SUB
+BN_ULONG
+bn_sub(BN_ULONG *r, int r_len, const BN_ULONG *a, int a_len, const BN_ULONG *b,
+    int b_len)
+{
+	int min_len, diff_len;
+	BN_ULONG borrow = 0;
+
+	if ((min_len = a_len) > b_len)
+		min_len = b_len;
+
+	diff_len = a_len - b_len;
+
+	borrow = bn_sub_words(r, a, b, min_len);
+
+	a += min_len;
+	b += min_len;
+	r += min_len;
+
+	/* XXX - consider doing four at a time to match bn_sub_words. */
+	while (diff_len < 0) {
+		/* Compute r[0] = 0 - b[0] - borrow. */
+		bn_subw_subw(0, b[0], borrow, &borrow, &r[0]);
+		diff_len++;
+		b++;
+		r++;
+	}
+
+	/* XXX - consider doing four at a time to match bn_sub_words. */
+	while (diff_len > 0) {
+		/* Compute r[0] = a[0] - 0 - borrow. */
+		bn_subw_subw(a[0], 0, borrow, &borrow, &r[0]);
+		diff_len--;
+		a++;
+		r++;
+	}
+
+	return borrow;
+}
+#endif
+
 int
 BN_uadd(BIGNUM *r, const BIGNUM *a, const BIGNUM *b)
 {
-	int max, min, dif;
-	BN_ULONG *ap, *bp, *rp, carry, t1, t2;
-	const BIGNUM *tmp;
+	BN_ULONG carry;
+	int rn;
 
-	bn_check_top(a);
-	bn_check_top(b);
-
-	if (a->top < b->top) {
-		tmp = a;
-		a = b;
-		b = tmp;
-	}
-	max = a->top;
-	min = b->top;
-	dif = max - min;
-
-	if (bn_wexpand(r, max + 1) == NULL)
+	if ((rn = a->top) < b->top)
+		rn = b->top;
+	if (rn == INT_MAX)
 		return 0;
 
-	r->top = max;
-
-	ap = a->d;
-	bp = b->d;
-	rp = r->d;
-
-	carry = bn_add_words(rp, ap, bp, min);
-	rp += min;
-	ap += min;
-	bp += min;
-
-	if (carry) {
-		while (dif) {
-			dif--;
-			t1 = *(ap++);
-			t2 = (t1 + 1) & BN_MASK2;
-			*(rp++) = t2;
-			if (t2) {
-				carry = 0;
-				break;
-			}
-		}
-		if (carry) {
-			/* carry != 0 => dif == 0 */
-			*rp = 1;
-			r->top++;
-		}
+	if (a->top == 0) {
+		if (!bn_copy(r, b))
+			return 0;
+		r->neg = 0;
+		return 1;
 	}
-	if (dif && rp != ap)
-		while (dif--)
-			/* copy remaining words if ap != rp */
-			*(rp++) = *(ap++);
+	if (b->top == 0) {
+		if (!bn_copy(r, a))
+			return 0;
+		r->neg = 0;
+		return 1;
+	}
+
+	if (!bn_wexpand(r, rn + 1))
+		return 0;
+
+	carry = bn_add(r->d, rn, a->d, a->top, b->d, b->top);
+	r->d[rn] = carry;
+
+	r->top = rn + (carry & 1);
 	r->neg = 0;
-	bn_check_top(r);
+
 	return 1;
 }
+LCRYPTO_ALIAS(BN_uadd);
 
-/* unsigned subtraction of b from a, a must be larger than b. */
 int
 BN_usub(BIGNUM *r, const BIGNUM *a, const BIGNUM *b)
 {
-	int max, min, dif;
-	BN_ULONG t1, t2, *ap, *bp, *rp;
-	int i, carry;
+	BN_ULONG borrow;
+	int rn;
 
-	bn_check_top(a);
-	bn_check_top(b);
-
-	max = a->top;
-	min = b->top;
-	dif = max - min;
-
-	if (dif < 0)	/* hmm... should not be happening */
-	{
+	if (a->top < b->top) {
 		BNerror(BN_R_ARG2_LT_ARG3);
-		return (0);
+		return 0;
 	}
 
-	if (bn_wexpand(r, max) == NULL)
-		return (0);
-
-	ap = a->d;
-	bp = b->d;
-	rp = r->d;
-
-#if 1
-	carry = 0;
-	for (i = min; i != 0; i--) {
-		t1= *(ap++);
-		t2= *(bp++);
-		if (carry) {
-			carry = (t1 <= t2);
-			t1 = (t1 - t2 - 1)&BN_MASK2;
-		} else {
-			carry = (t1 < t2);
-			t1 = (t1 - t2)&BN_MASK2;
-		}
-		*(rp++) = t1&BN_MASK2;
-	}
-#else
-	carry = bn_sub_words(rp, ap, bp, min);
-	ap += min;
-	bp += min;
-	rp += min;
-#endif
-	if (carry) /* subtracted */
-	{
-		if (!dif)
-			/* error: a < b */
+	if (b->top == 0) {
+		if (!bn_copy(r, a))
 			return 0;
-		while (dif) {
-			dif--;
-			t1 = *(ap++);
-			t2 = (t1 - 1)&BN_MASK2;
-			*(rp++) = t2;
-			if (t1)
-				break;
-		}
+		r->neg = 0;
+		return 1;
 	}
-#if 0
-	memcpy(rp, ap, sizeof(*rp)*(max - i));
-#else
-	if (rp != ap) {
-		for (;;) {
-			if (!dif--)
-				break;
-			rp[0] = ap[0];
-			if (!dif--)
-				break;
-			rp[1] = ap[1];
-			if (!dif--)
-				break;
-			rp[2] = ap[2];
-			if (!dif--)
-				break;
-			rp[3] = ap[3];
-			rp += 4;
-			ap += 4;
-		}
-	}
-#endif
 
-	r->top = max;
+	rn = a->top;
+
+	if (!bn_wexpand(r, rn))
+		return 0;
+
+	borrow = bn_sub(r->d, rn, a->d, a->top, b->d, b->top);
+	if (borrow > 0) {
+		BNerror(BN_R_ARG2_LT_ARG3);
+		return 0;
+	}
+
+	r->top = rn;
 	r->neg = 0;
+
 	bn_correct_top(r);
-	return (1);
+
+	return 1;
 }
+LCRYPTO_ALIAS(BN_usub);
+
+int
+BN_add(BIGNUM *r, const BIGNUM *a, const BIGNUM *b)
+{
+	int ret, r_neg;
+
+	if (a->neg == b->neg) {
+		r_neg = a->neg;
+		ret = BN_uadd(r, a, b);
+	} else {
+		int cmp = BN_ucmp(a, b);
+
+		if (cmp > 0) {
+			r_neg = a->neg;
+			ret = BN_usub(r, a, b);
+		} else if (cmp < 0) {
+			r_neg = b->neg;
+			ret = BN_usub(r, b, a);
+		} else {
+			r_neg = 0;
+			BN_zero(r);
+			ret = 1;
+		}
+	}
+
+	BN_set_negative(r, r_neg);
+
+	return ret;
+}
+LCRYPTO_ALIAS(BN_add);
 
 int
 BN_sub(BIGNUM *r, const BIGNUM *a, const BIGNUM *b)
 {
-	int max;
-	int add = 0, neg = 0;
-	const BIGNUM *tmp;
+	int ret, r_neg;
 
-	bn_check_top(a);
-	bn_check_top(b);
+	if (a->neg != b->neg) {
+		r_neg = a->neg;
+		ret = BN_uadd(r, a, b);
+	} else {
+		int cmp = BN_ucmp(a, b);
 
-	/*  a -  b	a-b
-	 *  a - -b	a+b
-	 * -a -  b	-(a+b)
-	 * -a - -b	b-a
-	 */
-	if (a->neg) {
-		if (b->neg) {
-			tmp = a;
-			a = b;
-			b = tmp;
+		if (cmp > 0) {
+			r_neg = a->neg;
+			ret = BN_usub(r, a, b);
+		} else if (cmp < 0) {
+			r_neg = !b->neg;
+			ret = BN_usub(r, b, a);
 		} else {
-			add = 1;
-			neg = 1;
-		}
-	} else {
-		if (b->neg) {
-			add = 1;
-			neg = 0;
+			r_neg = 0;
+			BN_zero(r);
+			ret = 1;
 		}
 	}
 
-	if (add) {
-		if (!BN_uadd(r, a, b))
-			return (0);
-		r->neg = neg;
-		return (1);
-	}
+	BN_set_negative(r, r_neg);
 
-	/* We are actually doing a - b :-) */
-
-	max = (a->top > b->top) ? a->top : b->top;
-	if (bn_wexpand(r, max) == NULL)
-		return (0);
-	if (BN_ucmp(a, b) < 0) {
-		if (!BN_usub(r, b, a))
-			return (0);
-		r->neg = 1;
-	} else {
-		if (!BN_usub(r, a, b))
-			return (0);
-		r->neg = 0;
-	}
-	bn_check_top(r);
-	return (1);
+	return ret;
 }
+LCRYPTO_ALIAS(BN_sub);

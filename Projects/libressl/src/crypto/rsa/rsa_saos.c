@@ -1,4 +1,4 @@
-/* $OpenBSD: rsa_saos.c,v 1.23 2017/05/02 03:59:45 deraadt Exp $ */
+/* $OpenBSD: rsa_saos.c,v 1.26 2025/05/10 05:54:38 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -60,10 +60,11 @@
 #include <string.h>
 
 #include <openssl/bn.h>
-#include <openssl/err.h>
 #include <openssl/objects.h>
 #include <openssl/rsa.h>
 #include <openssl/x509.h>
+
+#include "err_local.h"
 
 int
 RSA_sign_ASN1_OCTET_STRING(int type, const unsigned char *m, unsigned int m_len,
@@ -99,6 +100,7 @@ RSA_sign_ASN1_OCTET_STRING(int type, const unsigned char *m, unsigned int m_len,
 	freezero(s, (unsigned int)j + 1);
 	return ret;
 }
+LCRYPTO_ALIAS(RSA_sign_ASN1_OCTET_STRING);
 
 int
 RSA_verify_ASN1_OCTET_STRING(int dtype, const unsigned char *m,
@@ -130,7 +132,7 @@ RSA_verify_ASN1_OCTET_STRING(int dtype, const unsigned char *m,
 		goto err;
 
 	if ((unsigned int)sig->length != m_len ||
-	    memcmp(m, sig->data, m_len) != 0) {
+	    timingsafe_bcmp(m, sig->data, m_len) != 0) {
 		RSAerror(RSA_R_BAD_SIGNATURE);
 	} else
 		ret = 1;
@@ -139,3 +141,4 @@ err:
 	freezero(s, (unsigned int)siglen);
 	return ret;
 }
+LCRYPTO_ALIAS(RSA_verify_ASN1_OCTET_STRING);

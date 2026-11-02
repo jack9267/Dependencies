@@ -1,4 +1,4 @@
-.\" $OpenBSD: OPENSSL_config.3,v 1.10 2018/03/22 21:08:22 schwarze Exp $
+.\" $OpenBSD: OPENSSL_config.3,v 1.18 2025/06/09 12:43:53 schwarze Exp $
 .\" full merge up to: OpenSSL b97fdb57 Nov 11 09:33:09 2016 +0100
 .\"
 .\" This file is a derived work.
@@ -65,7 +65,7 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: March 22 2018 $
+.Dd $Mdocdate: June 9 2025 $
 .Dt OPENSSL_CONFIG 3
 .Os
 .Sh NAME
@@ -73,6 +73,7 @@
 .Nm OPENSSL_no_config
 .Nd simple crypto and ssl library configuration
 .Sh SYNOPSIS
+.Lb libcrypto
 .In openssl/conf.h
 .Ft void
 .Fo OPENSSL_config
@@ -82,12 +83,7 @@
 .Fn OPENSSL_no_config void
 .Sh DESCRIPTION
 .Fn OPENSSL_config
-initializes the crypto library with
-.Xr OPENSSL_init_crypto 3
-and then calls
-.Xr OPENSSL_load_builtin_modules 3 ,
-.Xr ENGINE_load_builtin_engines 3 ,
-and
+initializes the crypto library and calls
 .Xr CONF_modules_load_file 3
 with the standard configuration file and the given
 .Fa appname .
@@ -104,17 +100,29 @@ Further calls to
 have no effect.
 .Pp
 .Fn OPENSSL_no_config
-has no effect except that later calls to
+suppresses the loading of the standard configuration file, so that any
+future calls to
 .Fn OPENSSL_config
-will be ignored.
+or to
+.Xr OPENSSL_init_crypto 3
+will ensure the library is initialized but no configuration
+file will be loaded.
 .Pp
 Calling these functions is optional.
 All required initialization of the crypto libraries happens
 automatically when needed.
 .Pp
+To use a non-standard configuration file, refer to
+.Xr CONF_modules_load_file 3 .
+.Pp
+Internally,
+.Fn OPENSSL_config
+calls
+.Xr OPENSSL_init_crypto 3 .
+.Pp
 If an application is compiled with the preprocessor symbol
 .Dv OPENSSL_LOAD_CONF
-#define'd,
+defined,
 .Xr OpenSSL_add_all_algorithms 3
 automatically calls
 .Fn OPENSSL_config .
@@ -130,9 +138,10 @@ standard configuration file
 .Sh SEE ALSO
 .Xr CONF_modules_free 3 ,
 .Xr CONF_modules_load_file 3 ,
-.Xr OPENSSL_init_crypto 3 ,
-.Xr OPENSSL_load_builtin_modules 3 ,
-.Xr openssl.cnf 5
+.Xr crypto 3 ,
+.Xr OPENSSL_VERSION_NUMBER 3 ,
+.Xr openssl.cnf 5 ,
+.Xr x509v3.cnf 5
 .Sh HISTORY
 .Fn OPENSSL_config
 and

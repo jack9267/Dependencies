@@ -1,3 +1,20 @@
+/*	$OpenBSD: ocsp_test.c,v 1.7 2023/07/07 19:54:36 bcook Exp $	*/
+/*
+ * Copyright (c) 2016 Bob Beck <beck@openbsd.org>
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
 #include <stdio.h>
 #include <netdb.h>
 #include <stdlib.h>
@@ -18,10 +35,10 @@ tcp_connect(char *host, char *port)
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
 
-#ifdef _MSC_VER
-	if (BIO_sock_init() != 1)
+	if (BIO_sock_init() != 1) {
+		perror("BIO_sock_init()");
 		exit(-1);
-#endif
+	}
 
 	error = getaddrinfo(host, port, &hints, &res);
 	if (error != 0) {

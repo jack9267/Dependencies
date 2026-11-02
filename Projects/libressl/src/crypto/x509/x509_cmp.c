@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_cmp.c,v 1.30 2018/03/17 14:57:23 jsing Exp $ */
+/* $OpenBSD: x509_cmp.c,v 1.45 2025/05/10 05:54:39 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -63,10 +63,13 @@
 #include <openssl/opensslconf.h>
 
 #include <openssl/asn1.h>
-#include <openssl/err.h>
 #include <openssl/objects.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
+
+#include "err_local.h"
+#include "evp_local.h"
+#include "x509_local.h"
 
 int
 X509_issuer_and_serial_cmp(const X509 *a, const X509 *b)
@@ -76,46 +79,49 @@ X509_issuer_and_serial_cmp(const X509 *a, const X509 *b)
 
 	ai = a->cert_info;
 	bi = b->cert_info;
-	i = ASN1_STRING_cmp(ai->serialNumber, bi->serialNumber);
+	i = ASN1_INTEGER_cmp(ai->serialNumber, bi->serialNumber);
 	if (i)
 		return (i);
 	return (X509_NAME_cmp(ai->issuer, bi->issuer));
 }
+LCRYPTO_ALIAS(X509_issuer_and_serial_cmp);
 
 #ifndef OPENSSL_NO_MD5
 unsigned long
 X509_issuer_and_serial_hash(X509 *a)
 {
 	unsigned long ret = 0;
-	EVP_MD_CTX ctx;
+	EVP_MD_CTX *md_ctx;
 	unsigned char md[16];
-	char *f;
+	char *f = NULL;
 
-	EVP_MD_CTX_init(&ctx);
-	f = X509_NAME_oneline(a->cert_info->issuer, NULL, 0);
-	if (f == NULL)
+	if ((md_ctx = EVP_MD_CTX_new()) == NULL)
 		goto err;
-	if (!EVP_DigestInit_ex(&ctx, EVP_md5(), NULL))
+
+	if ((f = X509_NAME_oneline(a->cert_info->issuer, NULL, 0)) == NULL)
 		goto err;
-	if (!EVP_DigestUpdate(&ctx, (unsigned char *)f, strlen(f)))
+	if (!EVP_DigestInit_ex(md_ctx, EVP_md5(), NULL))
 		goto err;
-	free(f);
-	f = NULL;
-	if (!EVP_DigestUpdate(&ctx,
+	if (!EVP_DigestUpdate(md_ctx, (unsigned char *)f, strlen(f)))
+		goto err;
+	if (!EVP_DigestUpdate(md_ctx,
 	    (unsigned char *)a->cert_info->serialNumber->data,
 	    (unsigned long)a->cert_info->serialNumber->length))
 		goto err;
-	if (!EVP_DigestFinal_ex(&ctx, &(md[0]), NULL))
+	if (!EVP_DigestFinal_ex(md_ctx, &(md[0]), NULL))
 		goto err;
+
 	ret = (((unsigned long)md[0]) | ((unsigned long)md[1] << 8L) |
 	    ((unsigned long)md[2] << 16L) | ((unsigned long)md[3] << 24L)) &
 	    0xffffffffL;
 
 err:
-	EVP_MD_CTX_cleanup(&ctx);
+	EVP_MD_CTX_free(md_ctx);
 	free(f);
-	return (ret);
+
+	return ret;
 }
+LCRYPTO_ALIAS(X509_issuer_and_serial_hash);
 #endif
 
 int
@@ -123,38 +129,44 @@ X509_issuer_name_cmp(const X509 *a, const X509 *b)
 {
 	return (X509_NAME_cmp(a->cert_info->issuer, b->cert_info->issuer));
 }
+LCRYPTO_ALIAS(X509_issuer_name_cmp);
 
 int
 X509_subject_name_cmp(const X509 *a, const X509 *b)
 {
 	return (X509_NAME_cmp(a->cert_info->subject, b->cert_info->subject));
 }
+LCRYPTO_ALIAS(X509_subject_name_cmp);
 
 int
 X509_CRL_cmp(const X509_CRL *a, const X509_CRL *b)
 {
 	return (X509_NAME_cmp(a->crl->issuer, b->crl->issuer));
 }
+LCRYPTO_ALIAS(X509_CRL_cmp);
 
 #ifndef OPENSSL_NO_SHA
 int
 X509_CRL_match(const X509_CRL *a, const X509_CRL *b)
 {
-	return memcmp(a->sha1_hash, b->sha1_hash, 20);
+	return memcmp(a->hash, b->hash, X509_CRL_HASH_LEN);
 }
+LCRYPTO_ALIAS(X509_CRL_match);
 #endif
 
 X509_NAME *
-X509_get_issuer_name(X509 *a)
+X509_get_issuer_name(const X509 *a)
 {
 	return (a->cert_info->issuer);
 }
+LCRYPTO_ALIAS(X509_get_issuer_name);
 
 unsigned long
 X509_issuer_name_hash(X509 *x)
 {
 	return (X509_NAME_hash(x->cert_info->issuer));
 }
+LCRYPTO_ALIAS(X509_issuer_name_hash);
 
 #ifndef OPENSSL_NO_MD5
 unsigned long
@@ -162,25 +174,36 @@ X509_issuer_name_hash_old(X509 *x)
 {
 	return (X509_NAME_hash_old(x->cert_info->issuer));
 }
+LCRYPTO_ALIAS(X509_issuer_name_hash_old);
 #endif
 
 X509_NAME *
-X509_get_subject_name(X509 *a)
+X509_get_subject_name(const X509 *a)
 {
 	return (a->cert_info->subject);
 }
+LCRYPTO_ALIAS(X509_get_subject_name);
 
 ASN1_INTEGER *
 X509_get_serialNumber(X509 *a)
 {
 	return (a->cert_info->serialNumber);
 }
+LCRYPTO_ALIAS(X509_get_serialNumber);
+
+const ASN1_INTEGER *
+X509_get0_serialNumber(const X509 *a)
+{
+	return (a->cert_info->serialNumber);
+}
+LCRYPTO_ALIAS(X509_get0_serialNumber);
 
 unsigned long
 X509_subject_name_hash(X509 *x)
 {
 	return (X509_NAME_hash(x->cert_info->subject));
 }
+LCRYPTO_ALIAS(X509_subject_name_hash);
 
 #ifndef OPENSSL_NO_MD5
 unsigned long
@@ -188,6 +211,7 @@ X509_subject_name_hash_old(X509 *x)
 {
 	return (X509_NAME_hash_old(x->cert_info->subject));
 }
+LCRYPTO_ALIAS(X509_subject_name_hash_old);
 #endif
 
 #ifndef OPENSSL_NO_SHA
@@ -207,8 +231,9 @@ X509_cmp(const X509 *a, const X509 *b)
 	X509_check_purpose((X509 *)a, -1, 0);
 	X509_check_purpose((X509 *)b, -1, 0);
 
-	return memcmp(a->sha1_hash, b->sha1_hash, SHA_DIGEST_LENGTH);
+	return memcmp(a->hash, b->hash, X509_CERT_HASH_LEN);
 }
+LCRYPTO_ALIAS(X509_cmp);
 #endif
 
 int
@@ -232,6 +257,7 @@ X509_NAME_cmp(const X509_NAME *a, const X509_NAME *b)
 		return ret;
 	return memcmp(a->canon_enc, b->canon_enc, a->canon_enclen);
 }
+LCRYPTO_ALIAS(X509_NAME_cmp);
 
 unsigned long
 X509_NAME_hash(X509_NAME *x)
@@ -250,6 +276,7 @@ X509_NAME_hash(X509_NAME *x)
 	    0xffffffffL;
 	return (ret);
 }
+LCRYPTO_ALIAS(X509_NAME_hash);
 
 
 #ifndef OPENSSL_NO_MD5
@@ -259,25 +286,29 @@ X509_NAME_hash(X509_NAME *x)
 unsigned long
 X509_NAME_hash_old(X509_NAME *x)
 {
-	EVP_MD_CTX md_ctx;
+	EVP_MD_CTX *md_ctx;
 	unsigned long ret = 0;
 	unsigned char md[16];
 
+	if ((md_ctx = EVP_MD_CTX_new()) == NULL)
+		return ret;
+
 	/* Make sure X509_NAME structure contains valid cached encoding */
 	i2d_X509_NAME(x, NULL);
-	EVP_MD_CTX_init(&md_ctx);
-	if (EVP_DigestInit_ex(&md_ctx, EVP_md5(), NULL) &&
-	    EVP_DigestUpdate(&md_ctx, x->bytes->data, x->bytes->length) &&
-	    EVP_DigestFinal_ex(&md_ctx, md, NULL))
+	if (EVP_DigestInit_ex(md_ctx, EVP_md5(), NULL) &&
+	    EVP_DigestUpdate(md_ctx, x->bytes->data, x->bytes->length) &&
+	    EVP_DigestFinal_ex(md_ctx, md, NULL))
 		ret = (((unsigned long)md[0]) |
 		    ((unsigned long)md[1] << 8L) |
 		    ((unsigned long)md[2] << 16L) |
 		    ((unsigned long)md[3] << 24L)) &
 		    0xffffffffL;
-	EVP_MD_CTX_cleanup(&md_ctx);
 
-	return (ret);
+	EVP_MD_CTX_free(md_ctx);
+
+	return ret;
 }
+LCRYPTO_ALIAS(X509_NAME_hash_old);
 #endif
 
 /* Search a stack of X509 for a match */
@@ -303,6 +334,7 @@ X509_find_by_issuer_and_serial(STACK_OF(X509) *sk, X509_NAME *name,
 	}
 	return (NULL);
 }
+LCRYPTO_ALIAS(X509_find_by_issuer_and_serial);
 
 X509 *
 X509_find_by_subject(STACK_OF(X509) *sk, X509_NAME *name)
@@ -317,6 +349,7 @@ X509_find_by_subject(STACK_OF(X509) *sk, X509_NAME *name)
 	}
 	return (NULL);
 }
+LCRYPTO_ALIAS(X509_find_by_subject);
 
 EVP_PKEY *
 X509_get_pubkey(X509 *x)
@@ -325,14 +358,16 @@ X509_get_pubkey(X509 *x)
 		return (NULL);
 	return (X509_PUBKEY_get(x->cert_info->key));
 }
+LCRYPTO_ALIAS(X509_get_pubkey);
 
 EVP_PKEY *
-X509_get0_pubkey(X509 *x)
+X509_get0_pubkey(const X509 *x)
 {
 	if (x == NULL || x->cert_info == NULL)
 		return (NULL);
 	return (X509_PUBKEY_get0(x->cert_info->key));
 }
+LCRYPTO_ALIAS(X509_get0_pubkey);
 
 ASN1_BIT_STRING *
 X509_get0_pubkey_bitstr(const X509 *x)
@@ -341,14 +376,15 @@ X509_get0_pubkey_bitstr(const X509 *x)
 		return NULL;
 	return x->cert_info->key->public_key;
 }
+LCRYPTO_ALIAS(X509_get0_pubkey_bitstr);
 
 int
-X509_check_private_key(X509 *x, EVP_PKEY *k)
+X509_check_private_key(const X509 *x, const EVP_PKEY *k)
 {
-	EVP_PKEY *xk;
+	const EVP_PKEY *xk;
 	int ret;
 
-	xk = X509_get_pubkey(x);
+	xk = X509_get0_pubkey(x);
 
 	if (xk)
 		ret = EVP_PKEY_cmp(xk, k);
@@ -367,11 +403,11 @@ X509_check_private_key(X509 *x, EVP_PKEY *k)
 	case -2:
 		X509error(X509_R_UNKNOWN_KEY_TYPE);
 	}
-	EVP_PKEY_free(xk);
 	if (ret > 0)
 		return 1;
 	return 0;
 }
+LCRYPTO_ALIAS(X509_check_private_key);
 
 /*
  * Not strictly speaking an "up_ref" as a STACK doesn't have a reference
@@ -390,3 +426,4 @@ X509_chain_up_ref(STACK_OF(X509) *chain)
 
 	return ret;
 }
+LCRYPTO_ALIAS(X509_chain_up_ref);

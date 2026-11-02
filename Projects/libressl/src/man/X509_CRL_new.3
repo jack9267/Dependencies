@@ -1,6 +1,6 @@
-.\"	$OpenBSD: X509_CRL_new.3,v 1.6 2018/03/23 23:18:17 schwarze Exp $
+.\" $OpenBSD: X509_CRL_new.3,v 1.15 2025/06/08 22:40:30 schwarze Exp $
 .\"
-.\" Copyright (c) 2016, 2018 Ingo Schwarze <schwarze@openbsd.org>
+.\" Copyright (c) 2016, 2018, 2021 Ingo Schwarze <schwarze@openbsd.org>
 .\"
 .\" Permission to use, copy, modify, and distribute this software for any
 .\" purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: March 23 2018 $
+.Dd $Mdocdate: June 8 2025 $
 .Dt X509_CRL_NEW 3
 .Os
 .Sh NAME
@@ -26,6 +26,7 @@
 .Nm X509_CRL_INFO_free
 .Nd X.509 certificate revocation lists
 .Sh SYNOPSIS
+.Lb libcrypto
 .In openssl/x509.h
 .Ft X509_CRL *
 .Fn X509_CRL_new void
@@ -103,29 +104,39 @@ returns 1 on success or 0 on error.
 .Xr d2i_X509_CRL 3 ,
 .Xr DIST_POINT_new 3 ,
 .Xr PEM_read_X509_CRL 3 ,
+.Xr X509_CRL_digest 3 ,
 .Xr X509_CRL_get0_by_serial 3 ,
+.Xr X509_CRL_get0_lastUpdate 3 ,
+.Xr X509_CRL_get0_signature 3 ,
 .Xr X509_CRL_get_ext 3 ,
 .Xr X509_CRL_get_ext_d2i 3 ,
 .Xr X509_CRL_get_issuer 3 ,
 .Xr X509_CRL_get_version 3 ,
+.Xr X509_CRL_match 3 ,
+.Xr X509_CRL_print 3 ,
 .Xr X509_CRL_sign 3 ,
 .Xr X509_EXTENSION_new 3 ,
+.Xr X509_INFO_new 3 ,
 .Xr X509_load_crl_file 3 ,
 .Xr X509_new 3 ,
+.Xr X509_OBJECT_get0_X509_CRL 3 ,
 .Xr X509_REVOKED_new 3 ,
-.Xr X509_STORE_CTX_set0_crls 3
+.Xr X509_STORE_CTX_set0_crls 3 ,
+.Xr X509_STORE_get1_crls 3
 .Sh STANDARDS
 RFC 5280: Internet X.509 Public Key Infrastructure Certificate and
 Certificate Revocation List (CRL) Profile, section 5: CRL and CRL
 Extensions Profile
 .Sh HISTORY
 .Fn X509_CRL_new ,
-.Fn X509_CRL_dup ,
 .Fn X509_CRL_free ,
 .Fn X509_CRL_INFO_new ,
 and
 .Fn X509_CRL_INFO_free
-appeared before SSLeay 0.8 and have been available since
+first appeared in SSLeay 0.4.4.
+.Fn X509_CRL_dup
+first appeared in SSLeay 0.5.1.
+These functions have been available since
 .Ox 2.4 .
 .Pp
 .Fn X509_CRL_up_ref

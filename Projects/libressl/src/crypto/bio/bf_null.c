@@ -1,4 +1,4 @@
-/* $OpenBSD: bf_null.c,v 1.11 2014/07/11 08:44:47 jsing Exp $ */
+/* $OpenBSD: bf_null.c,v 1.15 2023/07/05 21:23:37 beck Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -61,6 +61,8 @@
 
 #include <openssl/bio.h>
 
+#include "bio_local.h"
+
 /* BIO_put and BIO_get both add to the digest,
  * BIO_gets returns the digest */
 
@@ -71,9 +73,9 @@ static int nullf_gets(BIO *h, char *str, int size);
 static long nullf_ctrl(BIO *h, int cmd, long arg1, void *arg2);
 static int nullf_new(BIO *h);
 static int nullf_free(BIO *data);
-static long nullf_callback_ctrl(BIO *h, int cmd, bio_info_cb *fp);
+static long nullf_callback_ctrl(BIO *h, int cmd, BIO_info_cb *fp);
 
-static BIO_METHOD methods_nullf = {
+static const BIO_METHOD methods_nullf = {
 	.type = BIO_TYPE_NULL_FILTER,
 	.name = "NULL filter",
 	.bwrite = nullf_write,
@@ -86,11 +88,12 @@ static BIO_METHOD methods_nullf = {
 	.callback_ctrl = nullf_callback_ctrl
 };
 
-BIO_METHOD *
+const BIO_METHOD *
 BIO_f_null(void)
 {
 	return (&methods_nullf);
 }
+LCRYPTO_ALIAS(BIO_f_null);
 
 static int
 nullf_new(BIO *bi)
@@ -165,7 +168,7 @@ nullf_ctrl(BIO *b, int cmd, long num, void *ptr)
 }
 
 static long
-nullf_callback_ctrl(BIO *b, int cmd, bio_info_cb *fp)
+nullf_callback_ctrl(BIO *b, int cmd, BIO_info_cb *fp)
 {
 	long ret = 1;
 

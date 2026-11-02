@@ -1,4 +1,4 @@
-/* $OpenBSD: tlstest.c,v 1.10 2018/03/19 16:36:12 jsing Exp $ */
+/* $OpenBSD: tlstest.c,v 1.19 2026/09/20 17:47:16 beck Exp $ */
 /*
  * Copyright (c) 2017 Joel Sing <jsing@openbsd.org>
  *
@@ -292,11 +292,66 @@ test_tls_socket(struct tls *client, struct tls *server)
 }
 
 static int
+test_tls(char *client_protocols, char *server_protocols, char *ciphers)
+{
+	struct tls_config *client_cfg, *server_cfg;
+	struct tls *client, *server;
+	uint32_t protocols;
+	int failure = 0;
+
+	if ((client = tls_client()) == NULL)
+		errx(1, "failed to create tls client");
+	if ((client_cfg = tls_config_new()) == NULL)
+		errx(1, "failed to create tls client config");
+	tls_config_insecure_noverifyname(client_cfg);
+	if (tls_config_parse_protocols(&protocols, client_protocols) == -1)
+		errx(1, "failed to parse protocols: %s", tls_config_error(client_cfg));
+	if (tls_config_set_protocols(client_cfg, protocols) == -1)
+		errx(1, "failed to set protocols: %s", tls_config_error(client_cfg));
+	if (tls_config_set_ciphers(client_cfg, ciphers) == -1)
+		errx(1, "failed to set ciphers: %s", tls_config_error(client_cfg));
+	if (tls_config_set_ca_file(client_cfg, cafile) == -1)
+		errx(1, "failed to set ca: %s", tls_config_error(client_cfg));
+
+	if ((server = tls_server()) == NULL)
+		errx(1, "failed to create tls server");
+	if ((server_cfg = tls_config_new()) == NULL)
+		errx(1, "failed to create tls server config");
+	if (tls_config_parse_protocols(&protocols, server_protocols) == -1)
+		errx(1, "failed to parse protocols: %s", tls_config_error(server_cfg));
+	if (tls_config_set_protocols(server_cfg, protocols) == -1)
+		errx(1, "failed to set protocols: %s", tls_config_error(server_cfg));
+	if (tls_config_set_ciphers(server_cfg, ciphers) == -1)
+		errx(1, "failed to set ciphers: %s", tls_config_error(server_cfg));
+	if (tls_config_set_keypair_file(server_cfg, certfile, keyfile) == -1)
+		errx(1, "failed to set keypair: %s",
+		    tls_config_error(server_cfg));
+
+	if (tls_configure(client, client_cfg) == -1)
+		errx(1, "failed to configure client: %s", tls_error(client));
+	tls_reset(server);
+	if (tls_configure(server, server_cfg) == -1)
+		errx(1, "failed to configure server: %s", tls_error(server));
+
+	tls_config_free(client_cfg);
+	tls_config_free(server_cfg);
+
+	failure |= test_tls_cbs(client, server);
+
+	tls_free(client);
+	tls_free(server);
+
+	return (failure);
+}
+
+static int
 do_tls_tests(void)
 {
 	struct tls_config *client_cfg, *server_cfg;
 	struct tls *client, *server;
 	int failure = 0;
+
+	printf("== TLS tests ==\n");
 
 	if ((client = tls_client()) == NULL)
 		errx(1, "failed to create tls client");
@@ -347,6 +402,8 @@ do_tls_tests(void)
 	tls_free(client);
 	tls_free(server);
 
+	printf("\n");
+
 	return (failure);
 }
 
@@ -357,7 +414,7 @@ do_tls_ordering_tests(void)
 	struct tls_config *client_cfg, *server_cfg;
 	int failure = 0;
 
-	circular_init();
+	printf("== TLS ordering tests ==\n");
 
 	if ((client = tls_client()) == NULL)
 		errx(1, "failed to create tls client");
@@ -389,6 +446,8 @@ do_tls_ordering_tests(void)
 		failure = 1;
 		goto done;
 	}
+
+	circular_init();
 
 	if (tls_accept_cbs(server, &server_cctx, server_read, server_write,
 	    NULL) == -1)
@@ -425,6 +484,342 @@ do_tls_ordering_tests(void)
 	tls_free(server);
 	tls_free(server_cctx);
 
+	printf("\n");
+
+	return (failure);
+}
+
+struct test_versions {
+	char *client;
+	char *server;
+};
+
+static struct test_versions tls_test_versions[] = {
+	{"tlsv1.3", "all"},
+	{"tlsv1.2", "all"},
+	{"all", "tlsv1.3"},
+	{"all", "tlsv1.2"},
+	{"all:!tlsv1.1", "tlsv1.2"},
+	{"all:!tlsv1.2", "tlsv1.3"},
+	{"all:!tlsv1.3", "tlsv1.2"},
+	{"all:!tlsv1.2:!tlsv1.1", "tlsv1.3"},
+	{"all:!tlsv1.2:!tlsv1.1:!tlsv1.0", "tlsv1.3"},
+	{"tlsv1.3", "tlsv1.3"},
+	{"tlsv1.2", "tlsv1.2"},
+};
+
+#define N_TLS_VERSION_TESTS \
+    (sizeof(tls_test_versions) / sizeof(*tls_test_versions))
+
+static int
+do_tls_version_tests(void)
+{
+	struct test_versions *tv;
+	int failure = 0;
+	size_t i;
+
+	printf("== TLS version tests ==\n");
+
+	for (i = 0; i < N_TLS_VERSION_TESTS; i++) {
+		tv = &tls_test_versions[i];
+		printf("INFO: version test %zu - client versions '%s' "
+		    "and server versions '%s'\n", i, tv->client, tv->server);
+		failure |= test_tls(tv->client, tv->server, "legacy");
+		printf("\n");
+	}
+
+	return failure;
+}
+
+static int
+test_tls_alpn(const char *client_alpn, const char *server_alpn,
+    const char *selected)
+{
+	struct tls_config *client_cfg, *server_cfg;
+	struct tls *client, *server, *server_cctx;
+	const char *got_server, *got_client;
+	int failed = 1;
+
+	if ((client = tls_client()) == NULL)
+		errx(1, "failed to create tls client");
+	if ((client_cfg = tls_config_new()) == NULL)
+		errx(1, "failed to create tls client config");
+	tls_config_insecure_noverifyname(client_cfg);
+	if (tls_config_set_alpn(client_cfg, client_alpn) == -1)
+		errx(1, "failed to set alpn: %s", tls_config_error(client_cfg));
+	if (tls_config_set_ca_file(client_cfg, cafile) == -1)
+		errx(1, "failed to set ca: %s", tls_config_error(client_cfg));
+
+	if ((server = tls_server()) == NULL)
+		errx(1, "failed to create tls server");
+	if ((server_cfg = tls_config_new()) == NULL)
+		errx(1, "failed to create tls server config");
+	if (tls_config_set_alpn(server_cfg, server_alpn) == -1)
+		errx(1, "failed to set alpn: %s", tls_config_error(server_cfg));
+	if (tls_config_set_keypair_file(server_cfg, certfile, keyfile) == -1)
+		errx(1, "failed to set keypair: %s",
+		    tls_config_error(server_cfg));
+
+	if (tls_configure(client, client_cfg) == -1)
+		errx(1, "failed to configure client: %s", tls_error(client));
+	tls_reset(server);
+	if (tls_configure(server, server_cfg) == -1)
+		errx(1, "failed to configure server: %s", tls_error(server));
+
+	tls_config_free(client_cfg);
+	tls_config_free(server_cfg);
+
+	circular_init();
+
+	if (tls_accept_cbs(server, &server_cctx, server_read, server_write,
+	    NULL) == -1)
+		errx(1, "failed to accept: %s", tls_error(server));
+
+	if (tls_connect_cbs(client, client_read, client_write, NULL,
+	    "test") == -1)
+		errx(1, "failed to connect: %s", tls_error(client));
+
+	if (do_client_server_test("alpn", client, server_cctx) != 0)
+		goto fail;
+
+	got_server = tls_conn_alpn_selected(server_cctx);
+	got_client = tls_conn_alpn_selected(client);
+
+	if (got_server == NULL || got_client == NULL) {
+		printf("FAIL: expected ALPN for server and client, got "
+		    "server: %p, client %p\n", got_server, got_client);
+		goto fail;
+	}
+
+	if (strcmp(got_server, got_client) != 0) {
+		printf("FAIL: ALPN mismatch: server %s, client %s\n",
+		    got_server, got_client);
+		goto fail;
+	}
+
+	if (strcmp(selected, got_server) != 0) {
+		printf("FAIL: ALPN mismatch: want %s, got %s\n",
+		    selected, got_server);
+		goto fail;
+	}
+
+	failed = 0;
+
+ fail:
+	tls_free(client);
+	tls_free(server);
+	tls_free(server_cctx);
+
+	return (failed);
+}
+
+static const struct test_alpn {
+	const char *client;
+	const char *server;
+	const char *selected;
+} tls_test_alpn[] = {
+	{
+		.client = "http/2,http/1.1",
+		.server = "http/1.1",
+		.selected = "http/1.1",
+	},
+	{
+		.client = "http/2,http/1.1",
+		.server = "http/2,http/1.1",
+		.selected = "http/2",
+	},
+	{
+		.client = "http/1.1,http/2",
+		.server = "http/2,http/1.1",
+		.selected = "http/2",
+	},
+	{
+		.client = "http/2,http/1.1",
+		.server = "http/1.1,http/2",
+		.selected = "http/1.1",
+	},
+	{
+		.client = "http/1.1",
+		.server = "http/2,http/1.1",
+		.selected = "http/1.1",
+	},
+};
+
+#define N_TLS_ALPN_TESTS (sizeof(tls_test_alpn) / sizeof(tls_test_alpn[0]))
+
+static int
+do_tls_alpn_tests(void)
+{
+	const struct test_alpn *ta;
+	int failure = 0;
+	size_t i;
+
+	printf("== TLS alpn tests ==\n");
+
+	for (i = 0; i < N_TLS_ALPN_TESTS; i++) {
+		ta = &tls_test_alpn[i];
+		printf("INFO: alpn test %zu - client alpn '%s' "
+		    "and server alpn '%s'\n", i, ta->client, ta->server);
+		failure |= test_tls_alpn(ta->client, ta->server, ta->selected);
+		printf("\n");
+	}
+
+	return failure;
+}
+
+static size_t
+count_pem_certs(const uint8_t *pem, size_t len)
+{
+	const char *marker = "-----BEGIN CERTIFICATE-----";
+	size_t marker_len = strlen(marker);
+	size_t i, n = 0;
+
+	for (i = 0; i + marker_len <= len; i++) {
+		if (memcmp(pem + i, marker, marker_len) == 0)
+			n++;
+	}
+
+	return n;
+}
+
+static int
+check_peer_certs_absent(const char *desc, struct tls *ctx)
+{
+	size_t len;
+
+	if (tls_peer_cert_unverified_bundle_pem(ctx, &len) != NULL) {
+		printf("FAIL: %s has a peer unverified bundle\n", desc);
+		return (1);
+	}
+	if (tls_peer_cert_verified_chain_pem(ctx, &len) != NULL) {
+		printf("FAIL: %s has a peer verified chain\n", desc);
+		return (1);
+	}
+
+	return (0);
+}
+
+static int
+check_peer_certs(const char *desc, struct tls *client, struct tls *server_cctx,
+    int verify)
+{
+	const uint8_t *bundle, *chain;
+	size_t bundle_len, chain_len;
+	size_t n;
+
+	if ((bundle = tls_peer_cert_unverified_bundle_pem(client,
+	    &bundle_len)) == NULL) {
+		printf("FAIL: %s client has no peer unverified bundle\n", desc);
+		return (1);
+	}
+	if ((n = count_pem_certs(bundle, bundle_len)) != 2) {
+		printf("FAIL: %s client unverified bundle has %zu certs, "
+		    "want 2\n", desc, n);
+		return (1);
+	}
+
+	chain = tls_peer_cert_verified_chain_pem(client, &chain_len);
+	if (!verify) {
+		if (chain != NULL) {
+			printf("FAIL: %s client has a peer verified chain "
+			    "without verification\n", desc);
+			return (1);
+		}
+	} else {
+		if (chain == NULL) {
+			printf("FAIL: %s client has no peer verified chain\n",
+			    desc);
+			return (1);
+		}
+		if ((n = count_pem_certs(chain, chain_len)) != 3) {
+			printf("FAIL: %s client verified chain has %zu certs, "
+			    "want 3\n", desc, n);
+			return (1);
+		}
+		if (chain_len <= bundle_len ||
+		    memcmp(chain, bundle, bundle_len) != 0) {
+			printf("FAIL: %s client verified chain does not start "
+			    "with the unverified bundle\n", desc);
+			return (1);
+		}
+	}
+
+	return check_peer_certs_absent("server", server_cctx);
+}
+
+static int
+test_tls_peer_certs(int verify)
+{
+	struct tls_config *client_cfg, *server_cfg;
+	struct tls *client, *server, *server_cctx;
+	char *desc = verify ? "verified" : "unverified";
+	int failure;
+
+	printf("INFO: peer cert test - %s client\n", desc);
+
+	if ((client = tls_client()) == NULL)
+		errx(1, "failed to create tls client");
+	if ((client_cfg = tls_config_new()) == NULL)
+		errx(1, "failed to create tls client config");
+	tls_config_insecure_noverifyname(client_cfg);
+	if (verify) {
+		if (tls_config_set_ca_file(client_cfg, cafile) == -1)
+			errx(1, "failed to set ca: %s",
+			    tls_config_error(client_cfg));
+	} else
+		tls_config_insecure_noverifycert(client_cfg);
+	if (tls_configure(client, client_cfg) == -1)
+		errx(1, "failed to configure client: %s", tls_error(client));
+
+	if ((server = tls_server()) == NULL)
+		errx(1, "failed to create tls server");
+	if ((server_cfg = tls_config_new()) == NULL)
+		errx(1, "failed to create tls server config");
+	if (tls_config_set_keypair_file(server_cfg, certfile, keyfile) == -1)
+		errx(1, "failed to set keypair: %s",
+		    tls_config_error(server_cfg));
+	if (tls_configure(server, server_cfg) == -1)
+		errx(1, "failed to configure server: %s", tls_error(server));
+
+	circular_init();
+
+	if (tls_accept_cbs(server, &server_cctx, server_read, server_write,
+	    NULL) == -1)
+		errx(1, "failed to accept: %s", tls_error(server));
+
+	if (tls_connect_cbs(client, client_read, client_write, NULL,
+	    "test") == -1)
+		errx(1, "failed to connect: %s", tls_error(client));
+
+	failure = check_peer_certs_absent("pre-handshake client", client);
+
+	if ((failure |= do_client_server_handshake(desc, client,
+	    server_cctx)) == 0) {
+		failure |= check_peer_certs(desc, client, server_cctx, verify);
+		failure |= do_client_server_close(desc, client, server_cctx);
+	}
+
+	tls_free(server_cctx);
+	tls_free(client);
+	tls_free(server);
+	tls_config_free(client_cfg);
+	tls_config_free(server_cfg);
+
+	return (failure);
+}
+
+static int
+do_tls_peer_cert_tests(void)
+{
+	int failure = 0;
+
+	printf("== TLS peer cert tests ==\n");
+
+	failure |= test_tls_peer_certs(1);
+	failure |= test_tls_peer_certs(0);
+
+	printf("\n");
+
 	return (failure);
 }
 
@@ -445,6 +840,9 @@ main(int argc, char **argv)
 
 	failure |= do_tls_tests();
 	failure |= do_tls_ordering_tests();
+	failure |= do_tls_version_tests();
+	failure |= do_tls_alpn_tests();
+	failure |= do_tls_peer_cert_tests();
 
 	return (failure);
 }
