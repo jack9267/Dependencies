@@ -22,14 +22,12 @@
 # SPDX-License-Identifier: curl
 #
 ###########################################################################
-#
-#
 
 use strict;
 use warnings;
 
-# we may get the dir root pointed out
-my $root=$ARGV[0] || ".";
+# we may get the directory root pointed out
+my $root = $ARGV[0] || ".";
 
 my %error; # from the include file
 my %docs; # from libcurl-errors.3
@@ -43,7 +41,7 @@ sub getdocserrors {
                 ;
             }
             else {
-                $docs{$symbol}=1;
+                $docs{$symbol} = 1;
             }
         }
     }
@@ -54,12 +52,12 @@ sub getincludeerrors {
     open(my $f, "<", "$root/docs/libcurl/symbols-in-versions");
     while(<$f>) {
         if($_ =~ /^(CURL[EM]_[^ \t]*)[ \t]*([0-9.]+)[ \t]*(.*)/) {
-            my ($symbol, $added, $rest) = ($1,$2,$3);
+            my ($symbol, $added, $rest) = ($1, $2, $3);
             if($rest =~ /^([0-9.]+)/) {
                 # removed!
             }
             else {
-                $error{$symbol}=$added;
+                $error{$symbol} = $added;
             }
         }
     }

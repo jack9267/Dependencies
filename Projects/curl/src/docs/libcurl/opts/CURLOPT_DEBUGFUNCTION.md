@@ -51,11 +51,13 @@ Pass a pointer to your callback function, which should match the prototype
 shown above.
 
 CURLOPT_DEBUGFUNCTION(3) replaces the standard debug function used when
-CURLOPT_VERBOSE(3) is in effect. This callback receives debug
-information, as specified in the *type* argument. This function must
-return 0. The *data* pointed to by the char * passed to this function is
-not null-terminated, but is exactly of the *size* as told by the
-*size* argument.
+CURLOPT_VERBOSE(3) is in effect. This callback receives debug information, as
+specified in the *type* argument. This function must return 0. The *data*
+pointed to by the char * passed to this function is not null-terminated, but
+is exactly of the *size* as told by the *size* argument.
+
+**WARNING:** this callback may receive sensitive contents from headers and
+data, including information sent as **CURLINFO_TEXT**.
 
 The *clientp* argument is the pointer set with CURLOPT_DEBUGDATA(3).
 
@@ -94,8 +96,8 @@ The data is SSL/TLS (binary) data received from the peer.
 
 ##
 
-WARNING: This callback may be called with the curl *handle* set to an internal
-handle. (Added in 8.4.0)
+**WARNING:** This callback may be called with the curl *handle* set to an
+internal handle. (Added in 8.4.0)
 
 If you need to distinguish your curl *handle* from internal handles then set
 CURLOPT_PRIVATE(3) on your handle.
@@ -109,19 +111,18 @@ NULL
 # EXAMPLE
 
 ~~~c
-static
-void dump(const char *text,
-          FILE *stream, unsigned char *ptr, size_t size)
+static void dump(const char *text,
+                 FILE *stream, unsigned char *ptr, size_t size)
 {
   size_t i;
   size_t c;
   unsigned int width = 0x10;
 
-  fprintf(stream, "%s, %10.10ld bytes (0x%8.8lx)\n",
-          text, (long)size, (long)size);
+  fprintf(stream, "%s, %lu bytes (0x%lx)\n",
+          text, (unsigned long)size, (unsigned long)size);
 
   for(i = 0; i < size; i += width) {
-    fprintf(stream, "%4.4lx: ", (long)i);
+    fprintf(stream, "%4.4lx: ", (unsigned long)i);
 
     /* show hex to the left */
     for(c = 0; c < width; c++) {
@@ -133,7 +134,8 @@ void dump(const char *text,
 
     /* show data on the right */
     for(c = 0; (c < width) && (i + c < size); c++) {
-      char x = (ptr[i + c] >= 0x20 && ptr[i + c] < 0x80) ? ptr[i + c] : '.';
+      char x = (ptr[i + c] >= 0x20 && ptr[i + c] < 0x80)
+               ? (char)ptr[i + c] : '.';
       fputc(x, stream);
     }
 
@@ -141,19 +143,19 @@ void dump(const char *text,
   }
 }
 
-static
-int my_trace(CURL *handle, curl_infotype type,
-             char *data, size_t size,
-             void *clientp)
+static int my_trace(CURL *handle, curl_infotype type,
+                    char *data, size_t size,
+                    void *clientp)
 {
   const char *text;
-  (void)handle; /* prevent compiler warning */
+  (void)handle;
   (void)clientp;
 
   switch(type) {
   case CURLINFO_TEXT:
     fputs("== Info: ", stderr);
     fwrite(data, size, 1, stderr);
+    return 0;
   default: /* in case a new one is introduced to shock us */
     return 0;
 
@@ -184,7 +186,7 @@ int my_trace(CURL *handle, curl_infotype type,
 int main(void)
 {
   CURL *curl;
-  CURLcode res;
+  CURLcode result;
 
   curl = curl_easy_init();
   if(curl) {
@@ -197,11 +199,11 @@ int main(void)
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
     curl_easy_setopt(curl, CURLOPT_URL, "https://example.com/");
-    res = curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
     /* Check for errors */
-    if(res != CURLE_OK)
+    if(result != CURLE_OK)
       fprintf(stderr, "curl_easy_perform() failed: %s\n",
-              curl_easy_strerror(res));
+              curl_easy_strerror(result));
 
     /* always cleanup */
     curl_easy_cleanup(curl);

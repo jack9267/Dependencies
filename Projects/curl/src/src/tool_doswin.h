@@ -27,18 +27,10 @@
 
 #if defined(_WIN32) || defined(MSDOS)
 
-#define SANITIZE_ALLOW_PATH      (1<<1)  /* Allow path separators and colons */
-#define SANITIZE_ALLOW_RESERVED  (1<<2)  /* Allow reserved device names */
+#define SANITIZE_ALLOW_PATH     (1 << 1) /* Allow path separators and colons */
+#define SANITIZE_ALLOW_RESERVED (1 << 2) /* Allow reserved device names */
 
-typedef enum {
-  SANITIZE_ERR_OK = 0,           /* 0 - OK */
-  SANITIZE_ERR_INVALID_PATH,     /* 1 - the path is invalid */
-  SANITIZE_ERR_BAD_ARGUMENT,     /* 2 - bad function parameter */
-  SANITIZE_ERR_OUT_OF_MEMORY,    /* 3 - out of memory */
-  SANITIZE_ERR_LAST /* never use! */
-} SANITIZEcode;
-
-SANITIZEcode sanitize_file_name(char **const sanitized, const char *file_name,
+SANITIZEcode sanitize_file_name(char ** const sanitized, const char *file_name,
                                 int flags);
 
 #ifdef __DJGPP__
@@ -54,6 +46,10 @@ CURLcode FindWin32CACert(struct OperationConfig *config,
 #endif
 struct curl_slist *GetLoadedModulePaths(void);
 CURLcode win32_init(void);
+
+#ifndef CURL_WINDOWS_UWP
+curl_socket_t win32_stdin_read_thread(void);
+#endif
 
 #endif /* _WIN32 */
 

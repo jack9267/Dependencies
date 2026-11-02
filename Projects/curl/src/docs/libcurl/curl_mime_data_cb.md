@@ -44,6 +44,8 @@ from a data read callback function.
 
 *part* is the part's to assign contents to.
 
+*datasize* is the number of bytes the read callback is expected to provide.
+
 *readfunc* is a pointer to a data read callback function, with a signature
 as shown by the above prototype. It may not be set to NULL.
 
@@ -108,7 +110,7 @@ source to avoid data duplication. In this case, original data must be retained
 until after the transfer terminates.
 ~~~c
 #include <string.h> /* for memcpy */
-char hugedata[512000];
+static char hugedata[512000];
 
 struct ctl {
   char *buffer;
@@ -116,10 +118,11 @@ struct ctl {
   curl_off_t position;
 };
 
-size_t read_callback(char *buffer, size_t size, size_t nitems, void *arg)
+static size_t read_callback(char *buffer, size_t size, size_t nitems,
+                            void *arg)
 {
-  struct ctl *p = (struct ctl *) arg;
-  curl_off_t sz = p->size - p->position;
+  struct ctl *p = (struct ctl *)arg;
+  size_t sz = (size_t)(p->size - p->position);
 
   nitems *= size;
   if(sz > nitems)
@@ -130,9 +133,9 @@ size_t read_callback(char *buffer, size_t size, size_t nitems, void *arg)
   return sz;
 }
 
-int seek_callback(void *arg, curl_off_t offset, int origin)
+static int seek_callback(void *arg, curl_off_t offset, int origin)
 {
-  struct ctl *p = (struct ctl *) arg;
+  struct ctl *p = (struct ctl *)arg;
 
   switch(origin) {
   case SEEK_END:
@@ -140,6 +143,8 @@ int seek_callback(void *arg, curl_off_t offset, int origin)
     break;
   case SEEK_CUR:
     offset += p->position;
+    break;
+  default:
     break;
   }
 
@@ -160,8 +165,8 @@ int main(void)
     hugectl.buffer = hugedata;
     hugectl.size = sizeof(hugedata);
     hugectl.position = 0;
-    curl_mime_data_cb(part, hugectl.size, read_callback, seek_callback, NULL,
-                      &hugectl);
+    curl_mime_data_cb(part, hugectl.size, read_callback,
+                      seek_callback, NULL, &hugectl);
   }
 }
 ~~~

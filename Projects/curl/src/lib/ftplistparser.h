@@ -27,6 +27,9 @@
 
 #ifndef CURL_DISABLE_FTP
 
+/* returns TRUE if in wildcard listing mode */
+bool Curl_ftp_listmode(struct Curl_easy *data);
+
 /* WRITEFUNCTION callback for parsing LIST responses */
 size_t Curl_ftp_parselist(char *buffer, size_t size, size_t nmemb,
                           void *connptr);
@@ -37,7 +40,7 @@ CURLcode Curl_ftp_parselist_geterror(struct ftp_parselist_data *pl_data);
 
 struct ftp_parselist_data *Curl_ftp_parselist_data_alloc(void);
 
-void Curl_ftp_parselist_data_free(struct ftp_parselist_data **pl_data);
+void Curl_ftp_parselist_data_free(struct ftp_parselist_data **parserp);
 
 /* list of wildcard process states */
 typedef enum {
@@ -65,13 +68,15 @@ struct WildcardData {
   unsigned char state; /* wildcard_states */
 };
 
-CURLcode Curl_wildcard_init(struct WildcardData *wc);
+void Curl_wildcard_init(struct WildcardData *wc);
 void Curl_wildcard_dtor(struct WildcardData **wcp);
 
 struct Curl_easy;
 
-#else
-/* FTP is disabled */
+#else /* CURL_DISABLE_FTP */
+#define Curl_ftp_listmode(x) FALSE
+#define Curl_ftp_parselist ZERO_NULL
 #define Curl_wildcard_dtor(x)
-#endif /* CURL_DISABLE_FTP */
+#endif /* !CURL_DISABLE_FTP */
+
 #endif /* HEADER_CURL_FTPLISTPARSER_H */

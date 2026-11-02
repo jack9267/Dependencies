@@ -1,46 +1,36 @@
+<?xml version="1.0" encoding="US-ASCII"?>
 <testcase>
 <info>
 <keywords>
 TrackMemory
+libtest
 </keywords>
 </info>
 
-#
 # Server-side
 <reply>
 </reply>
 
 # Client-side
 <client>
-<server>
-none
-</server>
 <features>
 TrackMemory
 IPv6
 </features>
 # tool is what to use instead of 'curl'
-<tool>
-lib%TESTNUMBER
-</tool>
 
 <name>
 libtest memory tracking operational
 </name>
-<command>
-nothing
-</command>
 </client>
 
-#
 # Verify data after the test has been "shot"
 <verify>
 <file name="%LOGDIR/memdump">
 MEM easy.c: malloc()
 MEM lib%TESTNUMBER.c: malloc()
 MEM lib%TESTNUMBER.c: free()
-MEM dynbuf.c: realloc()
-MEM dynbuf.c: realloc()
+MEM escape.c: malloc()
 MEM escape.c: free()
 MEM easy.c: free()
 </file>

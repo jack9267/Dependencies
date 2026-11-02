@@ -31,22 +31,18 @@
 
 #ifdef __AMIGA__
 #include <stdio.h>
-int main(void) { printf("AmigaOS is not supported.\n"); return 1; }
+int main(void)
+{
+  printf("Platform not supported.\n");
+  return 1;
+}
 #else
 
-#ifdef _WIN32
-#ifndef _CRT_SECURE_NO_WARNINGS
-#define _CRT_SECURE_NO_WARNINGS
-#endif
-#ifndef _CRT_NONSTDC_NO_DEPRECATE
-#define _CRT_NONSTDC_NO_DEPRECATE
-#endif
-#ifndef _WIN32_WINNT
-#define _WIN32_WINNT 0x0600
-#endif
+#ifdef _WIN32  /* Requires Windows Vista+ */
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
+#define strdup _strdup
 #else
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -110,7 +106,7 @@ static struct ip *ip_list_append(struct ip *list, const char *data)
   struct ip *ip, *last;
   char *cidr;
 
-  ip = (struct ip *)calloc(1, sizeof(*ip));
+  ip = calloc(1, sizeof(*ip));
   if(!ip)
     return NULL;
 
@@ -131,7 +127,7 @@ static struct ip *ip_list_append(struct ip *list, const char *data)
     return NULL;
   }
 
-  /* determine the number of bits that this IP will match against */
+  /* determine the number of bits that this IP matches against */
   cidr = strchr(ip->str, '/');
   if(cidr) {
     ip->maskbits = atoi(cidr + 1);
@@ -154,7 +150,8 @@ static struct ip *ip_list_append(struct ip *list, const char *data)
     ip->maskbits = 128;
 #endif
 
-  if(1 != inet_pton(ip->family, ip->str, &ip->netaddr)) {
+  /* !checksrc! disable BANNEDFUNC 1 */
+  if(inet_pton(ip->family, ip->str, &ip->netaddr) != 1) {
     free(ip->str);
     free(ip);
     return NULL;
@@ -195,8 +192,8 @@ static int ip_match(struct ip *ip, void *netaddr)
   int bytes, tailbits;
   const unsigned char *x, *y;
 
-  x = (unsigned char *)&ip->netaddr;
-  y = (unsigned char *)netaddr;
+  x = (const unsigned char *)&ip->netaddr;
+  y = (const unsigned char *)netaddr;
 
   for(bytes = ip->maskbits / 8; bytes; --bytes) {
     if(*x++ != *y++)
@@ -218,7 +215,7 @@ static int is_ipv4_mapped_ipv6_address(int family, void *netaddr)
 {
   if(family == AF_INET6) {
     int i;
-    unsigned char *x = (unsigned char *)netaddr;
+    const unsigned char *x = (const unsigned char *)netaddr;
     for(i = 0; i < 12; ++i) {
       if(x[i])
         break;
@@ -233,8 +230,7 @@ static int is_ipv4_mapped_ipv6_address(int family, void *netaddr)
 }
 #endif /* AF_INET6 */
 
-static curl_socket_t opensocket(void *clientp,
-                                curlsocktype purpose,
+static curl_socket_t opensocket(void *clientp, curlsocktype purpose,
                                 struct curl_sockaddr *address)
 {
   /* filter the address */
@@ -253,7 +249,7 @@ static curl_socket_t opensocket(void *clientp,
       struct connection_filter *filter = (struct connection_filter *)clientp;
 #ifdef AF_INET6
       int mapped = !filter->ipv6_v6only &&
-        is_ipv4_mapped_ipv6_address(address->family, cinaddr);
+                   is_ipv4_mapped_ipv6_address(address->family, cinaddr);
 #endif
 
       for(ip = filter->list; ip; ip = ip->next) {
@@ -268,7 +264,8 @@ static curl_socket_t opensocket(void *clientp,
 
       if(ip && filter->type == CONNECTION_FILTER_BLACKLIST) {
         if(filter->verbose) {
-          char buf[128] = {0};
+          char buf[128] = { 0 };
+          /* !checksrc! disable BANNEDFUNC 1 */
           inet_ntop(address->family, cinaddr, buf, sizeof(buf));
           fprintf(stderr, "* Rejecting IP %s due to blacklist entry %s.\n",
                   buf, ip->str);
@@ -277,10 +274,11 @@ static curl_socket_t opensocket(void *clientp,
       }
       else if(!ip && filter->type == CONNECTION_FILTER_WHITELIST) {
         if(filter->verbose) {
-          char buf[128] = {0};
+          char buf[128] = { 0 };
+          /* !checksrc! disable BANNEDFUNC 1 */
           inet_ntop(address->family, cinaddr, buf, sizeof(buf));
           fprintf(stderr,
-            "* Rejecting IP %s due to missing whitelist entry.\n", buf);
+                  "* Rejecting IP %s due to missing whitelist entry.\n", buf);
         }
         return CURL_SOCKET_BAD;
       }
@@ -293,19 +291,25 @@ static curl_socket_t opensocket(void *clientp,
 int main(void)
 {
   CURL *curl;
-  CURLcode res;
+  CURLcode result;
   struct connection_filter *filter;
 
-  filter = (struct connection_filter *)calloc(1, sizeof(*filter));
+  filter = calloc(1, sizeof(*filter));
   if(!filter)
-    exit(1);
+    return 1;
 
-  if(curl_global_init(CURL_GLOBAL_DEFAULT))
-    exit(1);
+  result = curl_global_init(CURL_GLOBAL_ALL);
+  if(result != CURLE_OK) {
+    free(filter);
+    return (int)result;
+  }
 
   curl = curl_easy_init();
-  if(!curl)
-    exit(1);
+  if(!curl) {
+    curl_global_cleanup();
+    free(filter);
+    return 1;
+  }
 
   /* Set the target URL */
   curl_easy_setopt(curl, CURLOPT_URL, "http://localhost");
@@ -330,12 +334,12 @@ int main(void)
   curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
 
   /* Perform the request */
-  res = curl_easy_perform(curl);
+  result = curl_easy_perform(curl);
 
   /* Check for errors */
-  if(res != CURLE_OK) {
+  if(result != CURLE_OK) {
     fprintf(stderr, "curl_easy_perform() failed: %s\n",
-            curl_easy_strerror(res));
+            curl_easy_strerror(result));
   }
 
   /* Clean up */

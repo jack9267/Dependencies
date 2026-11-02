@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 #
 #  Project                     ___| | | |  _ \| |
 #                             / __| | | | |_) | |
@@ -23,70 +22,66 @@
 #
 """Module for extracting test data from the test data folder and other utils."""
 
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
 import logging
 import os
 import re
 
 log = logging.getLogger(__name__)
 
-
 REPLY_DATA = re.compile("<reply>[ \t\n\r]*<data[^<]*>(.*?)</data>", re.MULTILINE | re.DOTALL)
 
 
 class ClosingFileHandler(logging.StreamHandler):
     def __init__(self, filename):
-        super(ClosingFileHandler, self).__init__()
+        super().__init__()
         self.filename = os.path.abspath(filename)
         self.setStream(None)
 
     def emit(self, record):
         with open(self.filename, "a") as fp:
             self.setStream(fp)
-            super(ClosingFileHandler, self).emit(record)
+            super().emit(record)
             self.setStream(None)
 
     def setStream(self, stream):
-        setStream = getattr(super(ClosingFileHandler, self), 'setStream', None)
+        setStream = getattr(super(), 'setStream', None)
         if callable(setStream):
             return setStream(stream)
         if stream is self.stream:
-            result = None
-        else:
-            result = self.stream
-            self.acquire()
-            try:
-                self.flush()
-                self.stream = stream
-            finally:
-                self.release()
+            return None
+
+        result = self.stream
+        self.acquire()
+        try:
+            self.flush()
+            self.stream = stream
+        finally:
+            self.release()
         return result
 
-class TestData(object):
+
+class TestData:
     def __init__(self, data_folder):
         self.data_folder = data_folder
 
     def get_test_data(self, test_number):
-        # Create the test file name
-        filename = os.path.join(self.data_folder,
-                                "test{0}".format(test_number))
+        # Create the test filename
+        filename = os.path.join(self.data_folder, f"test{test_number}")
 
         log.debug("Parsing file %s", filename)
 
-        with open(filename, "rb") as f:
-            contents = f.read().decode("utf-8")
+        with open(filename, "r", encoding='us-ascii') as f:
+            contents = f.read()
 
         m = REPLY_DATA.search(contents)
         if not m:
-            raise Exception("Couldn't find a <reply><data> section")
+            raise RuntimeError("Could not find a <reply><data> section")
 
-        # Left-strip the data so we don't get a newline before our data.
+        # Left-strip the data so we do not get a newline before our data.
         return m.group(1).lstrip()
 
 
 if __name__ == '__main__':
     td = TestData("./data")
-    data = td.get_test_data(1)
+    data = td.get_test_data(1451)
     print(data)

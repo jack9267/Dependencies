@@ -38,6 +38,10 @@ When doing uploads with FTP, the resume position is where in the local/source
 file libcurl should try to resume the upload from and it appends the source
 file to the remote target file.
 
+HTTP uploads using POST or PUT cannot be resumed. curl_easy_perform(3) returns
+CURLE_BAD_FUNCTION_ARGUMENT when this option is set to a non-zero value for
+such an upload.
+
 # DEFAULT
 
 0, not used
@@ -51,8 +55,9 @@ int main(void)
 {
   CURL *curl = curl_easy_init();
   if(curl) {
-    curl_off_t resume_position; /* get it somehow */
-    curl_off_t file_size; /* get it somehow as well */
+    CURLcode result;
+    curl_off_t resume_position = 1234; /* get it somehow */
+    curl_off_t file_size = 9876; /* get it somehow as well */
 
     curl_easy_setopt(curl, CURLOPT_URL, "ftp://example.com");
 
@@ -66,7 +71,8 @@ int main(void)
     curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, file_size);
 
     /* Perform the request */
-    curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
   }
 }
 ~~~

@@ -12,6 +12,7 @@ Protocol:
   - TLS
 TLS-backend:
   - OpenSSL
+  - Rustls
 Added-in: 7.71.0
 ---
 
@@ -32,7 +33,7 @@ CURLcode curl_easy_setopt(CURL *handle, CURLOPT_PROXY_SSLKEY_BLOB,
 
 Pass a pointer to a curl_blob structure that contains information (pointer and
 size) about the private key for connecting to the HTTPS proxy. Compatible with
-OpenSSL. The format (like "PEM") must be specified with
+OpenSSL and Rustls. The format (like "PEM") must be specified with
 CURLOPT_PROXY_SSLKEYTYPE(3).
 
 If the blob is initialized with the flags member of struct curl_blob set to
@@ -59,10 +60,10 @@ int main(void)
 {
   CURL *curl = curl_easy_init();
   if(curl) {
-    CURLcode res;
+    CURLcode result;
     struct curl_blob blob;
     curl_easy_setopt(curl, CURLOPT_URL, "https://example.com/");
-    curl_easy_setopt(curl, CURLOPT_PROXY, "https://proxy");
+    curl_easy_setopt(curl, CURLOPT_PROXY, "https://proxy.example");
     blob.data = certificateData;
     blob.len = filesize;
     blob.flags = CURL_BLOB_COPY;
@@ -73,7 +74,7 @@ int main(void)
     blob.len = privateKeySize;
     curl_easy_setopt(curl, CURLOPT_PROXY_SSLKEY_BLOB, &blob);
     curl_easy_setopt(curl, CURLOPT_PROXY_KEYPASSWD, "s3cret");
-    res = curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
   }
 }

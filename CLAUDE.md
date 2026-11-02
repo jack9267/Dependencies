@@ -47,3 +47,23 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   (`OBJ_cmp`, `ASN1_STRING_get0_data`, ...). ModLauncher's `CodeSigning.cpp` was the one caller reaching inside.
 - `Projects/libressl/CMakeLists.txt` is the old CMake build's hand-written wrapper for 2.7.5 and no longer
   matches the source; JBuild does not use it.
+
+## curl (`Projects/curl`)
+
+- **8.23.0, stock** (2026-11-02, from 8.12.1, once LibreSSL was updated). curl dropped Windows XP in 8.19.0:
+  it refuses to build for less than Vista (`_WIN32_WINNT` 0x0600), and calls `BCryptGenRandom` and
+  `if_nametoindex` itself. Built for Vista, with YY-Thunks covering those on XP builds; `YY.Depends.Analyzer
+  <file> /Target:5.1.2600` (in the YY-Thunks folder; it writes `<file>.md` beside itself) reports no Windows
+  import missing on XP in the curl DLL or in GTAC's client and launcher. 8.18.0 is the last release that
+  still supports XP itself.
+- **Windows builds from `Projects/curl/windows/curl_config.h`**, not curl's `config-win32.h`, which is for
+  Visual Studio 2010-2013 only since 8.13. It is made by curl's own CMake: configure `src` with
+  `-A Win32` and `-A x64`, `-DCURL_TARGET_WINDOWS_VERSION=0x0600`, OpenSSL pointed at this LibreSSL (on MSVC
+  `FindOpenSSL` reads `LIB_EAY_RELEASE`/`SSL_EAY_RELEASE`, not `OPENSSL_*_LIBRARY`) and zlib, and the features
+  `CURL_DISABLE_OPENSSL_AUTO_LOAD_CONFIG` on, everything else at curl's defaults (LDAP is Windows' own `wldap32`, which XP has); then take
+  `lib/curl_config.h`. Only `SIZEOF_SIZE_T`, `SIZEOF_CURL_SOCKET_T` and `ssize_t` differ between the two,
+  and the header picks them by `_WIN64`. Regenerate it after updating curl; the features belong there, not
+  in `premake5.lua`.
+- **`Projects/curl/apple/curl_config.h` is still 8.12.1's.** It has to be made again by curl's CMake on macOS
+  before the iOS build can be trusted with 8.23.0 (not done).
+

@@ -20,15 +20,15 @@ of `llist.c`). Use the functions.
 initialized with a call to `Curl_llist_init()` before it can be used
 
 To clean up a list, call `Curl_llist_destroy()`. Since the linked lists
-themselves do not allocate memory, it can also be fine to just *not* clean up
-the list.
+themselves do not allocate memory, it can also be fine to *not* clean up the
+list.
 
 ## Add a node
 
 There are two functions for adding a node to a linked list:
 
 1. Add it last in the list with `Curl_llist_append`
-2. Add it after a specific existing node with `Curl_llist_insert_next`
+2. Add it after a specific existing node with `llist_insert_next`
 
 When a node is added to a list, it stores an associated custom pointer to
 anything you like and you provide a pointer to a `struct Curl_llist_node`
@@ -47,9 +47,9 @@ Example: to add a `struct foobar` to a linked list. Add a node struct within
 it:
 
     struct foobar {
-       char *random;
-       struct Curl_llist_node storage; /* can be anywhere in the struct */
-       char *data;
+      char *random;
+      struct Curl_llist_node storage; /* can be anywhere in the struct */
+      char *data;
     };
 
     struct Curl_llist barlist; /* the list for foobar entries */
@@ -60,7 +60,7 @@ it:
     /* add the first struct to the list */
     Curl_llist_append(&barlist, &entries[0], &entries[0].storage);
 
-See also `Curl_llist_insert_next`.
+See also `llist_insert_next`.
 
 ## Remove a node
 
@@ -77,18 +77,18 @@ To iterate over a list: first get the head entry and then iterate over the
 nodes as long there is a next. Each node has an *element* associated with it,
 the custom pointer you stored there. Usually a struct pointer or similar.
 
-     struct Curl_llist_node *iter;
+    struct Curl_llist_node *iter;
 
-     /* get the first entry of the 'barlist' */
-     iter = Curl_llist_head(&barlist);
+    /* get the first entry of the 'barlist' */
+    iter = Curl_llist_head(&barlist);
 
-     while(iter) {
-       /* extract the element pointer from the node */
-       struct foobar *elem = Curl_node_elem(iter);
+    while(iter) {
+      /* extract the element pointer from the node */
+      struct foobar *elem = Curl_node_elem(iter);
 
-       /* advance to the next node in the list */
-       iter = Curl_node_next(iter);
-     }
+      /* advance to the next node in the list */
+      iter = Curl_node_next(iter);
+    }
 
 # Function overview
 
@@ -134,17 +134,17 @@ Adds `node` last in the `list` with a custom pointer to `elem`.
 
 The function is infallible.
 
-## `Curl_llist_insert_next`
+## `llist_insert_next`
 
 ~~~c
-void Curl_llist_insert_next(struct Curl_llist *list,
-                            struct Curl_llist_node *node,
-                            const void *elem,
-                            struct Curl_llist_node *node);
+void llist_insert_next(struct Curl_llist *list,
+                       struct Curl_llist_node *before,
+                       const void *elem,
+                       struct Curl_llist_node *node);
 ~~~
 
 Adds `node` to the `list` with a custom pointer to `elem` immediately after
-the previous list `node`.
+the previous list `before`.
 
 The function is infallible.
 

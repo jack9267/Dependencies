@@ -16,7 +16,6 @@ TLS-backend:
   - GnuTLS
   - wolfSSL
   - mbedTLS
-  - Secure Transport
   - Schannel
 Added-in: 7.39.0
 ---
@@ -37,9 +36,9 @@ CURLcode curl_easy_setopt(CURL *handle, CURLOPT_PINNEDPUBLICKEY,
 # DESCRIPTION
 
 Pass a pointer to a null-terminated string as parameter. The string can be the
-filename of your pinned public key. The file format expected is "PEM" or
-"DER". The string can also be any number of base64 encoded sha256 hashes
-preceded by "sha256//" and separated by ";"
+filename of your pinned public key. The file format expected is `PEM` or
+`DER`. The string can also be any number of base64 encoded sha256 hashes
+preceded by `sha256//` and separated by `;`.
 
 When negotiating a TLS or SSL connection, the server sends a certificate
 indicating its identity. A public key is extracted from this certificate and
@@ -54,6 +53,14 @@ On mismatch, *CURLE_SSL_PINNEDPUBKEYNOTMATCH* is returned.
 The application does not have to keep the string around after setting this
 option.
 
+The pinned public key is used to verify the initial origin used in a transfer.
+If the transfer is set to follow redirects to other origins, they are *not*
+checked against this key.
+
+For LDAP, this option only has an effect when using the OpenLDAP backend,
+which routes TLS through libcurl. It is not supported by Apple's OpenLDAP
+fork.
+
 # DEFAULT
 
 NULL
@@ -67,6 +74,7 @@ int main(void)
 {
   CURL *curl = curl_easy_init();
   if(curl) {
+    CURLcode result;
     curl_easy_setopt(curl, CURLOPT_URL, "https://example.com");
     curl_easy_setopt(curl, CURLOPT_PINNEDPUBLICKEY, "/etc/publickey.der");
     /* OR
@@ -77,7 +85,8 @@ int main(void)
     */
 
     /* Perform the request */
-    curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
   }
 }
 ~~~
@@ -94,7 +103,7 @@ server's certificate.
 # Windows-specific:
 # - Use NUL instead of /dev/null.
 # - OpenSSL may wait for input instead of disconnecting. Hit enter.
-# - If you do not have sed, then just copy the certificate into a file:
+# - If you do not have sed, then copy the certificate into a file:
 #   Lines from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----.
 #
 openssl s_client -servername www.example.com -connect www.example.com:443 \
@@ -129,8 +138,6 @@ footer:
 
 7.47.0: mbedTLS
 
-7.54.1: Secure Transport on macOS 10.7+/iOS 10+
-
 7.58.1: Schannel
 
 ## sha256 support
@@ -138,8 +145,6 @@ footer:
 7.44.0: OpenSSL, GnuTLS and wolfSSL
 
 7.47.0: mbedTLS
-
-7.54.1: Secure Transport on macOS 10.7+/iOS 10+
 
 7.58.1: Schannel
 

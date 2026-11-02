@@ -1,7 +1,9 @@
+<?xml version="1.0" encoding="US-ASCII"?>
 <testcase>
 <info>
 <keywords>
 HTTPS
+libtest
 </keywords>
 </info>
 
@@ -16,135 +18,8 @@ Content-Length: 29
 
 run 1: foobar and so on fun!
 </data>
-<datacheck>
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
-run 1: foobar and so on fun!
+<datacheck nonewline="yes">
+%repeat[128 x run 1: foobar and so on fun!%0a]%
 </datacheck>
 </reply>
 
@@ -158,18 +33,18 @@ OpenSSL
 https
 </server>
 <name>
-concurrent HTTPS GET using shared ssl session cache
+concurrent HTTPS GET using shared SSL session cache
 </name>
-<tool>
-lib%TESTNUMBER
-</tool>
 # provide URL and ca-cert
 <command>
-https://localhost:%HTTPSPORT/%TESTNUMBER  %SRCDIR/certs/EdelCurlRoot-ca.crt
+https://localhost:%HTTPSPORT/%TESTNUMBER %CERTDIR/certs/test-ca.crt
 </command>
 </client>
 
 # Verify data after the test has been "shot"
 <verify>
+<limits>
+Allocations: 13600
+</limits>
 </verify>
 </testcase>

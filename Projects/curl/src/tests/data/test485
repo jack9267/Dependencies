@@ -1,31 +1,26 @@
+<?xml version="1.0" encoding="US-ASCII"?>
 <testcase>
 <info>
 <keywords>
 HTTP
-etags
+etag
 </keywords>
 </info>
 
-#
 # Server-side
 <reply>
 </reply>
 
-#
 # Client-side
 <client>
-<server>
-none
-</server>
 <name>
-Use --etag-compare and -save with more than one URL, URLs specified first
+--etag-compare and -save with more than one URL, URLs specified first
 </name>
 <command>
 http://example.com/%TESTNUMBER http://example.net/fooo --etag-save %LOGDIR/etag%TESTNUMBER
 </command>
 </client>
 
-#
 # Verify data after the test has been "shot"
 <verify>
 <errorcode>

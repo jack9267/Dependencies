@@ -42,18 +42,18 @@ NULL
 
 ~~~c
 struct progress {
-  char *private;
+  char *private_data;
   size_t size;
 };
 
-static size_t progress_cb(void *clientp,
-                          curl_off_t dltotal,
-                          curl_off_t dlnow,
-                          curl_off_t ultotal,
-                          curl_off_t ulnow)
+static int progress_cb(void *clientp,
+                       curl_off_t dltotal,
+                       curl_off_t dlnow,
+                       curl_off_t ultotal,
+                       curl_off_t ulnow)
 {
   struct progress *memory = clientp;
-  printf("private ptr: %p\n", memory->private);
+  printf("private ptr: %p\n", (void *)memory->private_data);
   /* use the values */
 
   return 0; /* all is good */
@@ -65,7 +65,7 @@ int main(void)
   if(curl) {
     struct progress data;
 
-    /* pass struct to callback  */
+    /* pass struct to callback */
     curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &data);
     curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, progress_cb);
   }

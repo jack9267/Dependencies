@@ -23,32 +23,35 @@
  * SPDX-License-Identifier: curl
  *
  ***************************************************************************/
+#include "curl_setup.h"
 
-#include <curl/curl.h>
+/* Mapping tables for plain ASCII case conversion, defined in strcase.c.
+   Declared here so the conversions below inline at every call site without
+   relying on LTO or a unity build: casecompare() invokes one of them twice
+   per byte compared, where the call costs more than the lookup itself. */
+extern const unsigned char Curl_touppermap[256];
+extern const unsigned char Curl_tolowermap[256];
 
-/*
- * Only "raw" case insensitive strings. This is meant to be locale independent
- * and only compare strings we know are safe for this.
- *
- * The function is capable of comparing a-z case insensitively.
- *
- * Result is 1 if text matches and 0 if not.
- */
+/* Portable, consistent toupper/tolower. Do not use toupper()/tolower() from
+   <ctype.h>, whose behavior is altered by the current locale. */
+static CURL_INLINE char Curl_raw_toupper(char in)
+{
+  return (char)Curl_touppermap[(unsigned char)in];
+}
 
-#define strcasecompare(a,b) curl_strequal(a,b)
-#define strncasecompare(a,b,c) curl_strnequal(a,b,c)
-
-char Curl_raw_toupper(char in);
-char Curl_raw_tolower(char in);
+static CURL_INLINE char Curl_raw_tolower(char in)
+{
+  return (char)Curl_tolowermap[(unsigned char)in];
+}
 
 /* checkprefix() is a shorter version of the above, used when the first
    argument is the string literal */
-#define checkprefix(a,b)    curl_strnequal(b, STRCONST(a))
+#define checkprefix(a, b) curl_strnequal(b, STRCONST(a))
 
 void Curl_strntoupper(char *dest, const char *src, size_t n);
 void Curl_strntolower(char *dest, const char *src, size_t n);
 
-bool Curl_safecmp(char *a, char *b);
-int Curl_timestrcmp(const char *first, const char *second);
+bool Curl_safecmp(const char *a, const char *b);
+int Curl_timestrcmp(const char *a, const char *b);
 
 #endif /* HEADER_CURL_STRCASE_H */

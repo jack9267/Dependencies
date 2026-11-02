@@ -1,8 +1,10 @@
+<?xml version="1.0" encoding="US-ASCII"?>
 <testcase>
 <info>
 <keywords>
 HTTP
 HSTS
+libtest
 </keywords>
 </info>
 
@@ -16,16 +18,10 @@ HSTS
 HSTS
 http
 </features>
-<server>
-none
-</server>
 
 <name>
 HSTS curl_easy_duphandle
 </name>
-<tool>
-lib%TESTNUMBER
-</tool>
 
 <command>
 http://%HOSTIP:%NOLISTENPORT/not-there/%TESTNUMBER

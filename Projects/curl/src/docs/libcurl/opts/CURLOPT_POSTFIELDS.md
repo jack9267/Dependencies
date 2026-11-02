@@ -84,9 +84,10 @@ NULL
 /* send an application/x-www-form-urlencoded POST */
 int main(void)
 {
+  CURLcode result = CURLE_OK;
   CURL *curl = curl_easy_init();
   if(curl) {
-    const char *data = "data to send";
+    static const char *data = "data to send";
 
     curl_easy_setopt(curl, CURLOPT_URL, "https://example.com");
 
@@ -96,13 +97,14 @@ int main(void)
     /* pass in a pointer to the data - libcurl does not copy */
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
 
-    curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
   }
 
   /* send an application/json POST */
   curl = curl_easy_init();
   if(curl) {
-    const char *json = "{\"name\": \"daniel\"}";
+    static const char *json = "{\"name\": \"daniel\"}";
     struct curl_slist *slist1 = NULL;
     slist1 = curl_slist_append(slist1, "Content-Type: application/json");
     slist1 = curl_slist_append(slist1, "Accept: application/json");
@@ -115,7 +117,8 @@ int main(void)
     /* pass in a pointer to the data - libcurl does not copy */
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json);
 
-    curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
   }
 }
 ~~~

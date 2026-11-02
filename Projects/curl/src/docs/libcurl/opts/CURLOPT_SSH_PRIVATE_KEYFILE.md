@@ -33,8 +33,7 @@ used, libcurl defaults to **$HOME/.ssh/id_rsa** or **$HOME/.ssh/id_dsa** if
 the HOME environment variable is set, and in the current directory if HOME is
 not set.
 
-If the file is password-protected, set the password with
-CURLOPT_KEYPASSWD(3).
+If the file is password-protected, set the password with CURLOPT_KEYPASSWD(3).
 
 The SSH library derives the public key from this private key when possible. If
 the SSH library cannot derive the public key from the private one and no
@@ -43,6 +42,11 @@ fails.
 
 The application does not have to keep the string around after setting this
 option.
+
+This option is used to set up a new connection only. The private key is used
+when libcurl establishes a new SSH connection; once that connection has been
+successfully set up and verified, it is deemed vetted and may be reused by
+libcurl even if this option is changed.
 
 # DEFAULT
 
@@ -57,12 +61,12 @@ int main(void)
 {
   CURL *curl = curl_easy_init();
   if(curl) {
-    CURLcode res;
+    CURLcode result;
     curl_easy_setopt(curl, CURLOPT_URL, "sftp://example.com/file");
     curl_easy_setopt(curl, CURLOPT_SSH_PRIVATE_KEYFILE,
                      "/home/clarkkent/.ssh/id_rsa");
     curl_easy_setopt(curl, CURLOPT_KEYPASSWD, "password");
-    res = curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
   }
 }

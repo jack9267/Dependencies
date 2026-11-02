@@ -41,27 +41,38 @@ manual carefully as bad input values may cause libcurl to behave badly. You
 can only set one option in each function call. A typical application uses many
 curl_easy_setopt(3) calls in the setup phase.
 
-Options set with this function call are valid for all forthcoming transfers
-performed using this *handle*. The options are not in any way reset between
-transfers, so if you want subsequent transfers with different options, you
-must change them between the transfers. You can optionally reset all options
-back to internal default with curl_easy_reset(3).
+The *handle* argument is the return code from a curl_easy_init(3) or
+curl_easy_duphandle(3) call.
+
+Options set with this function call are sticky. They remain set for all
+forthcoming transfers performed using this *handle*. The options are not in
+any way reset between transfers, so if you want subsequent transfers with
+different options, you must change them between the transfers. You can
+optionally reset all options back to internal default with curl_easy_reset(3).
+
+Changing options with curl_easy_setopt(3) while a transfer is still in
+progress may cause undefined and undesired behavior.
+
+The order in which the options are set does not matter.
+
+# STRINGS
 
 Strings passed to libcurl as 'char *' arguments, are copied by the library;
 the string storage associated to the pointer argument may be discarded or
 reused after curl_easy_setopt(3) returns. The only exception to this rule is
 really CURLOPT_POSTFIELDS(3), but the alternative that copies the string
 CURLOPT_COPYPOSTFIELDS(3) has some usage characteristics you need to read up
-on. This function does not accept input strings longer than
+on.
+
+This function does not accept input strings longer than
 **CURL_MAX_INPUT_LENGTH** (8 MB).
 
-The order in which the options are set does not matter.
+libcurl does little to no verification of the contents of provided strings.
+Passing in "creative octets" like newlines where they are not expected might
+trigger unexpected results.
 
 Before version 7.17.0, strings were not copied. Instead the user was forced
-keep them available until libcurl no longer needed them.
-
-The *handle* is the return code from a curl_easy_init(3) or
-curl_easy_duphandle(3) call.
+to keep them available until libcurl no longer needed them.
 
 # OPTIONS
 
@@ -463,6 +474,22 @@ See CURLOPT_HTTPPOST(3)
 
 Tunnel through the HTTP proxy. CURLOPT_HTTPPROXYTUNNEL(3)
 
+## CURLOPT_HTTPSIG_ALGORITHM
+
+RFC 9421 HTTP Message Signatures algorithm. See CURLOPT_HTTPSIG_ALGORITHM(3)
+
+## CURLOPT_HTTPSIG_HEADERS
+
+Components to sign for HTTP Message Signatures. See CURLOPT_HTTPSIG_HEADERS(3)
+
+## CURLOPT_HTTPSIG_KEY
+
+Hex-encoded key for HTTP Message Signatures. See CURLOPT_HTTPSIG_KEY(3)
+
+## CURLOPT_HTTPSIG_KEYID
+
+Key identifier for HTTP Message Signatures. See CURLOPT_HTTPSIG_KEYID(3)
+
 ## CURLOPT_HTTP_CONTENT_DECODING
 
 Disable Content decoding. See CURLOPT_HTTP_CONTENT_DECODING(3)
@@ -532,7 +559,7 @@ Client key password. See CURLOPT_KEYPASSWD(3)
 
 ## CURLOPT_KRBLEVEL
 
-Kerberos security level. See CURLOPT_KRBLEVEL(3)
+**OBSOLETE**. Kerberos security level. See CURLOPT_KRBLEVEL(3)
 
 ## CURLOPT_LOCALPORT
 
@@ -678,6 +705,10 @@ Port number to connect to. See CURLOPT_PORT(3)
 
 Make an HTTP POST. See CURLOPT_POST(3)
 
+## CURLOPT_POSTFIELDS
+
+Send a POST with this data - does not copy it. See CURLOPT_POSTFIELDS(3)
+
 ## CURLOPT_POSTFIELDSIZE
 
 The POST data is this big. See CURLOPT_POSTFIELDSIZE(3)
@@ -696,7 +727,7 @@ How to act on redirects after POST. See CURLOPT_POSTREDIR(3)
 
 ## CURLOPT_PREQUOTE
 
-Commands to run just before transfer. See CURLOPT_PREQUOTE(3)
+Commands to run immediately before transfer. See CURLOPT_PREQUOTE(3)
 
 ## CURLOPT_PREREQDATA
 
@@ -852,15 +883,18 @@ Proxy TLS 1.3 cipher suites to use. See CURLOPT_PROXY_TLS13_CIPHERS(3)
 
 ## CURLOPT_PROXY_TLSAUTH_PASSWORD
 
-Proxy TLS authentication password. See CURLOPT_PROXY_TLSAUTH_PASSWORD(3)
+**Deprecated option**. Proxy TLS authentication password. See
+CURLOPT_PROXY_TLSAUTH_PASSWORD(3)
 
 ## CURLOPT_PROXY_TLSAUTH_TYPE
 
-Proxy TLS authentication methods. See CURLOPT_PROXY_TLSAUTH_TYPE(3)
+**Deprecated option**. Proxy TLS authentication methods. See
+CURLOPT_PROXY_TLSAUTH_TYPE(3)
 
 ## CURLOPT_PROXY_TLSAUTH_USERNAME
 
-Proxy TLS authentication username. See CURLOPT_PROXY_TLSAUTH_USERNAME(3)
+**Deprecated option**. Proxy TLS authentication username. See
+CURLOPT_PROXY_TLSAUTH_USERNAME(3)
 
 ## CURLOPT_PROXY_TRANSFER_MODE
 
@@ -1118,7 +1152,7 @@ Enable use of ALPN. See CURLOPT_SSL_ENABLE_ALPN(3)
 
 ## CURLOPT_SSL_FALSESTART
 
-Enable TLS False Start. See CURLOPT_SSL_FALSESTART(3)
+**Deprecated option** Enable TLS False Start. See CURLOPT_SSL_FALSESTART(3)
 
 ## CURLOPT_SSL_OPTIONS
 
@@ -1127,6 +1161,10 @@ Control SSL behavior. See CURLOPT_SSL_OPTIONS(3)
 ## CURLOPT_SSL_SESSIONID_CACHE
 
 Disable SSL session-id cache. See CURLOPT_SSL_SESSIONID_CACHE(3)
+
+## CURLOPT_SSL_SIGNATURE_ALGORITHMS
+
+TLS signature algorithms to use. See CURLOPT_SSL_SIGNATURE_ALGORITHMS(3)
 
 ## CURLOPT_SSL_VERIFYHOST
 
@@ -1146,11 +1184,12 @@ Redirect stderr to another stream. See CURLOPT_STDERR(3)
 
 ## CURLOPT_STREAM_DEPENDS
 
-This HTTP/2 stream depends on another. See CURLOPT_STREAM_DEPENDS(3)
+**Deprecated option** This HTTP/2 stream depends on another. See
+CURLOPT_STREAM_DEPENDS(3)
 
 ## CURLOPT_STREAM_DEPENDS_E
 
-This HTTP/2 stream depends on another exclusively. See
+**Deprecated option** This HTTP/2 stream depends on another exclusively. See
 CURLOPT_STREAM_DEPENDS_E(3)
 
 ## CURLOPT_STREAM_WEIGHT
@@ -1224,15 +1263,16 @@ TLS 1.3 cipher suites to use. See CURLOPT_TLS13_CIPHERS(3)
 
 ## CURLOPT_TLSAUTH_PASSWORD
 
-TLS authentication password. See CURLOPT_TLSAUTH_PASSWORD(3)
+**Deprecated option**. TLS authentication password. See CURLOPT_TLSAUTH_PASSWORD(3)
 
 ## CURLOPT_TLSAUTH_TYPE
 
-TLS authentication methods. See CURLOPT_TLSAUTH_TYPE(3)
+**Deprecated option**. TLS authentication methods. See CURLOPT_TLSAUTH_TYPE(3)
 
 ## CURLOPT_TLSAUTH_USERNAME
 
-TLS authentication username. See CURLOPT_TLSAUTH_USERNAME(3)
+**Deprecated option**. TLS authentication username. See
+CURLOPT_TLSAUTH_USERNAME(3)
 
 ## CURLOPT_TRAILERDATA
 
@@ -1272,6 +1312,10 @@ Upload data. See CURLOPT_UPLOAD(3)
 ## CURLOPT_UPLOAD_BUFFERSIZE
 
 Set upload buffer size. See CURLOPT_UPLOAD_BUFFERSIZE(3)
+
+## CURLOPT_UPLOAD_FLAGS
+
+Set upload flags. See CURLOPT_UPLOAD_FLAGS(3)
 
 ## CURLOPT_URL
 
@@ -1336,9 +1380,9 @@ int main(void)
 {
   CURL *curl = curl_easy_init();
   if(curl) {
-    CURLcode res;
+    CURLcode result;
     curl_easy_setopt(curl, CURLOPT_URL, "https://example.com");
-    res = curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
   }
 }

@@ -10,6 +10,8 @@ See-also:
   - CURLOPT_POSTFIELDSIZE (3)
 Protocol:
   - HTTP
+  - MQTT
+  - RTSP
 Added-in: 7.11.1
 ---
 
@@ -28,11 +30,13 @@ CURLcode curl_easy_setopt(CURL *handle, CURLOPT_POSTFIELDSIZE_LARGE,
 
 # DESCRIPTION
 
-If you want to post static data to the server without having libcurl do a
-strlen() to measure the data size, this option must be used. When this option
-is used you can post fully binary data, which otherwise is likely to fail. If
-this size is set to -1, libcurl uses strlen() to get the size or relies on the
+Set the *size* of the data buffer to POST to prevent libcurl from doing a
+strlen() to figure out the data size. When this option is used you can post
+fully binary data, which otherwise is likely to fail. If this size is set to
+-1, libcurl uses strlen() to get the size or relies on the
 CURLOPT_READFUNCTION(3) (if used) to signal the end of data.
+
+You *must* make sure that the set size is not larger than the provided buffer.
 
 # DEFAULT
 
@@ -49,8 +53,9 @@ int main(void)
 {
   CURL *curl = curl_easy_init();
   if(curl) {
+    CURLcode result;
     const char *data = large_chunk;
-    curl_off_t length_of_data; /* set somehow */
+    curl_off_t length_of_data = 12345; /* set somehow */
 
     curl_easy_setopt(curl, CURLOPT_URL, "https://example.com");
 
@@ -59,7 +64,8 @@ int main(void)
 
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
 
-    curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
   }
 }
 ~~~

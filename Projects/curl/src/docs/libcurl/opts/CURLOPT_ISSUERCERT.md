@@ -37,14 +37,17 @@ associated with the certificate provided by the option. This additional check
 is useful in multi-level PKI where one needs to enforce that the peer
 certificate is from a specific branch of the tree.
 
+The provided issuer certificate is used only for an issuer check against the
+peer certificate; it is not validated or trusted by itself.
+
 This option makes sense only when used in combination with the
-CURLOPT_SSL_VERIFYPEER(3) option. Otherwise, the result of the check is
-not considered as failure.
+CURLOPT_SSL_VERIFYPEER(3) option. Otherwise, the result of the check is not
+considered as failure.
 
 A specific error code (CURLE_SSL_ISSUER_ERROR) is defined with the option,
 which is returned if the setup of the SSL/TLS session has failed due to a
-mismatch with the issuer of peer certificate (CURLOPT_SSL_VERIFYPEER(3)
-has to be set too for the check to fail). (Added in 7.19.0)
+mismatch with the issuer of peer certificate (CURLOPT_SSL_VERIFYPEER(3) has to
+be set too for the check to fail).
 
 Using this option multiple times makes the last set string override the
 previous ones. Set it to NULL to disable its use again.
@@ -65,10 +68,10 @@ int main(void)
 {
   CURL *curl = curl_easy_init();
   if(curl) {
-    CURLcode res;
+    CURLcode result;
     curl_easy_setopt(curl, CURLOPT_URL, "https://example.com/");
     curl_easy_setopt(curl, CURLOPT_ISSUERCERT, "/etc/certs/cacert.pem");
-    res = curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
   }
 }

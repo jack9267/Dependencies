@@ -1,19 +1,17 @@
+<?xml version="1.0" encoding="US-ASCII"?>
 <testcase>
 <info>
 <keywords>
-unittest
-URLAPI
+urlapi
+url
+libtest
 </keywords>
 </info>
 
-#
 # Client-side
 <client>
-<server>
-none
-</server>
 <setenv>
-LANG=en_US.UTF-8
+LC_ALL=C.UTF-8
 </setenv>
 <features>
 file
@@ -22,21 +20,20 @@ http
 pop3
 smtp
 imap
-ldap
 dict
 ftp
 </features>
 <name>
 URL API
 </name>
-<tool>
-lib%TESTNUMBER
-</tool>
 </client>
 
 <verify>
 <stdout>
 success
 </stdout>
+<limits>
+Allocations: 3650
+</limits>
 </verify>
 </testcase>

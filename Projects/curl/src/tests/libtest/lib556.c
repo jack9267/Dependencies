@@ -21,67 +21,61 @@
  * SPDX-License-Identifier: curl
  *
  ***************************************************************************/
-#include "test.h"
+#include "first.h"
 
-#include "warnless.h"
-#include "memdebug.h"
-
-/* For Windows, mainly (may be moved in a config file?) */
-#ifndef STDIN_FILENO
-#define STDIN_FILENO 0
-#endif
-#ifndef STDOUT_FILENO
-#define STDOUT_FILENO 1
-#endif
-#ifndef STDERR_FILENO
-#define STDERR_FILENO 2
-#endif
-
-CURLcode test(char *URL)
+static CURLcode test_lib556(const char *URL)
 {
-  CURLcode res;
+  CURLcode result;
   CURL *curl;
-#ifdef LIB696
+  size_t ncheck = 0;
   int transfers = 0;
-#endif
 
   if(curl_global_init(CURL_GLOBAL_ALL) != CURLE_OK) {
-    fprintf(stderr, "curl_global_init() failed\n");
+    curl_mfprintf(stderr, "curl_global_init() failed\n");
     return TEST_ERR_MAJOR_BAD;
   }
 
   curl = curl_easy_init();
   if(!curl) {
-    fprintf(stderr, "curl_easy_init() failed\n");
+    curl_mfprintf(stderr, "curl_easy_init() failed\n");
     curl_global_cleanup();
     return TEST_ERR_MAJOR_BAD;
   }
 
-  test_setopt(curl, CURLOPT_URL, URL);
-  test_setopt(curl, CURLOPT_CONNECT_ONLY, 1L);
-  test_setopt(curl, CURLOPT_VERBOSE, 1L);
+  easy_setopt(curl, CURLOPT_URL, URL);
+  easy_setopt(curl, CURLOPT_CONNECT_ONLY, 1L);
+  easy_setopt(curl, CURLOPT_VERBOSE, 1L);
 
-#ifdef LIB696
+  if(curl_easy_recv(NULL, NULL, 0, NULL) != CURLE_BAD_FUNCTION_ARGUMENT ||
+     curl_easy_recv(curl, NULL, 10, &ncheck) != CURLE_BAD_FUNCTION_ARGUMENT ||
+     curl_easy_send(NULL, NULL, 0, NULL) != CURLE_BAD_FUNCTION_ARGUMENT ||
+     curl_easy_send(curl, NULL, 10, &ncheck) != CURLE_BAD_FUNCTION_ARGUMENT) {
+    curl_mfprintf(stderr, "curl_easy_recv/send argument validation failed\n");
+    result = TEST_ERR_FAILURE;
+    goto test_cleanup;
+  }
+
 again:
-#endif
 
-  res = curl_easy_perform(curl);
+  result = curl_easy_perform(curl);
 
-  if(!res) {
+  if(!result) {
     /* we are connected, now get an HTTP document the raw way */
-    const char *request =
-      "GET /556 HTTP/1.1\r\n"
-      "Host: ninja\r\n\r\n";
+    char request[64];
     const char *sbuf = request;
-    size_t sblen = strlen(request);
+    size_t sblen;
     size_t nwritten = 0, nread = 0;
+
+    sblen = curl_msnprintf(request, sizeof(request),
+                           "GET /%d HTTP/1.1\r\n"
+                           "Host: ninja\r\n\r\n", testnum);
 
     do {
       char buf[1024];
 
       if(sblen) {
-        res = curl_easy_send(curl, sbuf, sblen, &nwritten);
-        if(res && res != CURLE_AGAIN)
+        result = curl_easy_send(curl, sbuf, sblen, &nwritten);
+        if(result && result != CURLE_AGAIN)
           break;
         if(nwritten > 0) {
           sbuf += nwritten;
@@ -90,35 +84,35 @@ again:
       }
 
       /* busy-read like crazy */
-      res = curl_easy_recv(curl, buf, sizeof(buf), &nread);
+      result = curl_easy_recv(curl, buf, sizeof(buf), &nread);
 
-      if(nread) {
-        /* send received stuff to stdout */
-        if((size_t)write(STDOUT_FILENO, buf, nread) != nread) {
-          fprintf(stderr, "write() failed: errno %d (%s)\n",
-                  errno, strerror(errno));
-          res = TEST_ERR_FAILURE;
-          break;
-        }
+      if(nread &&
+         /* send received stuff to stdout */
+         (size_t)write(STDOUT_FILENO, buf, nread) != nread) {
+        char errbuf[STRERROR_LEN];
+        curl_mfprintf(stderr, "write() failed: errno %d (%s)\n",
+                      errno, curlx_strerror(errno, errbuf, sizeof(errbuf)));
+        result = TEST_ERR_FAILURE;
+        break;
       }
 
-    } while((res == CURLE_OK && nread) || (res == CURLE_AGAIN));
+    } while((result == CURLE_OK && nread) || (result == CURLE_AGAIN));
 
-    if(res && res != CURLE_AGAIN)
-      res = TEST_ERR_FAILURE;
+    if(result && result != CURLE_AGAIN)
+      result = TEST_ERR_FAILURE;
   }
 
-#ifdef LIB696
-  ++transfers;
-  /* perform the transfer a second time */
-  if(!res && transfers == 1)
-    goto again;
-#endif
+  if(testnum == 696) {
+    ++transfers;
+    /* perform the transfer a second time */
+    if(!result && transfers == 1)
+      goto again;
+  }
 
 test_cleanup:
 
   curl_easy_cleanup(curl);
   curl_global_cleanup();
 
-  return res;
+  return result;
 }

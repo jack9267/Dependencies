@@ -1,15 +1,17 @@
+<?xml version="1.0" encoding="US-ASCII"?>
 <testcase>
 <info>
 <keywords>
 HTTP
 CURLOPT_SOCKOPTFUNCTION
 CURL_SOCKOPT_ALREADY_CONNECTED
+libtest
 </keywords>
 </info>
 
 # Server-side
 <reply>
-<data crlf="yes">
+<data crlf="headers">
 HTTP/1.1 200 OK
 Date: Thu, 09 Nov 2010 14:49:00 GMT
 Server: test-server/fake
@@ -22,7 +24,7 @@ Content-Length: 0
 # Client-side
 <client>
 <precheck>
-./libtest/lib%TESTNUMBER check
+%LIBTESTS lib%TESTNUMBER check
 </precheck>
 <server>
 http
@@ -31,9 +33,6 @@ http
 <name>
 application hands over already connected socket
 </name>
-<tool>
-lib%TESTNUMBER
-</tool>
 
 <command>
 http://%HOSTIP:%HTTPPORT/file %HOSTIP %HTTPPORT
@@ -42,7 +41,7 @@ http://%HOSTIP:%HTTPPORT/file %HOSTIP %HTTPPORT
 
 # Verify data after the test has been "shot"
 <verify>
-<protocol crlf="yes">
+<protocol crlf="headers">
 GET /file HTTP/1.1
 Host: %HOSTIP:%HTTPPORT
 Accept: */*

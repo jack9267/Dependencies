@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="US-ASCII"?>
 <testcase>
 <info>
 <keywords>
@@ -6,16 +7,15 @@ HTTP/0.9
 </keywords>
 </info>
 
-#
 # Server-side
 <reply>
-<data>
+<data crlf="headers">
 HTTP/1.1 200 OK
 Content-Length: 5
 
 Data
 </data>
-<data2>
+<data2 crlf="yes">
 Data
 Data
 Data
@@ -24,24 +24,22 @@ Data
 </datacheck>
 </reply>
 
-#
 # Client-side
 <client>
 <server>
 http
 </server>
 <name>
-HTTP/1.1 response followed by an HTTP/0.9 response over the same connection
+HTTP/1.1 response followed by HTTP/0.9 response over same connection
 </name>
 <command>
 http://%HOSTIP:%HTTPPORT/%TESTNUMBER http://%HOSTIP:%HTTPPORT/%TESTNUMBER0002
 </command>
 </client>
 
-#
 # Verify data after the test has been "shot"
 <verify>
-<protocol>
+<protocol crlf="headers">
 GET /%TESTNUMBER HTTP/1.1
 Host: %HOSTIP:%HTTPPORT
 User-Agent: curl/%VERSION

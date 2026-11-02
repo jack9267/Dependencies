@@ -79,7 +79,7 @@ contain zero-valued bytes.
 
 followed by a pointer to the contents of this part, the actual data to send
 away. libcurl copies the provided data, so your application does not need to
-keep it around after this function call. If the data is not null terminated,
+keep it around after this function call. If the data is not null-terminated,
 or if you would like it to contain zero bytes, you must set the length of the
 name with **CURLFORM_CONTENTSLENGTH**. The copied data is freed by
 curl_formfree(3).
@@ -101,8 +101,6 @@ If you pass a 0 (zero) for this option, libcurl calls strlen() on the contents
 to figure out the size. If you really want to send a zero byte content then
 you must make sure strlen() on the data pointer returns zero.
 
-(Option added in 7.46.0)
-
 ## CURLFORM_CONTENTSLENGTH
 
 (This option is deprecated. Use *CURLFORM_CONTENTLEN* instead.)
@@ -114,11 +112,21 @@ If you pass a 0 (zero) for this option, libcurl calls strlen() on the contents
 to figure out the size. If you really want to send a zero byte content then
 you must make sure strlen() on the data pointer returns zero.
 
+## CURLFORM_NAMELENGTH
+
+followed by a long giving the length of the name. Pass this option to set
+the length of *CURLFORM_COPYNAME* and *CURLFORM_PTRNAME* strings, if they are
+not null-terminated.
+
+If you pass a 0 (zero) for this option, libcurl calls strlen() on the name to
+figure out the size. If you really want to send a zero byte name then you must
+make sure strlen() on the name pointer returns zero.
+
 ## CURLFORM_FILECONTENT
 
 followed by a filename, causes that file to be read and its contents used
 as data in this part. This part does *not* automatically become a file
-upload part simply because its data was read from a file.
+upload part due to its data being read from a file.
 
 The specified file needs to kept around until the associated transfer is done.
 
@@ -171,13 +179,12 @@ long which gives the length of the buffer.
 
 ## CURLFORM_STREAM
 
-Tells libcurl to use the CURLOPT_READFUNCTION(3) callback to get
-data. The parameter you pass to *CURLFORM_STREAM* is the pointer passed on
-to the read callback's fourth argument. If you want the part to look like a
-file upload one, set the *CURLFORM_FILENAME* parameter as well. Note that
-when using *CURLFORM_STREAM*, *CURLFORM_CONTENTSLENGTH* must also be
-set with the total expected length of the part unless the formpost is sent
-chunked encoded. (Option added in libcurl 7.18.2)
+Tells libcurl to use the CURLOPT_READFUNCTION(3) callback to get data. The
+parameter you pass to *CURLFORM_STREAM* is the pointer passed on to the read
+callback's fourth argument. If you want the part to look like a file upload
+one, set the *CURLFORM_FILENAME* parameter as well. Note that when using
+*CURLFORM_STREAM*, *CURLFORM_CONTENTSLENGTH* must also be set with the total
+expected length of the part unless the formpost is sent chunked encoded.
 
 ## CURLFORM_ARRAY
 
@@ -210,7 +217,7 @@ See example below.
 ~~~c
 #include <string.h> /* for strlen */
 
-static const char record[]="data in a buffer";
+static const char record[] = "data in a buffer";
 
 int main(void)
 {
@@ -219,16 +226,16 @@ int main(void)
     struct curl_httppost *post = NULL;
     struct curl_httppost *last = NULL;
     char namebuffer[] = "name buffer";
-    long namelength = strlen(namebuffer);
+    size_t namelength = strlen(namebuffer);
     char buffer[] = "test buffer";
     char htmlbuffer[] = "<HTML>test buffer</HTML>";
-    long htmlbufferlength = strlen(htmlbuffer);
+    size_t htmlbufferlength = strlen(htmlbuffer);
     struct curl_forms forms[3];
     char file1[] = "my-face.jpg";
     char file2[] = "your-face.jpg";
     /* add null character into htmlbuffer, to demonstrate that
        transfers of buffers containing null characters actually work
-    */
+     */
     htmlbuffer[8] = '\0';
 
     /* Add simple name/content section */
@@ -247,12 +254,12 @@ int main(void)
     /* Add ptrname/ptrcontent section */
     curl_formadd(&post, &last, CURLFORM_PTRNAME, namebuffer,
                  CURLFORM_PTRCONTENTS, buffer, CURLFORM_NAMELENGTH,
-                 namelength, CURLFORM_END);
+                 (long)namelength, CURLFORM_END);
 
     /* Add name/ptrcontent/contenttype section */
     curl_formadd(&post, &last, CURLFORM_COPYNAME, "html_code_with_hole",
                  CURLFORM_PTRCONTENTS, htmlbuffer,
-                 CURLFORM_CONTENTSLENGTH, htmlbufferlength,
+                 CURLFORM_CONTENTSLENGTH, (long)htmlbufferlength,
                  CURLFORM_CONTENTTYPE, "text/html", CURLFORM_END);
 
     /* Add simple file section */
@@ -274,14 +281,14 @@ int main(void)
     forms[0].value  = file1;
     forms[1].option = CURLFORM_FILE;
     forms[1].value  = file2;
-    forms[2].option  = CURLFORM_END;
+    forms[2].option = CURLFORM_END;
 
     /* Add a buffer to upload */
     curl_formadd(&post, &last,
                  CURLFORM_COPYNAME, "name",
                  CURLFORM_BUFFER, "data",
                  CURLFORM_BUFFERPTR, record,
-                 CURLFORM_BUFFERLENGTH, sizeof(record),
+                 CURLFORM_BUFFERLENGTH, (long)sizeof(record),
                  CURLFORM_END);
 
     /* no option needed for the end marker */
@@ -316,4 +323,4 @@ filenames are now escaped before transmission.
 # RETURN VALUE
 
 0 means everything was OK, non-zero means an error occurred corresponding to a
-CURL_FORMADD_* constant defined in *\<curl/curl.h\>*.
+`CURL_FORMADD_*` constant defined in *\<curl/curl.h\>*.

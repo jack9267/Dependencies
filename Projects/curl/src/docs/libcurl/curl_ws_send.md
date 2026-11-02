@@ -9,6 +9,7 @@ See-also:
   - curl_easy_perform (3)
   - curl_easy_setopt (3)
   - curl_ws_recv (3)
+  - curl_ws_start_frame (3)
   - libcurl-ws (3)
 Protocol:
   - WS
@@ -49,7 +50,10 @@ in the section on *CURLWS_OFFSET* below.
 
 *flags* must contain at least one flag indicating the type of the message.
 To send a fragmented message consisting of multiple frames, additionally set
-the *CURLWS_CONT* bit in all frames except the final one.
+the *CURLWS_CONT* bit in all frames except the final one. The appropriate
+message type bit should be set in every frame of a fragmented message without
+exemption. Omitting the message type for continuation frames of a fragmented
+message is only supported for backwards compatibility and highly discouraged.
 
 For more details on the supported flags see below and in curl_ws_meta(3).
 
@@ -82,9 +86,9 @@ calls.
 
 int main(void)
 {
-  const char *buffer = "PAYLOAD";
+  static const char *buffer = "PAYLOAD";
   size_t offset = 0;
-  CURLcode res = CURLE_OK;
+  CURLcode result = CURLE_OK;
   CURL *curl = curl_easy_init();
 
   curl_easy_setopt(curl, CURLOPT_URL, "wss://example.com/");
@@ -92,24 +96,25 @@ int main(void)
   /* start HTTPS connection and upgrade to WSS, then return control */
   curl_easy_perform(curl);
 
-  while(!res) {
+  while(!result) {
     size_t sent;
-    res = curl_ws_send(curl, buffer + offset, strlen(buffer) - offset, &sent,
-                       0, CURLWS_TEXT);
+    result = curl_ws_send(curl, buffer + offset,
+                          strlen(buffer) - offset, &sent,
+                          0, CURLWS_TEXT);
     offset += sent;
 
-    if(res == CURLE_OK) {
+    if(result == CURLE_OK) {
       if(offset == strlen(buffer))
         break; /* finished sending */
     }
 
-    if(res == CURLE_AGAIN)
+    if(result == CURLE_AGAIN)
       /* in real application: wait for socket here, e.g. using select() */
-      res = CURLE_OK;
+      result = CURLE_OK;
   }
 
   curl_easy_cleanup(curl);
-  return (int)res;
+  return (int)result;
 }
 ~~~
 

@@ -11,6 +11,7 @@ Protocol:
   - TLS
 TLS-backend:
   - OpenSSL
+  - Rustls
   - wolfSSL
 Added-in: 7.71.0
 ---
@@ -31,8 +32,8 @@ CURLcode curl_easy_setopt(CURL *handle, CURLOPT_SSLKEY_BLOB,
 # DESCRIPTION
 
 Pass a pointer to a curl_blob structure, which contains information (pointer
-and size) for a private key. Compatible with OpenSSL. The format (like "PEM")
-must be specified with CURLOPT_SSLKEYTYPE(3).
+and size) for a private key. Compatible with OpenSSL and Rustls. The format
+(like "PEM") must be specified with CURLOPT_SSLKEYTYPE(3).
 
 If the blob is initialized with the flags member of struct curl_blob set to
 CURL_BLOB_COPY, the application does not have to keep the buffer around after
@@ -61,7 +62,7 @@ int main(void)
 {
   CURL *curl = curl_easy_init();
   if(curl) {
-    CURLcode res;
+    CURLcode result;
     struct curl_blob blob;
     curl_easy_setopt(curl, CURLOPT_URL, "https://example.com/");
     blob.data = certificateData;
@@ -75,7 +76,7 @@ int main(void)
     curl_easy_setopt(curl, CURLOPT_SSLKEY_BLOB, &blob);
     curl_easy_setopt(curl, CURLOPT_KEYPASSWD, "s3cret");
     curl_easy_setopt(curl, CURLOPT_SSLKEYTYPE, "PEM");
-    res = curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
   }
 }

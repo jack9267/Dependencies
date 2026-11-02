@@ -32,10 +32,10 @@ This option is deprecated. We strongly recommend using
 CURLOPT_REDIR_PROTOCOLS_STR(3) instead because this option cannot
 control all available protocols.
 
-Pass a long that holds a bitmask of CURLPROTO_* defines. If used, this bitmask
+Pass a long that holds a bitmask of protocol bits. If used, this bitmask
 limits what protocols libcurl may use in a transfer that it follows to in a
-redirect when CURLOPT_FOLLOWLOCATION(3) is enabled. This allows you to
-limit specific transfers to only be allowed to use a subset of protocols in
+redirect when CURLOPT_FOLLOWLOCATION(3) is enabled. This allows you to limit
+specific transfers to only be allowed to use a subset of protocols in
 redirections.
 
 Protocols denied by CURLOPT_PROTOCOLS(3) are not overridden by this
@@ -58,19 +58,12 @@ CURLPROTO_IMAP
 CURLPROTO_IMAPS
 CURLPROTO_LDAP
 CURLPROTO_LDAPS
+CURLPROTO_MQTT
 CURLPROTO_POP3
 CURLPROTO_POP3S
-CURLPROTO_RTMP
-CURLPROTO_RTMPE
-CURLPROTO_RTMPS
-CURLPROTO_RTMPT
-CURLPROTO_RTMPTE
-CURLPROTO_RTMPTS
 CURLPROTO_RTSP
 CURLPROTO_SCP
 CURLPROTO_SFTP
-CURLPROTO_SMB
-CURLPROTO_SMBS
 CURLPROTO_SMTP
 CURLPROTO_SMTPS
 CURLPROTO_TELNET
@@ -79,20 +72,18 @@ CURLPROTO_TFTP
 
 # DEFAULT
 
-HTTP, HTTPS, FTP and FTPS (Added in 7.65.2).
-
-Older versions defaulted to all protocols except FILE, SCP and since 7.40.0
-SMB and SMBS.
+HTTP, HTTPS, FTP and FTPS
 
 # %PROTOCOLS%
 
 # EXAMPLE
 
 ~~~c
-int main(int argc, char **argv)
+int main(int argc, char *argv[])
 {
   CURL *curl = curl_easy_init();
   if(curl) {
+    CURLcode result;
     /* pass in the URL from an external source */
     curl_easy_setopt(curl, CURLOPT_URL, argv[1]);
 
@@ -101,10 +92,16 @@ int main(int argc, char **argv)
                      CURLPROTO_HTTP | CURLPROTO_HTTPS);
 
     /* Perform the request */
-    curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
   }
 }
 ~~~
+
+# HISTORY
+
+**CURLPROTO_*** macros became `long` types in 8.16.0, prior to this version
+a `long` cast was necessary when passed to curl_easy_setopt(3).
 
 # DEPRECATED
 

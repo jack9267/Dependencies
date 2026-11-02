@@ -47,18 +47,11 @@ accessible file.
 This option is by default set to the system path where libcurl's CA
 certificate bundle is assumed to be stored, as established at build time.
 
-(iOS and macOS only) If curl is built against Secure Transport, then this
-option is supported for backward compatibility with other SSL engines, but it
-should not be set. If the option is not set, then curl uses the certificates
-in the system and user Keychain to verify the peer, which is the preferred
-method of verifying the peer's certificate chain.
-
 The application does not have to keep the string around after setting this
 option.
 
 Using this option multiple times makes the last set string override the
-previous ones. Set it to NULL to disable its use again and switches back to
-internal default.
+previous ones. Set it to NULL to disable its use again.
 
 The default value for this can be figured out with CURLINFO_CAINFO(3).
 
@@ -75,12 +68,12 @@ int main(void)
 {
   CURL *curl = curl_easy_init();
   if(curl) {
-    CURLcode res;
+    CURLcode result;
     curl_easy_setopt(curl, CURLOPT_URL, "https://example.com/");
     /* using an HTTPS proxy */
-    curl_easy_setopt(curl, CURLOPT_PROXY, "https://localhost:443");
+    curl_easy_setopt(curl, CURLOPT_PROXY, "https://proxy.example:443");
     curl_easy_setopt(curl, CURLOPT_PROXY_CAINFO, "/etc/certs/cabundle.pem");
-    res = curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
   }
 }

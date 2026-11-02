@@ -11,6 +11,7 @@ Protocol:
 TLS-backend:
   - OpenSSL
   - wolfSSL
+  - Rustls
 Added-in: 8.8.0
 ---
 
@@ -28,14 +29,10 @@ CURLcode curl_easy_setopt(CURL *handle, CURLOPT_ECH, char *config);
 
 # DESCRIPTION
 
+This feature is **experimental** and may change before it is considered
+stable. We advise against using it in production.
+
 ECH is only compatible with TLSv1.3.
-
-This experimental feature requires a special build of OpenSSL, as ECH is not
-yet supported in OpenSSL releases. In contrast ECH is supported by the latest
-BoringSSL and wolfSSL releases.
-
-There is also a known issue with using wolfSSL which does not support ECH when
-the HelloRetryRequest mechanism is used.
 
 Pass a string that specifies configuration details for ECH. In all cases, if
 ECH is attempted, it may fail for various reasons. The keywords supported are:
@@ -91,12 +88,14 @@ int main(void)
 {
   CURL *curl = curl_easy_init();
 
-  const char *config = \
-    "ecl:AED+DQA87wAgACB/RuzUCsW3uBbSFI7mzD63TUXpI8sGDTnFTbFCDpa+" \
+  static const char *config =
+    "ecl:AED+DQA87wAgACB/RuzUCsW3uBbSFI7mzD63TUXpI8sGDTnFTbFCDpa+"
     "CAAEAAEAAQANY292ZXIuZGVmby5pZQAA";
   if(curl) {
+    CURLcode result;
     curl_easy_setopt(curl, CURLOPT_ECH, config);
-    curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
   }
 }
 ~~~

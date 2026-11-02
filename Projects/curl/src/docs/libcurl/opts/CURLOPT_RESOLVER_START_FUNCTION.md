@@ -34,7 +34,10 @@ Pass a pointer to your callback function, which should match the prototype
 shown above.
 
 This callback function gets called by libcurl every time before a new resolve
-request is started.
+request is started. A single transfer can trigger more than one such
+request, for example an HTTPS RR lookup is a separate request from the
+regular A/AAAA lookup, and each gets its own call to this callback before it
+is started.
 
 *resolver_state* points to a backend-specific resolver state. Currently only
 the ares resolver backend has a resolver state. It can be used to set up any
@@ -71,10 +74,11 @@ int main(void)
 {
   CURL *curl = curl_easy_init();
   if(curl) {
+    CURLcode result;
     curl_easy_setopt(curl, CURLOPT_RESOLVER_START_FUNCTION, start_cb);
     curl_easy_setopt(curl, CURLOPT_RESOLVER_START_DATA, curl);
     curl_easy_setopt(curl, CURLOPT_URL, "https://example.com");
-    curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
   }
 }

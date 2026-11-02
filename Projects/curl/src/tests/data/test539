@@ -1,11 +1,12 @@
+<?xml version="1.0" encoding="US-ASCII"?>
 <testcase>
 <info>
 <keywords>
 FTP
+libtest
 </keywords>
 </info>
 
-#
 # Server-side
 <reply>
 <data>
@@ -28,9 +29,6 @@ contents for file number two
 ftp
 </server>
 # tool is what to use instead of 'curl'
-<tool>
-lib%TESTNUMBER
-</tool>
 
 <name>
 Two FTP fetches using different CURLOPT_FTP_FILEMETHOD
@@ -40,13 +38,9 @@ ftp://%HOSTIP:%FTPPORT/path/to/the/file/%TESTNUMBER ftp://%HOSTIP:%FTPPORT/path/
 </command>
 </client>
 
-#
 # Verify data after the test has been "shot"
 <verify>
-<strip>
-QUIT
-</strip>
-<protocol>
+<protocol crlf="yes">
 USER anonymous
 PASS ftp@example.com
 PWD

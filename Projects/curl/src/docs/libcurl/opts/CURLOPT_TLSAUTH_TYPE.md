@@ -29,6 +29,8 @@ CURLcode curl_easy_setopt(CURL *handle, CURLOPT_TLSAUTH_TYPE, char *type);
 
 # DESCRIPTION
 
+Deprecated option. It serves no purpose anymore.
+
 Pass a pointer to a null-terminated string as parameter. The string should be
 the method of the TLS authentication. Supported method is "SRP".
 
@@ -45,11 +47,15 @@ defined in RFC 5054 and provides mutual authentication if both sides have a
 shared secret. To use TLS-SRP, you must also set the
 CURLOPT_TLSAUTH_USERNAME(3) and CURLOPT_TLSAUTH_PASSWORD(3) options.
 
-TLS SRP does not work with TLS 1.3.
+TLS-SRP does not work with TLS 1.3.
 
 # DEFAULT
 
 blank
+
+# DEPRECATED
+
+This option was deprecated in 8.22.0.
 
 # %PROTOCOLS%
 
@@ -60,12 +66,12 @@ int main(void)
 {
   CURL *curl = curl_easy_init();
   if(curl) {
-    CURLcode res;
+    CURLcode result;
     curl_easy_setopt(curl, CURLOPT_URL, "https://example.com/");
     curl_easy_setopt(curl, CURLOPT_TLSAUTH_TYPE, "SRP");
     curl_easy_setopt(curl, CURLOPT_TLSAUTH_USERNAME, "user");
     curl_easy_setopt(curl, CURLOPT_TLSAUTH_PASSWORD, "secret");
-    res = curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
   }
 }

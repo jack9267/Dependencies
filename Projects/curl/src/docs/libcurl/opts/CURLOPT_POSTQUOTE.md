@@ -50,19 +50,20 @@ NULL
 ~~~c
 int main(void)
 {
+  CURL *curl;
   struct curl_slist *cmdlist = NULL;
   cmdlist = curl_slist_append(cmdlist, "RNFR source-name");
   cmdlist = curl_slist_append(cmdlist, "RNTO new-name");
 
-  CURL *curl = curl_easy_init();
+  curl = curl_easy_init();
   if(curl) {
-    CURLcode res;
+    CURLcode result;
     curl_easy_setopt(curl, CURLOPT_URL, "ftp://example.com/foo.bin");
 
     /* pass in the FTP commands to run after the transfer */
     curl_easy_setopt(curl, CURLOPT_POSTQUOTE, cmdlist);
 
-    res = curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
 
     curl_easy_cleanup(curl);
   }

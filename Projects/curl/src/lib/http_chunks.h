@@ -23,19 +23,21 @@
  * SPDX-License-Identifier: curl
  *
  ***************************************************************************/
+#include "curl_setup.h"
 
 #ifndef CURL_DISABLE_HTTP
 
-#include "dynbuf.h"
+#include "curlx/dynbuf.h"
 
 struct connectdata;
 
 /*
  * The longest possible hexadecimal number we support in a chunked transfer.
- * Neither RFC2616 nor the later HTTP specs define a maximum chunk size.
- * For 64-bit curl_off_t we support 16 digits. For 32-bit, 8 digits.
+ * Neither RFC2616 nor the later HTTP specs define a maximum chunk size. With
+ * the 64-bit curl_off_t we support 16 digits, excluding leading zeroes. But
+ * why would a sane server prefix with zeroes? Let's accept one.
  */
-#define CHUNK_MAXNUM_LEN (SIZEOF_CURL_OFF_T * 2)
+#define CHUNK_MAXNUM_LEN 17
 
 typedef enum {
   /* await and buffer all hexadecimal digits until we get one that is not a
@@ -49,7 +51,7 @@ typedef enum {
      POST_CR state. */
   CHUNK_DATA,
 
-  /* POSTLF should get a CR and then a LF and nothing else, then move back to
+  /* POSTLF should get a CR and then an LF and nothing else, then move back to
      HEX as the CRLF combination marks the end of a chunk. A missing CR is no
      big deal. */
   CHUNK_POSTLF,
@@ -64,7 +66,7 @@ typedef enum {
   CHUNK_TRAILER,
 
   /* A trailer CR has been found - next state is CHUNK_TRAILER_POSTCR.
-     Next char must be a LF */
+     Next char must be an LF */
   CHUNK_TRAILER_CR,
 
   /* A trailer LF must be found now, otherwise CHUNKE_BAD_CHUNK will be
@@ -87,7 +89,8 @@ typedef enum {
   CHUNKE_BAD_CHUNK,
   CHUNKE_BAD_ENCODING,
   CHUNKE_OUT_OF_MEMORY,
-  CHUNKE_PASSTHRU_ERROR /* Curl_httpchunk_read() returns a CURLcode to use */
+  CHUNKE_PASSTHRU_ERROR, /* Curl_httpchunk_read() returns a CURLcode to use */
+  CHUNKE_TRAILER_LIMIT /* Max header limit exceeded by trailers */
 } CHUNKcode;
 
 struct Curl_chunker {
@@ -98,11 +101,12 @@ struct Curl_chunker {
   unsigned char hexindex;
   char hexbuffer[CHUNK_MAXNUM_LEN + 1]; /* +1 for null-terminator */
   BIT(ignore_body); /* never write response body data */
+  BIT(in_connect); /* this is a CONNECT response body */
 };
 
 /* The following functions are defined in http_chunks.c */
 void Curl_httpchunk_init(struct Curl_easy *data, struct Curl_chunker *ch,
-                         bool ignore_body);
+                         bool ignore_body, bool in_connect);
 void Curl_httpchunk_free(struct Curl_easy *data, struct Curl_chunker *ch);
 void Curl_httpchunk_reset(struct Curl_easy *data, struct Curl_chunker *ch,
                           bool ignore_body);

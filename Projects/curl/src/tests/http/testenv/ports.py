@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 #***************************************************************************
 #                                  _   _ ____  _
 #  Project                     ___| | | |  _ \| |
@@ -25,23 +23,35 @@
 ###########################################################################
 #
 import logging
+import os
 import socket
-from typing import Dict
+from typing import Callable, Dict
+
+from filelock import FileLock
 
 log = logging.getLogger(__name__)
 
 
-def alloc_ports(port_specs: Dict[str, int]) -> Dict[str, int]:
-    ports = {}
+def alloc_port_set(port_specs: Dict[str, int]) -> Dict[str, int]:
     socks = []
+    ports = {}
     for name, ptype in port_specs.items():
-        try:
-            s = socket.socket(type=ptype)
-            s.bind(('', 0))
-            ports[name] = s.getsockname()[1]
-            socks.append(s)
-        except Exception as e:
-            raise e
+        s = socket.socket(type=ptype)
+        s.bind(('127.0.0.1', 0))
+        ports[name] = s.getsockname()[1]
+        socks.append(s)
     for s in socks:
         s.close()
     return ports
+
+
+def alloc_ports_and_do(port_spec: Dict[str, int],
+                       do_func: Callable[[Dict[str, int]], bool],
+                       gen_dir, max_tries=1) -> bool:
+    lock_file = os.path.join(gen_dir, 'ports.lock')
+    with FileLock(lock_file):
+        for _ in range(max_tries):
+            port_set = alloc_port_set(port_spec)
+            if do_func(port_set):
+                return True
+    return False

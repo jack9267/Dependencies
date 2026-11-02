@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 #***************************************************************************
 #                                  _   _ ____  _
 #  Project                     ___| | | |  _ \| |
@@ -23,16 +21,23 @@
 # SPDX-License-Identifier: curl
 #
 ###########################################################################
-# ruff: noqa: F401, E402
+# ruff: noqa: F401
 import pytest
+
 pytest.register_assert_rewrite("testenv.env", "testenv.curl", "testenv.caddy",
                                "testenv.httpd", "testenv.nghttpx")
 
-from .env import Env
-from .certs import TestCA, Credentials
+# This import must be first to avoid circular imports
+from .curl import CurlClient, ExecResult, RunProfile  # noqa: I001
+
 from .caddy import Caddy
-from .httpd import Httpd
-from .curl import CurlClient, ExecResult, RunProfile
+from .certs import Credentials, TestCA
 from .client import LocalClient
-from .nghttpx import Nghttpx, NghttpxQuic, NghttpxFwd
+from .dante import Dante
+from .dnsd import Dnsd
+from .env import Env
+from .h2o import H2oProxy, H2oServer
+from .httpd import Httpd
+from .nghttpx import Nghttpx, NghttpxFwd, NghttpxQuic, NghttpxTcp
+from .sshd import Sshd
 from .vsftpd import VsFTPD

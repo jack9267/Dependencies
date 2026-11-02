@@ -40,6 +40,10 @@ option.
 The bitmask can be constructed by the bits listed and described in the
 CURLOPT_HTTPAUTH(3) man page.
 
+Custom `Proxy-Authorization:` headers set with CURLOPT_PROXYHEADER(3) may
+interfere with and cause unintended side-effects if combined with
+authentication set with CURLOPT_PROXYAUTH(3).
+
 # DEFAULT
 
 CURLAUTH_BASIC
@@ -53,7 +57,7 @@ int main(void)
 {
   CURL *curl = curl_easy_init();
   if(curl) {
-    CURLcode ret;
+    CURLcode result;
     curl_easy_setopt(curl, CURLOPT_URL, "https://example.com/");
     /* use this proxy */
     curl_easy_setopt(curl, CURLOPT_PROXY, "http://local.example.com:1080");
@@ -61,11 +65,16 @@ int main(void)
     curl_easy_setopt(curl, CURLOPT_PROXYAUTH, CURLAUTH_ANY);
     /* set the proxy credentials */
     curl_easy_setopt(curl, CURLOPT_PROXYUSERPWD, "james:007");
-    ret = curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
   }
 }
 ~~~
+
+# HISTORY
+
+**CURLAUTH_*** macros became `long` types in 7.26.0, prior to this version
+a `long` cast was necessary when passed to curl_easy_setopt(3).
 
 # %AVAILABILITY%
 

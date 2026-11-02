@@ -1,15 +1,17 @@
+<?xml version="1.0" encoding="US-ASCII"?>
 <testcase>
 <info>
 <keywords>
 HTTP
 HTTP POST
 CURLOPT_READFUNCTION
+libtest
 </keywords>
 </info>
 
 # Server-side
 <reply>
-<data crlf="yes" nocheck="yes">
+<data crlf="headers" nocheck="yes">
 HTTP/1.1 200 OK
 Content-Length: 6
 Content-Type: text/html
@@ -27,9 +29,6 @@ http
 <name>
 Chunked HTTP POST from callback with CURLOPT_POSTFIELDSIZE set
 </name>
-<tool>
-lib%TESTNUMBER
-</tool>
 
 <command>
 http://%HOSTIP:%HTTPPORT/boom

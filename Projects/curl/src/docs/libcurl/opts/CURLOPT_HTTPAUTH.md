@@ -37,6 +37,10 @@ extra network round-trip. Set the actual name and password with the
 CURLOPT_USERPWD(3) option or with the CURLOPT_USERNAME(3) and the
 CURLOPT_PASSWORD(3) options.
 
+Custom `Authorization:` headers set with CURLOPT_HTTPHEADER(3) may interfere
+with and cause unintended side-effects if combined with authentication set
+with CURLOPT_HTTPAUTH(3).
+
 For authentication with a proxy, see CURLOPT_PROXYAUTH(3).
 
 ## CURLAUTH_BASIC
@@ -54,11 +58,8 @@ regular old-fashioned Basic method.
 
 ## CURLAUTH_DIGEST_IE
 
-HTTP Digest authentication with an IE flavor. Digest authentication is defined
-in RFC 2617 and is a more secure way to do authentication over public networks
-than the regular old-fashioned Basic method. The IE flavor is simply that
-libcurl uses a special "quirk" that IE is known to have used before version 7
-and that some servers require the client to use.
+The IE-specific Digest authentication behavior is no longer supported.
+This bit is kept for compatibility and is treated as CURLAUTH_DIGEST.
 
 ## CURLAUTH_BEARER
 
@@ -80,8 +81,7 @@ HTTP NTLM authentication. A proprietary protocol invented and used by
 Microsoft. It uses a challenge-response and hash concept similar to Digest, to
 prevent the password from being eavesdropped.
 
-You need to build libcurl with either OpenSSL or GnuTLS support for this
-option to work, or build libcurl on Windows with SSPI support.
+NTLM uses weak cryptographic algorithms and is not considered secure.
 
 ## CURLAUTH_NTLM_WB
 
@@ -122,6 +122,11 @@ single auth algorithm is acceptable.
 provides AWS V4 signature authentication on HTTPS header
 see CURLOPT_AWS_SIGV4(3).
 
+## CURLAUTH_HTTPSIG
+
+provides RFC 9421 HTTP Message Signatures on outgoing requests,
+see CURLOPT_HTTPSIG_ALGORITHM(3).
+
 # DEFAULT
 
 CURLAUTH_BASIC
@@ -135,12 +140,12 @@ int main(void)
 {
   CURL *curl = curl_easy_init();
   if(curl) {
-    CURLcode ret;
+    CURLcode result;
     curl_easy_setopt(curl, CURLOPT_URL, "https://example.com/");
     /* allow whatever auth the server speaks */
-    curl_easy_setopt(curl, CURLOPT_HTTPAUTH, (long)CURLAUTH_ANY);
+    curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
     curl_easy_setopt(curl, CURLOPT_USERPWD, "james:bond");
-    ret = curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
   }
 }
 ~~~
@@ -153,9 +158,16 @@ CURLAUTH_ONLY was added in 7.21.3
 
 CURLAUTH_NTLM_WB was added in 7.22.0
 
+**CURLAUTH_*** macros became `long` types in 7.26.0, prior to this version
+a `long` cast was necessary when passed to curl_easy_setopt(3).
+
 CURLAUTH_BEARER was added in 7.61.0
 
 CURLAUTH_AWS_SIGV4 was added in 7.74.0
+
+CURLAUTH_DIGEST_IE does nothing since 8.21.0
+
+CURLAUTH_HTTPSIG was added in 8.22.0
 
 # %AVAILABILITY%
 

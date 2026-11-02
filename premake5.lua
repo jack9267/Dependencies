@@ -820,32 +820,34 @@ dep("ssl", {
 -- LibreSSL as here. curl takes its platform from a configure-made curl_config.h; Projects/curl/apple's
 -- is one made by curl's own CMake on macOS (the two share a libc), with nothing in it about TLS or zlib -
 -- those are the defines.
+--
+-- Windows takes one too (curl's config-win32.h is for Visual Studio 2010-2013 only since 8.13):
+-- Projects/curl/windows's was made by curl's own CMake against this LibreSSL and zlib, with the features
+-- below, and holds every Windows setting; regenerate it after updating curl. It is built for Vista (since
+-- 8.19.0 curl refuses anything older); what it calls from Vista on - BCryptGenRandom, if_nametoindex and
+-- the rest - YY-Thunks supplies on XP builds, as for LibreSSL.
 dep("curl", {
 	systems = { "windows", "ios" },
 	defines = not WINDOWS_TARGET and {
 		"HAVE_CONFIG_H", "BUILDING_LIBCURL", "CURL_STATICLIB", "USE_OPENSSL", "HAVE_LIBZ", "HAVE_ZLIB_H",
-		"CURL_DISABLE_FILE=1", "CURL_DISABLE_POP3=1", "CURL_DISABLE_IMAP=1", "CURL_DISABLE_SMTP=1",
 		"CURL_DISABLE_OPENSSL_AUTO_LOAD_CONFIG",
 	} or {
-		"BUILDING_LIBCURL", "CURL_DISABLE_LDAP=1", "CURL_DISABLE_LDAPS=1", "CURL_DISABLE_FILE=1",
-		"CURL_DISABLE_POP3=1", "CURL_DISABLE_IMAP=1", "CURL_DISABLE_SMTP=1", "USE_WEBSOCKETS=1",
-		"CURL_DISABLE_OPENSSL_AUTO_LOAD_CONFIG", "HAVE_WINDOWS_H", "HAVE_WINSOCK_H",
-		"HAVE_WS2TCPIP_H", "HAVE_WINSOCK2_H", "HAVE_ZLIB_H", "HAVE_ZLIB", "HAVE_LIBZ", "USE_IPV6",
-		"CURL_STATICLIB", "USE_SSLEAY", "USE_OPENSSL",
+		"HAVE_CONFIG_H", "BUILDING_LIBCURL", "CURL_STATICLIB", "_WIN32_WINNT=0x0600",
 	},
-	includedirs = table.join(not WINDOWS_TARGET and { "Projects/curl/apple" } or {},
+	includedirs = table.join({ WINDOWS_TARGET and "Projects/curl/windows" or "Projects/curl/apple" },
 		{ "Projects/curl/src/include", "Projects/curl/src/lib",
 		"Projects/libressl/src/include", "Projects/zlib/include" }),
-	-- The DLL drops CURL_STATICLIB, compiles the version .rc, and links the ssl/crypto/zlib DLLs
-	-- (wldap32/ws2_32/crypt32 are already workspace-scope).
+	-- The DLL drops CURL_STATICLIB, compiles the version .rc, and links the ssl/crypto/zlib DLLs and bcrypt
+	-- (wldap32/ws2_32/crypt32/iphlpapi are already workspace-scope).
 	shared = { {
 		dropdefines = { "CURL_STATICLIB" },
 		addfiles    = { "Projects/curl/src/lib/**.rc" },
-		extra       = function() links { "ssl", "crypto", "zlib" } end,
+		extra       = function() links { "ssl", "crypto", "zlib", "bcrypt" } end,
 	} },
 	files = WINDOWS_TARGET and { "Projects/curl/src/lib/**.c" } or {
-		"Projects/curl/src/lib/*.c", "Projects/curl/src/lib/vauth/*.c", "Projects/curl/src/lib/vquic/*.c",
-		"Projects/curl/src/lib/vssh/*.c", "Projects/curl/src/lib/vtls/*.c" },
+		"Projects/curl/src/lib/*.c", "Projects/curl/src/lib/curlx/*.c", "Projects/curl/src/lib/vauth/*.c",
+		"Projects/curl/src/lib/vdns/*.c", "Projects/curl/src/lib/vquic/*.c", "Projects/curl/src/lib/vssh/*.c",
+		"Projects/curl/src/lib/vtls/*.c" },
 })
 
 dep("pixman", {

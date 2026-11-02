@@ -61,6 +61,7 @@
 # SPDX-License-Identifier: curl
 #
 ###########################################################################
+# Shared between CMakeLists.txt and Makefile.am
 VPATH = @srcdir@
 am__is_gnu_make = { \
   if test -z '$(MAKELEVEL)'; then \
@@ -136,37 +137,43 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 @USE_CPPFLAG_CURL_STATICLIB_TRUE@am__append_1 = -DCURL_STATICLIB
+@DOING_NATIVE_WINDOWS_TRUE@am__append_2 = -DWIN32_LEAN_AND_MEAN
 check_PROGRAMS = 10-at-a-time$(EXEEXT) address-scope$(EXEEXT) \
-	altsvc$(EXEEXT) anyauthput$(EXEEXT) block_ip$(EXEEXT) \
-	certinfo$(EXEEXT) chkspeed$(EXEEXT) connect-to$(EXEEXT) \
-	cookie_interface$(EXEEXT) debug$(EXEEXT) \
-	default-scheme$(EXEEXT) externalsocket$(EXEEXT) \
-	fileupload$(EXEEXT) ftp-wildcard$(EXEEXT) ftpget$(EXEEXT) \
-	ftpgetinfo$(EXEEXT) ftpgetresp$(EXEEXT) ftpsget$(EXEEXT) \
-	ftpupload$(EXEEXT) ftpuploadfrommem$(EXEEXT) \
-	ftpuploadresume$(EXEEXT) getinfo$(EXEEXT) getinmemory$(EXEEXT) \
-	getredirect$(EXEEXT) getreferrer$(EXEEXT) headerapi$(EXEEXT) \
-	hsts-preload$(EXEEXT) http-options$(EXEEXT) http-post$(EXEEXT) \
+	altsvc$(EXEEXT) anyauthput$(EXEEXT) aws-sigv4$(EXEEXT) \
+	block_ip$(EXEEXT) cainfo-blob$(EXEEXT) certinfo$(EXEEXT) \
+	chkspeed$(EXEEXT) clientcert-blob$(EXEEXT) \
+	conditional$(EXEEXT) connect-to$(EXEEXT) cookie$(EXEEXT) \
+	cookiejar$(EXEEXT) cookie_interface$(EXEEXT) debug$(EXEEXT) \
+	default-scheme$(EXEEXT) doh$(EXEEXT) externalsocket$(EXEEXT) \
+	fileupload$(EXEEXT) ftp-delete$(EXEEXT) ftp-listonly$(EXEEXT) \
+	ftp-wildcard$(EXEEXT) ftpget$(EXEEXT) ftpgetinfo$(EXEEXT) \
+	ftpgetresp$(EXEEXT) ftpsget$(EXEEXT) ftpupload$(EXEEXT) \
+	ftpuploadfrommem$(EXEEXT) ftpuploadresume$(EXEEXT) \
+	getinfo$(EXEEXT) getinmemory$(EXEEXT) getredirect$(EXEEXT) \
+	getreferrer$(EXEEXT) headerapi$(EXEEXT) hsts-preload$(EXEEXT) \
+	http-options$(EXEEXT) http-post$(EXEEXT) \
 	http2-download$(EXEEXT) http2-pushinmemory$(EXEEXT) \
 	http2-serverpush$(EXEEXT) http2-upload$(EXEEXT) http3$(EXEEXT) \
 	http3-present$(EXEEXT) httpcustomheader$(EXEEXT) \
 	httpput$(EXEEXT) httpput-postfields$(EXEEXT) https$(EXEEXT) \
-	imap-append$(EXEEXT) imap-authzid$(EXEEXT) imap-copy$(EXEEXT) \
-	imap-create$(EXEEXT) imap-delete$(EXEEXT) \
+	httpsig$(EXEEXT) imap-append$(EXEEXT) imap-authzid$(EXEEXT) \
+	imap-copy$(EXEEXT) imap-create$(EXEEXT) imap-delete$(EXEEXT) \
 	imap-examine$(EXEEXT) imap-fetch$(EXEEXT) imap-list$(EXEEXT) \
 	imap-lsub$(EXEEXT) imap-multi$(EXEEXT) imap-noop$(EXEEXT) \
 	imap-search$(EXEEXT) imap-ssl$(EXEEXT) imap-store$(EXEEXT) \
 	imap-tls$(EXEEXT) interface$(EXEEXT) ipv6$(EXEEXT) \
-	keepalive$(EXEEXT) localport$(EXEEXT) maxconnects$(EXEEXT) \
+	keepalive$(EXEEXT) limit-rate$(EXEEXT) localport$(EXEEXT) \
+	log_failed_transfers$(EXEEXT) maxconnects$(EXEEXT) \
 	multi-app$(EXEEXT) multi-debugcallback$(EXEEXT) \
 	multi-double$(EXEEXT) multi-formadd$(EXEEXT) \
 	multi-legacy$(EXEEXT) multi-post$(EXEEXT) \
-	multi-single$(EXEEXT) netrc$(EXEEXT) parseurl$(EXEEXT) \
-	persistent$(EXEEXT) pop3-authzid$(EXEEXT) pop3-dele$(EXEEXT) \
-	pop3-list$(EXEEXT) pop3-multi$(EXEEXT) pop3-noop$(EXEEXT) \
-	pop3-retr$(EXEEXT) pop3-ssl$(EXEEXT) pop3-stat$(EXEEXT) \
-	pop3-tls$(EXEEXT) pop3-top$(EXEEXT) pop3-uidl$(EXEEXT) \
-	post-callback$(EXEEXT) postinmemory$(EXEEXT) postit2$(EXEEXT) \
+	multi-single$(EXEEXT) nagle$(EXEEXT) netrc$(EXEEXT) \
+	parseurl$(EXEEXT) path-as-is$(EXEEXT) persistent$(EXEEXT) \
+	pop3-authzid$(EXEEXT) pop3-dele$(EXEEXT) pop3-list$(EXEEXT) \
+	pop3-multi$(EXEEXT) pop3-noop$(EXEEXT) pop3-retr$(EXEEXT) \
+	pop3-ssl$(EXEEXT) pop3-stat$(EXEEXT) pop3-tls$(EXEEXT) \
+	pop3-top$(EXEEXT) pop3-uidl$(EXEEXT) post-callback$(EXEEXT) \
+	postinmemory$(EXEEXT) postit2$(EXEEXT) \
 	postit2-formadd$(EXEEXT) progressfunc$(EXEEXT) \
 	protofeats$(EXEEXT) range$(EXEEXT) resolve$(EXEEXT) \
 	rtsp-options$(EXEEXT) sendrecv$(EXEEXT) sepheaders$(EXEEXT) \
@@ -175,13 +182,14 @@ check_PROGRAMS = 10-at-a-time$(EXEEXT) address-scope$(EXEEXT) \
 	simplepost$(EXEEXT) simplessl$(EXEEXT) smtp-authzid$(EXEEXT) \
 	smtp-expn$(EXEEXT) smtp-mail$(EXEEXT) smtp-mime$(EXEEXT) \
 	smtp-multi$(EXEEXT) smtp-ssl$(EXEEXT) smtp-tls$(EXEEXT) \
-	smtp-vrfy$(EXEEXT) sslbackend$(EXEEXT) unixsocket$(EXEEXT) \
-	url2file$(EXEEXT) urlapi$(EXEEXT) websocket$(EXEEXT) \
-	websocket-cb$(EXEEXT)
+	smtp-vrfy$(EXEEXT) sslbackend$(EXEEXT) synctime$(EXEEXT) \
+	trailer$(EXEEXT) unixsocket$(EXEEXT) url2file$(EXEEXT) \
+	urlapi$(EXEEXT) websocket$(EXEEXT) websocket-cb$(EXEEXT) \
+	websocket-updown$(EXEEXT)
 subdir = docs/examples
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/curl-amissl.m4 \
-	$(top_srcdir)/m4/curl-bearssl.m4 \
+	$(top_srcdir)/m4/curl-apple-sectrust.m4 \
 	$(top_srcdir)/m4/curl-compilers.m4 \
 	$(top_srcdir)/m4/curl-confopts.m4 \
 	$(top_srcdir)/m4/curl-functions.m4 \
@@ -192,7 +200,6 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/curl-amissl.m4 \
 	$(top_srcdir)/m4/curl-reentrant.m4 \
 	$(top_srcdir)/m4/curl-rustls.m4 \
 	$(top_srcdir)/m4/curl-schannel.m4 \
-	$(top_srcdir)/m4/curl-sectransp.m4 \
 	$(top_srcdir)/m4/curl-sysconfig.m4 \
 	$(top_srcdir)/m4/curl-wolfssl.m4 $(top_srcdir)/m4/libtool.m4 \
 	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
@@ -202,8 +209,7 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/curl-amissl.m4 \
 	$(top_srcdir)/m4/xc-lt-iface.m4 \
 	$(top_srcdir)/m4/xc-val-flgs.m4 \
 	$(top_srcdir)/m4/zz40-xc-ovr.m4 \
-	$(top_srcdir)/m4/zz50-xc-ovr.m4 \
-	$(top_srcdir)/m4/zz60-xc-ovr.m4 $(top_srcdir)/acinclude.m4 \
+	$(top_srcdir)/m4/zz50-xc-ovr.m4 $(top_srcdir)/acinclude.m4 \
 	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
@@ -215,7 +221,7 @@ CONFIG_CLEAN_VPATH_FILES =
 10_at_a_time_SOURCES = 10-at-a-time.c
 10_at_a_time_OBJECTS = 10-at-a-time.$(OBJEXT)
 10_at_a_time_LDADD = $(LDADD)
-10_at_a_time_DEPENDENCIES = $(LIBDIR)/libcurl.la
+10_at_a_time_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -223,443 +229,511 @@ am__v_lt_1 =
 address_scope_SOURCES = address-scope.c
 address_scope_OBJECTS = address-scope.$(OBJEXT)
 address_scope_LDADD = $(LDADD)
-address_scope_DEPENDENCIES = $(LIBDIR)/libcurl.la
+address_scope_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 altsvc_SOURCES = altsvc.c
 altsvc_OBJECTS = altsvc.$(OBJEXT)
 altsvc_LDADD = $(LDADD)
-altsvc_DEPENDENCIES = $(LIBDIR)/libcurl.la
+altsvc_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 anyauthput_SOURCES = anyauthput.c
 anyauthput_OBJECTS = anyauthput.$(OBJEXT)
 anyauthput_LDADD = $(LDADD)
-anyauthput_DEPENDENCIES = $(LIBDIR)/libcurl.la
+anyauthput_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
+aws_sigv4_SOURCES = aws-sigv4.c
+aws_sigv4_OBJECTS = aws-sigv4.$(OBJEXT)
+aws_sigv4_LDADD = $(LDADD)
+aws_sigv4_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 block_ip_SOURCES = block_ip.c
 block_ip_OBJECTS = block_ip.$(OBJEXT)
 block_ip_LDADD = $(LDADD)
-block_ip_DEPENDENCIES = $(LIBDIR)/libcurl.la
+block_ip_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
+cainfo_blob_SOURCES = cainfo-blob.c
+cainfo_blob_OBJECTS = cainfo-blob.$(OBJEXT)
+cainfo_blob_LDADD = $(LDADD)
+cainfo_blob_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 certinfo_SOURCES = certinfo.c
 certinfo_OBJECTS = certinfo.$(OBJEXT)
 certinfo_LDADD = $(LDADD)
-certinfo_DEPENDENCIES = $(LIBDIR)/libcurl.la
+certinfo_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 chkspeed_SOURCES = chkspeed.c
 chkspeed_OBJECTS = chkspeed.$(OBJEXT)
 chkspeed_LDADD = $(LDADD)
-chkspeed_DEPENDENCIES = $(LIBDIR)/libcurl.la
+chkspeed_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
+clientcert_blob_SOURCES = clientcert-blob.c
+clientcert_blob_OBJECTS = clientcert-blob.$(OBJEXT)
+clientcert_blob_LDADD = $(LDADD)
+clientcert_blob_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
+conditional_SOURCES = conditional.c
+conditional_OBJECTS = conditional.$(OBJEXT)
+conditional_LDADD = $(LDADD)
+conditional_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 connect_to_SOURCES = connect-to.c
 connect_to_OBJECTS = connect-to.$(OBJEXT)
 connect_to_LDADD = $(LDADD)
-connect_to_DEPENDENCIES = $(LIBDIR)/libcurl.la
+connect_to_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
+cookie_SOURCES = cookie.c
+cookie_OBJECTS = cookie.$(OBJEXT)
+cookie_LDADD = $(LDADD)
+cookie_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 cookie_interface_SOURCES = cookie_interface.c
 cookie_interface_OBJECTS = cookie_interface.$(OBJEXT)
 cookie_interface_LDADD = $(LDADD)
-cookie_interface_DEPENDENCIES = $(LIBDIR)/libcurl.la
+cookie_interface_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
+cookiejar_SOURCES = cookiejar.c
+cookiejar_OBJECTS = cookiejar.$(OBJEXT)
+cookiejar_LDADD = $(LDADD)
+cookiejar_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 debug_SOURCES = debug.c
 debug_OBJECTS = debug.$(OBJEXT)
 debug_LDADD = $(LDADD)
-debug_DEPENDENCIES = $(LIBDIR)/libcurl.la
+debug_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 default_scheme_SOURCES = default-scheme.c
 default_scheme_OBJECTS = default-scheme.$(OBJEXT)
 default_scheme_LDADD = $(LDADD)
-default_scheme_DEPENDENCIES = $(LIBDIR)/libcurl.la
+default_scheme_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
+doh_SOURCES = doh.c
+doh_OBJECTS = doh.$(OBJEXT)
+doh_LDADD = $(LDADD)
+doh_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 externalsocket_SOURCES = externalsocket.c
 externalsocket_OBJECTS = externalsocket.$(OBJEXT)
 externalsocket_LDADD = $(LDADD)
-externalsocket_DEPENDENCIES = $(LIBDIR)/libcurl.la
+externalsocket_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 fileupload_SOURCES = fileupload.c
 fileupload_OBJECTS = fileupload.$(OBJEXT)
 fileupload_LDADD = $(LDADD)
-fileupload_DEPENDENCIES = $(LIBDIR)/libcurl.la
+fileupload_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
+ftp_delete_SOURCES = ftp-delete.c
+ftp_delete_OBJECTS = ftp-delete.$(OBJEXT)
+ftp_delete_LDADD = $(LDADD)
+ftp_delete_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
+ftp_listonly_SOURCES = ftp-listonly.c
+ftp_listonly_OBJECTS = ftp-listonly.$(OBJEXT)
+ftp_listonly_LDADD = $(LDADD)
+ftp_listonly_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 ftp_wildcard_SOURCES = ftp-wildcard.c
 ftp_wildcard_OBJECTS = ftp-wildcard.$(OBJEXT)
 ftp_wildcard_LDADD = $(LDADD)
-ftp_wildcard_DEPENDENCIES = $(LIBDIR)/libcurl.la
+ftp_wildcard_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 ftpget_SOURCES = ftpget.c
 ftpget_OBJECTS = ftpget.$(OBJEXT)
 ftpget_LDADD = $(LDADD)
-ftpget_DEPENDENCIES = $(LIBDIR)/libcurl.la
+ftpget_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 ftpgetinfo_SOURCES = ftpgetinfo.c
 ftpgetinfo_OBJECTS = ftpgetinfo.$(OBJEXT)
 ftpgetinfo_LDADD = $(LDADD)
-ftpgetinfo_DEPENDENCIES = $(LIBDIR)/libcurl.la
+ftpgetinfo_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 ftpgetresp_SOURCES = ftpgetresp.c
 ftpgetresp_OBJECTS = ftpgetresp.$(OBJEXT)
 ftpgetresp_LDADD = $(LDADD)
-ftpgetresp_DEPENDENCIES = $(LIBDIR)/libcurl.la
+ftpgetresp_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 ftpsget_SOURCES = ftpsget.c
 ftpsget_OBJECTS = ftpsget.$(OBJEXT)
 ftpsget_LDADD = $(LDADD)
-ftpsget_DEPENDENCIES = $(LIBDIR)/libcurl.la
+ftpsget_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 ftpupload_SOURCES = ftpupload.c
 ftpupload_OBJECTS = ftpupload.$(OBJEXT)
 ftpupload_LDADD = $(LDADD)
-ftpupload_DEPENDENCIES = $(LIBDIR)/libcurl.la
+ftpupload_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 ftpuploadfrommem_SOURCES = ftpuploadfrommem.c
 ftpuploadfrommem_OBJECTS = ftpuploadfrommem.$(OBJEXT)
 ftpuploadfrommem_LDADD = $(LDADD)
-ftpuploadfrommem_DEPENDENCIES = $(LIBDIR)/libcurl.la
+ftpuploadfrommem_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 ftpuploadresume_SOURCES = ftpuploadresume.c
 ftpuploadresume_OBJECTS = ftpuploadresume.$(OBJEXT)
 ftpuploadresume_LDADD = $(LDADD)
-ftpuploadresume_DEPENDENCIES = $(LIBDIR)/libcurl.la
+ftpuploadresume_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 getinfo_SOURCES = getinfo.c
 getinfo_OBJECTS = getinfo.$(OBJEXT)
 getinfo_LDADD = $(LDADD)
-getinfo_DEPENDENCIES = $(LIBDIR)/libcurl.la
+getinfo_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 getinmemory_SOURCES = getinmemory.c
 getinmemory_OBJECTS = getinmemory.$(OBJEXT)
 getinmemory_LDADD = $(LDADD)
-getinmemory_DEPENDENCIES = $(LIBDIR)/libcurl.la
+getinmemory_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 getredirect_SOURCES = getredirect.c
 getredirect_OBJECTS = getredirect.$(OBJEXT)
 getredirect_LDADD = $(LDADD)
-getredirect_DEPENDENCIES = $(LIBDIR)/libcurl.la
+getredirect_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 getreferrer_SOURCES = getreferrer.c
 getreferrer_OBJECTS = getreferrer.$(OBJEXT)
 getreferrer_LDADD = $(LDADD)
-getreferrer_DEPENDENCIES = $(LIBDIR)/libcurl.la
+getreferrer_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 headerapi_SOURCES = headerapi.c
 headerapi_OBJECTS = headerapi.$(OBJEXT)
 headerapi_LDADD = $(LDADD)
-headerapi_DEPENDENCIES = $(LIBDIR)/libcurl.la
+headerapi_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 hsts_preload_SOURCES = hsts-preload.c
 hsts_preload_OBJECTS = hsts-preload.$(OBJEXT)
 hsts_preload_LDADD = $(LDADD)
-hsts_preload_DEPENDENCIES = $(LIBDIR)/libcurl.la
+hsts_preload_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 http_options_SOURCES = http-options.c
 http_options_OBJECTS = http-options.$(OBJEXT)
 http_options_LDADD = $(LDADD)
-http_options_DEPENDENCIES = $(LIBDIR)/libcurl.la
+http_options_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 http_post_SOURCES = http-post.c
 http_post_OBJECTS = http-post.$(OBJEXT)
 http_post_LDADD = $(LDADD)
-http_post_DEPENDENCIES = $(LIBDIR)/libcurl.la
+http_post_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 http2_download_SOURCES = http2-download.c
 http2_download_OBJECTS = http2-download.$(OBJEXT)
 http2_download_LDADD = $(LDADD)
-http2_download_DEPENDENCIES = $(LIBDIR)/libcurl.la
+http2_download_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 http2_pushinmemory_SOURCES = http2-pushinmemory.c
 http2_pushinmemory_OBJECTS = http2-pushinmemory.$(OBJEXT)
 http2_pushinmemory_LDADD = $(LDADD)
-http2_pushinmemory_DEPENDENCIES = $(LIBDIR)/libcurl.la
+http2_pushinmemory_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 http2_serverpush_SOURCES = http2-serverpush.c
 http2_serverpush_OBJECTS = http2-serverpush.$(OBJEXT)
 http2_serverpush_LDADD = $(LDADD)
-http2_serverpush_DEPENDENCIES = $(LIBDIR)/libcurl.la
+http2_serverpush_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 http2_upload_SOURCES = http2-upload.c
 http2_upload_OBJECTS = http2-upload.$(OBJEXT)
 http2_upload_LDADD = $(LDADD)
-http2_upload_DEPENDENCIES = $(LIBDIR)/libcurl.la
+http2_upload_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 http3_SOURCES = http3.c
 http3_OBJECTS = http3.$(OBJEXT)
 http3_LDADD = $(LDADD)
-http3_DEPENDENCIES = $(LIBDIR)/libcurl.la
+http3_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 http3_present_SOURCES = http3-present.c
 http3_present_OBJECTS = http3-present.$(OBJEXT)
 http3_present_LDADD = $(LDADD)
-http3_present_DEPENDENCIES = $(LIBDIR)/libcurl.la
+http3_present_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 httpcustomheader_SOURCES = httpcustomheader.c
 httpcustomheader_OBJECTS = httpcustomheader.$(OBJEXT)
 httpcustomheader_LDADD = $(LDADD)
-httpcustomheader_DEPENDENCIES = $(LIBDIR)/libcurl.la
+httpcustomheader_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 httpput_SOURCES = httpput.c
 httpput_OBJECTS = httpput.$(OBJEXT)
 httpput_LDADD = $(LDADD)
-httpput_DEPENDENCIES = $(LIBDIR)/libcurl.la
+httpput_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 httpput_postfields_SOURCES = httpput-postfields.c
 httpput_postfields_OBJECTS = httpput-postfields.$(OBJEXT)
 httpput_postfields_LDADD = $(LDADD)
-httpput_postfields_DEPENDENCIES = $(LIBDIR)/libcurl.la
+httpput_postfields_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 https_SOURCES = https.c
 https_OBJECTS = https.$(OBJEXT)
 https_LDADD = $(LDADD)
-https_DEPENDENCIES = $(LIBDIR)/libcurl.la
+https_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
+httpsig_SOURCES = httpsig.c
+httpsig_OBJECTS = httpsig.$(OBJEXT)
+httpsig_LDADD = $(LDADD)
+httpsig_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 imap_append_SOURCES = imap-append.c
 imap_append_OBJECTS = imap-append.$(OBJEXT)
 imap_append_LDADD = $(LDADD)
-imap_append_DEPENDENCIES = $(LIBDIR)/libcurl.la
+imap_append_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 imap_authzid_SOURCES = imap-authzid.c
 imap_authzid_OBJECTS = imap-authzid.$(OBJEXT)
 imap_authzid_LDADD = $(LDADD)
-imap_authzid_DEPENDENCIES = $(LIBDIR)/libcurl.la
+imap_authzid_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 imap_copy_SOURCES = imap-copy.c
 imap_copy_OBJECTS = imap-copy.$(OBJEXT)
 imap_copy_LDADD = $(LDADD)
-imap_copy_DEPENDENCIES = $(LIBDIR)/libcurl.la
+imap_copy_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 imap_create_SOURCES = imap-create.c
 imap_create_OBJECTS = imap-create.$(OBJEXT)
 imap_create_LDADD = $(LDADD)
-imap_create_DEPENDENCIES = $(LIBDIR)/libcurl.la
+imap_create_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 imap_delete_SOURCES = imap-delete.c
 imap_delete_OBJECTS = imap-delete.$(OBJEXT)
 imap_delete_LDADD = $(LDADD)
-imap_delete_DEPENDENCIES = $(LIBDIR)/libcurl.la
+imap_delete_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 imap_examine_SOURCES = imap-examine.c
 imap_examine_OBJECTS = imap-examine.$(OBJEXT)
 imap_examine_LDADD = $(LDADD)
-imap_examine_DEPENDENCIES = $(LIBDIR)/libcurl.la
+imap_examine_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 imap_fetch_SOURCES = imap-fetch.c
 imap_fetch_OBJECTS = imap-fetch.$(OBJEXT)
 imap_fetch_LDADD = $(LDADD)
-imap_fetch_DEPENDENCIES = $(LIBDIR)/libcurl.la
+imap_fetch_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 imap_list_SOURCES = imap-list.c
 imap_list_OBJECTS = imap-list.$(OBJEXT)
 imap_list_LDADD = $(LDADD)
-imap_list_DEPENDENCIES = $(LIBDIR)/libcurl.la
+imap_list_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 imap_lsub_SOURCES = imap-lsub.c
 imap_lsub_OBJECTS = imap-lsub.$(OBJEXT)
 imap_lsub_LDADD = $(LDADD)
-imap_lsub_DEPENDENCIES = $(LIBDIR)/libcurl.la
+imap_lsub_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 imap_multi_SOURCES = imap-multi.c
 imap_multi_OBJECTS = imap-multi.$(OBJEXT)
 imap_multi_LDADD = $(LDADD)
-imap_multi_DEPENDENCIES = $(LIBDIR)/libcurl.la
+imap_multi_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 imap_noop_SOURCES = imap-noop.c
 imap_noop_OBJECTS = imap-noop.$(OBJEXT)
 imap_noop_LDADD = $(LDADD)
-imap_noop_DEPENDENCIES = $(LIBDIR)/libcurl.la
+imap_noop_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 imap_search_SOURCES = imap-search.c
 imap_search_OBJECTS = imap-search.$(OBJEXT)
 imap_search_LDADD = $(LDADD)
-imap_search_DEPENDENCIES = $(LIBDIR)/libcurl.la
+imap_search_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 imap_ssl_SOURCES = imap-ssl.c
 imap_ssl_OBJECTS = imap-ssl.$(OBJEXT)
 imap_ssl_LDADD = $(LDADD)
-imap_ssl_DEPENDENCIES = $(LIBDIR)/libcurl.la
+imap_ssl_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 imap_store_SOURCES = imap-store.c
 imap_store_OBJECTS = imap-store.$(OBJEXT)
 imap_store_LDADD = $(LDADD)
-imap_store_DEPENDENCIES = $(LIBDIR)/libcurl.la
+imap_store_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 imap_tls_SOURCES = imap-tls.c
 imap_tls_OBJECTS = imap-tls.$(OBJEXT)
 imap_tls_LDADD = $(LDADD)
-imap_tls_DEPENDENCIES = $(LIBDIR)/libcurl.la
+imap_tls_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 interface_SOURCES = interface.c
 interface_OBJECTS = interface.$(OBJEXT)
 interface_LDADD = $(LDADD)
-interface_DEPENDENCIES = $(LIBDIR)/libcurl.la
+interface_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 ipv6_SOURCES = ipv6.c
 ipv6_OBJECTS = ipv6.$(OBJEXT)
 ipv6_LDADD = $(LDADD)
-ipv6_DEPENDENCIES = $(LIBDIR)/libcurl.la
+ipv6_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 keepalive_SOURCES = keepalive.c
 keepalive_OBJECTS = keepalive.$(OBJEXT)
 keepalive_LDADD = $(LDADD)
-keepalive_DEPENDENCIES = $(LIBDIR)/libcurl.la
+keepalive_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
+limit_rate_SOURCES = limit-rate.c
+limit_rate_OBJECTS = limit-rate.$(OBJEXT)
+limit_rate_LDADD = $(LDADD)
+limit_rate_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 localport_SOURCES = localport.c
 localport_OBJECTS = localport.$(OBJEXT)
 localport_LDADD = $(LDADD)
-localport_DEPENDENCIES = $(LIBDIR)/libcurl.la
+localport_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
+log_failed_transfers_SOURCES = log_failed_transfers.c
+log_failed_transfers_OBJECTS = log_failed_transfers.$(OBJEXT)
+log_failed_transfers_LDADD = $(LDADD)
+log_failed_transfers_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 maxconnects_SOURCES = maxconnects.c
 maxconnects_OBJECTS = maxconnects.$(OBJEXT)
 maxconnects_LDADD = $(LDADD)
-maxconnects_DEPENDENCIES = $(LIBDIR)/libcurl.la
+maxconnects_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 multi_app_SOURCES = multi-app.c
 multi_app_OBJECTS = multi-app.$(OBJEXT)
 multi_app_LDADD = $(LDADD)
-multi_app_DEPENDENCIES = $(LIBDIR)/libcurl.la
+multi_app_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 multi_debugcallback_SOURCES = multi-debugcallback.c
 multi_debugcallback_OBJECTS = multi-debugcallback.$(OBJEXT)
 multi_debugcallback_LDADD = $(LDADD)
-multi_debugcallback_DEPENDENCIES = $(LIBDIR)/libcurl.la
+multi_debugcallback_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 multi_double_SOURCES = multi-double.c
 multi_double_OBJECTS = multi-double.$(OBJEXT)
 multi_double_LDADD = $(LDADD)
-multi_double_DEPENDENCIES = $(LIBDIR)/libcurl.la
+multi_double_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 multi_formadd_SOURCES = multi-formadd.c
 multi_formadd_OBJECTS = multi-formadd.$(OBJEXT)
 multi_formadd_LDADD = $(LDADD)
-multi_formadd_DEPENDENCIES = $(LIBDIR)/libcurl.la
+multi_formadd_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 multi_legacy_SOURCES = multi-legacy.c
 multi_legacy_OBJECTS = multi-legacy.$(OBJEXT)
 multi_legacy_LDADD = $(LDADD)
-multi_legacy_DEPENDENCIES = $(LIBDIR)/libcurl.la
+multi_legacy_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 multi_post_SOURCES = multi-post.c
 multi_post_OBJECTS = multi-post.$(OBJEXT)
 multi_post_LDADD = $(LDADD)
-multi_post_DEPENDENCIES = $(LIBDIR)/libcurl.la
+multi_post_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 multi_single_SOURCES = multi-single.c
 multi_single_OBJECTS = multi-single.$(OBJEXT)
 multi_single_LDADD = $(LDADD)
-multi_single_DEPENDENCIES = $(LIBDIR)/libcurl.la
+multi_single_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
+nagle_SOURCES = nagle.c
+nagle_OBJECTS = nagle.$(OBJEXT)
+nagle_LDADD = $(LDADD)
+nagle_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 netrc_SOURCES = netrc.c
 netrc_OBJECTS = netrc.$(OBJEXT)
 netrc_LDADD = $(LDADD)
-netrc_DEPENDENCIES = $(LIBDIR)/libcurl.la
+netrc_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 parseurl_SOURCES = parseurl.c
 parseurl_OBJECTS = parseurl.$(OBJEXT)
 parseurl_LDADD = $(LDADD)
-parseurl_DEPENDENCIES = $(LIBDIR)/libcurl.la
+parseurl_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
+path_as_is_SOURCES = path-as-is.c
+path_as_is_OBJECTS = path-as-is.$(OBJEXT)
+path_as_is_LDADD = $(LDADD)
+path_as_is_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 persistent_SOURCES = persistent.c
 persistent_OBJECTS = persistent.$(OBJEXT)
 persistent_LDADD = $(LDADD)
-persistent_DEPENDENCIES = $(LIBDIR)/libcurl.la
+persistent_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 pop3_authzid_SOURCES = pop3-authzid.c
 pop3_authzid_OBJECTS = pop3-authzid.$(OBJEXT)
 pop3_authzid_LDADD = $(LDADD)
-pop3_authzid_DEPENDENCIES = $(LIBDIR)/libcurl.la
+pop3_authzid_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 pop3_dele_SOURCES = pop3-dele.c
 pop3_dele_OBJECTS = pop3-dele.$(OBJEXT)
 pop3_dele_LDADD = $(LDADD)
-pop3_dele_DEPENDENCIES = $(LIBDIR)/libcurl.la
+pop3_dele_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 pop3_list_SOURCES = pop3-list.c
 pop3_list_OBJECTS = pop3-list.$(OBJEXT)
 pop3_list_LDADD = $(LDADD)
-pop3_list_DEPENDENCIES = $(LIBDIR)/libcurl.la
+pop3_list_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 pop3_multi_SOURCES = pop3-multi.c
 pop3_multi_OBJECTS = pop3-multi.$(OBJEXT)
 pop3_multi_LDADD = $(LDADD)
-pop3_multi_DEPENDENCIES = $(LIBDIR)/libcurl.la
+pop3_multi_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 pop3_noop_SOURCES = pop3-noop.c
 pop3_noop_OBJECTS = pop3-noop.$(OBJEXT)
 pop3_noop_LDADD = $(LDADD)
-pop3_noop_DEPENDENCIES = $(LIBDIR)/libcurl.la
+pop3_noop_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 pop3_retr_SOURCES = pop3-retr.c
 pop3_retr_OBJECTS = pop3-retr.$(OBJEXT)
 pop3_retr_LDADD = $(LDADD)
-pop3_retr_DEPENDENCIES = $(LIBDIR)/libcurl.la
+pop3_retr_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 pop3_ssl_SOURCES = pop3-ssl.c
 pop3_ssl_OBJECTS = pop3-ssl.$(OBJEXT)
 pop3_ssl_LDADD = $(LDADD)
-pop3_ssl_DEPENDENCIES = $(LIBDIR)/libcurl.la
+pop3_ssl_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 pop3_stat_SOURCES = pop3-stat.c
 pop3_stat_OBJECTS = pop3-stat.$(OBJEXT)
 pop3_stat_LDADD = $(LDADD)
-pop3_stat_DEPENDENCIES = $(LIBDIR)/libcurl.la
+pop3_stat_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 pop3_tls_SOURCES = pop3-tls.c
 pop3_tls_OBJECTS = pop3-tls.$(OBJEXT)
 pop3_tls_LDADD = $(LDADD)
-pop3_tls_DEPENDENCIES = $(LIBDIR)/libcurl.la
+pop3_tls_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 pop3_top_SOURCES = pop3-top.c
 pop3_top_OBJECTS = pop3-top.$(OBJEXT)
 pop3_top_LDADD = $(LDADD)
-pop3_top_DEPENDENCIES = $(LIBDIR)/libcurl.la
+pop3_top_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 pop3_uidl_SOURCES = pop3-uidl.c
 pop3_uidl_OBJECTS = pop3-uidl.$(OBJEXT)
 pop3_uidl_LDADD = $(LDADD)
-pop3_uidl_DEPENDENCIES = $(LIBDIR)/libcurl.la
+pop3_uidl_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 post_callback_SOURCES = post-callback.c
 post_callback_OBJECTS = post-callback.$(OBJEXT)
 post_callback_LDADD = $(LDADD)
-post_callback_DEPENDENCIES = $(LIBDIR)/libcurl.la
+post_callback_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 postinmemory_SOURCES = postinmemory.c
 postinmemory_OBJECTS = postinmemory.$(OBJEXT)
 postinmemory_LDADD = $(LDADD)
-postinmemory_DEPENDENCIES = $(LIBDIR)/libcurl.la
+postinmemory_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 postit2_SOURCES = postit2.c
 postit2_OBJECTS = postit2.$(OBJEXT)
 postit2_LDADD = $(LDADD)
-postit2_DEPENDENCIES = $(LIBDIR)/libcurl.la
+postit2_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 postit2_formadd_SOURCES = postit2-formadd.c
 postit2_formadd_OBJECTS = postit2-formadd.$(OBJEXT)
 postit2_formadd_LDADD = $(LDADD)
-postit2_formadd_DEPENDENCIES = $(LIBDIR)/libcurl.la
+postit2_formadd_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 progressfunc_SOURCES = progressfunc.c
 progressfunc_OBJECTS = progressfunc.$(OBJEXT)
 progressfunc_LDADD = $(LDADD)
-progressfunc_DEPENDENCIES = $(LIBDIR)/libcurl.la
+progressfunc_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 protofeats_SOURCES = protofeats.c
 protofeats_OBJECTS = protofeats.$(OBJEXT)
 protofeats_LDADD = $(LDADD)
-protofeats_DEPENDENCIES = $(LIBDIR)/libcurl.la
+protofeats_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 range_SOURCES = range.c
 range_OBJECTS = range.$(OBJEXT)
 range_LDADD = $(LDADD)
-range_DEPENDENCIES = $(LIBDIR)/libcurl.la
+range_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 resolve_SOURCES = resolve.c
 resolve_OBJECTS = resolve.$(OBJEXT)
 resolve_LDADD = $(LDADD)
-resolve_DEPENDENCIES = $(LIBDIR)/libcurl.la
+resolve_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 rtsp_options_SOURCES = rtsp-options.c
 rtsp_options_OBJECTS = rtsp-options.$(OBJEXT)
 rtsp_options_LDADD = $(LDADD)
-rtsp_options_DEPENDENCIES = $(LIBDIR)/libcurl.la
+rtsp_options_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 sendrecv_SOURCES = sendrecv.c
 sendrecv_OBJECTS = sendrecv.$(OBJEXT)
 sendrecv_LDADD = $(LDADD)
-sendrecv_DEPENDENCIES = $(LIBDIR)/libcurl.la
+sendrecv_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 sepheaders_SOURCES = sepheaders.c
 sepheaders_OBJECTS = sepheaders.$(OBJEXT)
 sepheaders_LDADD = $(LDADD)
-sepheaders_DEPENDENCIES = $(LIBDIR)/libcurl.la
+sepheaders_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 sftpget_SOURCES = sftpget.c
 sftpget_OBJECTS = sftpget.$(OBJEXT)
 sftpget_LDADD = $(LDADD)
-sftpget_DEPENDENCIES = $(LIBDIR)/libcurl.la
+sftpget_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 sftpuploadresume_SOURCES = sftpuploadresume.c
 sftpuploadresume_OBJECTS = sftpuploadresume.$(OBJEXT)
 sftpuploadresume_LDADD = $(LDADD)
-sftpuploadresume_DEPENDENCIES = $(LIBDIR)/libcurl.la
+sftpuploadresume_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 shared_connection_cache_SOURCES = shared-connection-cache.c
 shared_connection_cache_OBJECTS = shared-connection-cache.$(OBJEXT)
 shared_connection_cache_LDADD = $(LDADD)
-shared_connection_cache_DEPENDENCIES = $(LIBDIR)/libcurl.la
+shared_connection_cache_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 simple_SOURCES = simple.c
 simple_OBJECTS = simple.$(OBJEXT)
 simple_LDADD = $(LDADD)
-simple_DEPENDENCIES = $(LIBDIR)/libcurl.la
+simple_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 simplepost_SOURCES = simplepost.c
 simplepost_OBJECTS = simplepost.$(OBJEXT)
 simplepost_LDADD = $(LDADD)
-simplepost_DEPENDENCIES = $(LIBDIR)/libcurl.la
+simplepost_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 simplessl_SOURCES = simplessl.c
 simplessl_OBJECTS = simplessl.$(OBJEXT)
 simplessl_LDADD = $(LDADD)
-simplessl_DEPENDENCIES = $(LIBDIR)/libcurl.la
+simplessl_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 smtp_authzid_SOURCES = smtp-authzid.c
 smtp_authzid_OBJECTS = smtp-authzid.$(OBJEXT)
 smtp_authzid_LDADD = $(LDADD)
-smtp_authzid_DEPENDENCIES = $(LIBDIR)/libcurl.la
+smtp_authzid_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 smtp_expn_SOURCES = smtp-expn.c
 smtp_expn_OBJECTS = smtp-expn.$(OBJEXT)
 smtp_expn_LDADD = $(LDADD)
-smtp_expn_DEPENDENCIES = $(LIBDIR)/libcurl.la
+smtp_expn_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 smtp_mail_SOURCES = smtp-mail.c
 smtp_mail_OBJECTS = smtp-mail.$(OBJEXT)
 smtp_mail_LDADD = $(LDADD)
-smtp_mail_DEPENDENCIES = $(LIBDIR)/libcurl.la
+smtp_mail_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 smtp_mime_SOURCES = smtp-mime.c
 smtp_mime_OBJECTS = smtp-mime.$(OBJEXT)
 smtp_mime_LDADD = $(LDADD)
-smtp_mime_DEPENDENCIES = $(LIBDIR)/libcurl.la
+smtp_mime_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 smtp_multi_SOURCES = smtp-multi.c
 smtp_multi_OBJECTS = smtp-multi.$(OBJEXT)
 smtp_multi_LDADD = $(LDADD)
-smtp_multi_DEPENDENCIES = $(LIBDIR)/libcurl.la
+smtp_multi_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 smtp_ssl_SOURCES = smtp-ssl.c
 smtp_ssl_OBJECTS = smtp-ssl.$(OBJEXT)
 smtp_ssl_LDADD = $(LDADD)
-smtp_ssl_DEPENDENCIES = $(LIBDIR)/libcurl.la
+smtp_ssl_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 smtp_tls_SOURCES = smtp-tls.c
 smtp_tls_OBJECTS = smtp-tls.$(OBJEXT)
 smtp_tls_LDADD = $(LDADD)
-smtp_tls_DEPENDENCIES = $(LIBDIR)/libcurl.la
+smtp_tls_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 smtp_vrfy_SOURCES = smtp-vrfy.c
 smtp_vrfy_OBJECTS = smtp-vrfy.$(OBJEXT)
 smtp_vrfy_LDADD = $(LDADD)
-smtp_vrfy_DEPENDENCIES = $(LIBDIR)/libcurl.la
+smtp_vrfy_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 sslbackend_SOURCES = sslbackend.c
 sslbackend_OBJECTS = sslbackend.$(OBJEXT)
 sslbackend_LDADD = $(LDADD)
-sslbackend_DEPENDENCIES = $(LIBDIR)/libcurl.la
+sslbackend_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
+synctime_SOURCES = synctime.c
+synctime_OBJECTS = synctime.$(OBJEXT)
+synctime_LDADD = $(LDADD)
+synctime_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
+trailer_SOURCES = trailer.c
+trailer_OBJECTS = trailer.$(OBJEXT)
+trailer_LDADD = $(LDADD)
+trailer_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 unixsocket_SOURCES = unixsocket.c
 unixsocket_OBJECTS = unixsocket.$(OBJEXT)
 unixsocket_LDADD = $(LDADD)
-unixsocket_DEPENDENCIES = $(LIBDIR)/libcurl.la
+unixsocket_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 url2file_SOURCES = url2file.c
 url2file_OBJECTS = url2file.$(OBJEXT)
 url2file_LDADD = $(LDADD)
-url2file_DEPENDENCIES = $(LIBDIR)/libcurl.la
+url2file_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 urlapi_SOURCES = urlapi.c
 urlapi_OBJECTS = urlapi.$(OBJEXT)
 urlapi_LDADD = $(LDADD)
-urlapi_DEPENDENCIES = $(LIBDIR)/libcurl.la
+urlapi_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 websocket_SOURCES = websocket.c
 websocket_OBJECTS = websocket.$(OBJEXT)
 websocket_LDADD = $(LDADD)
-websocket_DEPENDENCIES = $(LIBDIR)/libcurl.la
+websocket_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 websocket_cb_SOURCES = websocket-cb.c
 websocket_cb_OBJECTS = websocket-cb.$(OBJEXT)
 websocket_cb_LDADD = $(LDADD)
-websocket_cb_DEPENDENCIES = $(LIBDIR)/libcurl.la
+websocket_cb_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
+websocket_updown_SOURCES = websocket-updown.c
+websocket_updown_OBJECTS = websocket-updown.$(OBJEXT)
+websocket_updown_LDADD = $(LDADD)
+websocket_updown_DEPENDENCIES = $(top_builddir)/lib/libcurl.la
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -677,62 +751,70 @@ depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/10-at-a-time.Po \
 	./$(DEPDIR)/address-scope.Po ./$(DEPDIR)/altsvc.Po \
-	./$(DEPDIR)/anyauthput.Po ./$(DEPDIR)/block_ip.Po \
+	./$(DEPDIR)/anyauthput.Po ./$(DEPDIR)/aws-sigv4.Po \
+	./$(DEPDIR)/block_ip.Po ./$(DEPDIR)/cainfo-blob.Po \
 	./$(DEPDIR)/certinfo.Po ./$(DEPDIR)/chkspeed.Po \
-	./$(DEPDIR)/connect-to.Po ./$(DEPDIR)/cookie_interface.Po \
+	./$(DEPDIR)/clientcert-blob.Po ./$(DEPDIR)/conditional.Po \
+	./$(DEPDIR)/connect-to.Po ./$(DEPDIR)/cookie.Po \
+	./$(DEPDIR)/cookie_interface.Po ./$(DEPDIR)/cookiejar.Po \
 	./$(DEPDIR)/debug.Po ./$(DEPDIR)/default-scheme.Po \
-	./$(DEPDIR)/externalsocket.Po ./$(DEPDIR)/fileupload.Po \
-	./$(DEPDIR)/ftp-wildcard.Po ./$(DEPDIR)/ftpget.Po \
-	./$(DEPDIR)/ftpgetinfo.Po ./$(DEPDIR)/ftpgetresp.Po \
-	./$(DEPDIR)/ftpsget.Po ./$(DEPDIR)/ftpupload.Po \
-	./$(DEPDIR)/ftpuploadfrommem.Po ./$(DEPDIR)/ftpuploadresume.Po \
-	./$(DEPDIR)/getinfo.Po ./$(DEPDIR)/getinmemory.Po \
-	./$(DEPDIR)/getredirect.Po ./$(DEPDIR)/getreferrer.Po \
-	./$(DEPDIR)/headerapi.Po ./$(DEPDIR)/hsts-preload.Po \
-	./$(DEPDIR)/http-options.Po ./$(DEPDIR)/http-post.Po \
-	./$(DEPDIR)/http2-download.Po \
+	./$(DEPDIR)/doh.Po ./$(DEPDIR)/externalsocket.Po \
+	./$(DEPDIR)/fileupload.Po ./$(DEPDIR)/ftp-delete.Po \
+	./$(DEPDIR)/ftp-listonly.Po ./$(DEPDIR)/ftp-wildcard.Po \
+	./$(DEPDIR)/ftpget.Po ./$(DEPDIR)/ftpgetinfo.Po \
+	./$(DEPDIR)/ftpgetresp.Po ./$(DEPDIR)/ftpsget.Po \
+	./$(DEPDIR)/ftpupload.Po ./$(DEPDIR)/ftpuploadfrommem.Po \
+	./$(DEPDIR)/ftpuploadresume.Po ./$(DEPDIR)/getinfo.Po \
+	./$(DEPDIR)/getinmemory.Po ./$(DEPDIR)/getredirect.Po \
+	./$(DEPDIR)/getreferrer.Po ./$(DEPDIR)/headerapi.Po \
+	./$(DEPDIR)/hsts-preload.Po ./$(DEPDIR)/http-options.Po \
+	./$(DEPDIR)/http-post.Po ./$(DEPDIR)/http2-download.Po \
 	./$(DEPDIR)/http2-pushinmemory.Po \
 	./$(DEPDIR)/http2-serverpush.Po ./$(DEPDIR)/http2-upload.Po \
 	./$(DEPDIR)/http3-present.Po ./$(DEPDIR)/http3.Po \
 	./$(DEPDIR)/httpcustomheader.Po \
 	./$(DEPDIR)/httpput-postfields.Po ./$(DEPDIR)/httpput.Po \
-	./$(DEPDIR)/https.Po ./$(DEPDIR)/imap-append.Po \
-	./$(DEPDIR)/imap-authzid.Po ./$(DEPDIR)/imap-copy.Po \
-	./$(DEPDIR)/imap-create.Po ./$(DEPDIR)/imap-delete.Po \
-	./$(DEPDIR)/imap-examine.Po ./$(DEPDIR)/imap-fetch.Po \
-	./$(DEPDIR)/imap-list.Po ./$(DEPDIR)/imap-lsub.Po \
-	./$(DEPDIR)/imap-multi.Po ./$(DEPDIR)/imap-noop.Po \
-	./$(DEPDIR)/imap-search.Po ./$(DEPDIR)/imap-ssl.Po \
-	./$(DEPDIR)/imap-store.Po ./$(DEPDIR)/imap-tls.Po \
-	./$(DEPDIR)/interface.Po ./$(DEPDIR)/ipv6.Po \
-	./$(DEPDIR)/keepalive.Po ./$(DEPDIR)/localport.Po \
-	./$(DEPDIR)/maxconnects.Po ./$(DEPDIR)/multi-app.Po \
-	./$(DEPDIR)/multi-debugcallback.Po ./$(DEPDIR)/multi-double.Po \
-	./$(DEPDIR)/multi-formadd.Po ./$(DEPDIR)/multi-legacy.Po \
-	./$(DEPDIR)/multi-post.Po ./$(DEPDIR)/multi-single.Po \
+	./$(DEPDIR)/https.Po ./$(DEPDIR)/httpsig.Po \
+	./$(DEPDIR)/imap-append.Po ./$(DEPDIR)/imap-authzid.Po \
+	./$(DEPDIR)/imap-copy.Po ./$(DEPDIR)/imap-create.Po \
+	./$(DEPDIR)/imap-delete.Po ./$(DEPDIR)/imap-examine.Po \
+	./$(DEPDIR)/imap-fetch.Po ./$(DEPDIR)/imap-list.Po \
+	./$(DEPDIR)/imap-lsub.Po ./$(DEPDIR)/imap-multi.Po \
+	./$(DEPDIR)/imap-noop.Po ./$(DEPDIR)/imap-search.Po \
+	./$(DEPDIR)/imap-ssl.Po ./$(DEPDIR)/imap-store.Po \
+	./$(DEPDIR)/imap-tls.Po ./$(DEPDIR)/interface.Po \
+	./$(DEPDIR)/ipv6.Po ./$(DEPDIR)/keepalive.Po \
+	./$(DEPDIR)/limit-rate.Po ./$(DEPDIR)/localport.Po \
+	./$(DEPDIR)/log_failed_transfers.Po ./$(DEPDIR)/maxconnects.Po \
+	./$(DEPDIR)/multi-app.Po ./$(DEPDIR)/multi-debugcallback.Po \
+	./$(DEPDIR)/multi-double.Po ./$(DEPDIR)/multi-formadd.Po \
+	./$(DEPDIR)/multi-legacy.Po ./$(DEPDIR)/multi-post.Po \
+	./$(DEPDIR)/multi-single.Po ./$(DEPDIR)/nagle.Po \
 	./$(DEPDIR)/netrc.Po ./$(DEPDIR)/parseurl.Po \
-	./$(DEPDIR)/persistent.Po ./$(DEPDIR)/pop3-authzid.Po \
-	./$(DEPDIR)/pop3-dele.Po ./$(DEPDIR)/pop3-list.Po \
-	./$(DEPDIR)/pop3-multi.Po ./$(DEPDIR)/pop3-noop.Po \
-	./$(DEPDIR)/pop3-retr.Po ./$(DEPDIR)/pop3-ssl.Po \
-	./$(DEPDIR)/pop3-stat.Po ./$(DEPDIR)/pop3-tls.Po \
-	./$(DEPDIR)/pop3-top.Po ./$(DEPDIR)/pop3-uidl.Po \
-	./$(DEPDIR)/post-callback.Po ./$(DEPDIR)/postinmemory.Po \
-	./$(DEPDIR)/postit2-formadd.Po ./$(DEPDIR)/postit2.Po \
-	./$(DEPDIR)/progressfunc.Po ./$(DEPDIR)/protofeats.Po \
-	./$(DEPDIR)/range.Po ./$(DEPDIR)/resolve.Po \
-	./$(DEPDIR)/rtsp-options.Po ./$(DEPDIR)/sendrecv.Po \
-	./$(DEPDIR)/sepheaders.Po ./$(DEPDIR)/sftpget.Po \
-	./$(DEPDIR)/sftpuploadresume.Po \
+	./$(DEPDIR)/path-as-is.Po ./$(DEPDIR)/persistent.Po \
+	./$(DEPDIR)/pop3-authzid.Po ./$(DEPDIR)/pop3-dele.Po \
+	./$(DEPDIR)/pop3-list.Po ./$(DEPDIR)/pop3-multi.Po \
+	./$(DEPDIR)/pop3-noop.Po ./$(DEPDIR)/pop3-retr.Po \
+	./$(DEPDIR)/pop3-ssl.Po ./$(DEPDIR)/pop3-stat.Po \
+	./$(DEPDIR)/pop3-tls.Po ./$(DEPDIR)/pop3-top.Po \
+	./$(DEPDIR)/pop3-uidl.Po ./$(DEPDIR)/post-callback.Po \
+	./$(DEPDIR)/postinmemory.Po ./$(DEPDIR)/postit2-formadd.Po \
+	./$(DEPDIR)/postit2.Po ./$(DEPDIR)/progressfunc.Po \
+	./$(DEPDIR)/protofeats.Po ./$(DEPDIR)/range.Po \
+	./$(DEPDIR)/resolve.Po ./$(DEPDIR)/rtsp-options.Po \
+	./$(DEPDIR)/sendrecv.Po ./$(DEPDIR)/sepheaders.Po \
+	./$(DEPDIR)/sftpget.Po ./$(DEPDIR)/sftpuploadresume.Po \
 	./$(DEPDIR)/shared-connection-cache.Po ./$(DEPDIR)/simple.Po \
 	./$(DEPDIR)/simplepost.Po ./$(DEPDIR)/simplessl.Po \
 	./$(DEPDIR)/smtp-authzid.Po ./$(DEPDIR)/smtp-expn.Po \
 	./$(DEPDIR)/smtp-mail.Po ./$(DEPDIR)/smtp-mime.Po \
 	./$(DEPDIR)/smtp-multi.Po ./$(DEPDIR)/smtp-ssl.Po \
 	./$(DEPDIR)/smtp-tls.Po ./$(DEPDIR)/smtp-vrfy.Po \
-	./$(DEPDIR)/sslbackend.Po ./$(DEPDIR)/unixsocket.Po \
+	./$(DEPDIR)/sslbackend.Po ./$(DEPDIR)/synctime.Po \
+	./$(DEPDIR)/trailer.Po ./$(DEPDIR)/unixsocket.Po \
 	./$(DEPDIR)/url2file.Po ./$(DEPDIR)/urlapi.Po \
-	./$(DEPDIR)/websocket-cb.Po ./$(DEPDIR)/websocket.Po
+	./$(DEPDIR)/websocket-cb.Po ./$(DEPDIR)/websocket-updown.Po \
+	./$(DEPDIR)/websocket.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -753,57 +835,65 @@ am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = 10-at-a-time.c address-scope.c altsvc.c anyauthput.c \
-	block_ip.c certinfo.c chkspeed.c connect-to.c \
-	cookie_interface.c debug.c default-scheme.c externalsocket.c \
-	fileupload.c ftp-wildcard.c ftpget.c ftpgetinfo.c ftpgetresp.c \
-	ftpsget.c ftpupload.c ftpuploadfrommem.c ftpuploadresume.c \
-	getinfo.c getinmemory.c getredirect.c getreferrer.c \
-	headerapi.c hsts-preload.c http-options.c http-post.c \
-	http2-download.c http2-pushinmemory.c http2-serverpush.c \
-	http2-upload.c http3.c http3-present.c httpcustomheader.c \
-	httpput.c httpput-postfields.c https.c imap-append.c \
+	aws-sigv4.c block_ip.c cainfo-blob.c certinfo.c chkspeed.c \
+	clientcert-blob.c conditional.c connect-to.c cookie.c \
+	cookie_interface.c cookiejar.c debug.c default-scheme.c doh.c \
+	externalsocket.c fileupload.c ftp-delete.c ftp-listonly.c \
+	ftp-wildcard.c ftpget.c ftpgetinfo.c ftpgetresp.c ftpsget.c \
+	ftpupload.c ftpuploadfrommem.c ftpuploadresume.c getinfo.c \
+	getinmemory.c getredirect.c getreferrer.c headerapi.c \
+	hsts-preload.c http-options.c http-post.c http2-download.c \
+	http2-pushinmemory.c http2-serverpush.c http2-upload.c http3.c \
+	http3-present.c httpcustomheader.c httpput.c \
+	httpput-postfields.c https.c httpsig.c imap-append.c \
 	imap-authzid.c imap-copy.c imap-create.c imap-delete.c \
 	imap-examine.c imap-fetch.c imap-list.c imap-lsub.c \
 	imap-multi.c imap-noop.c imap-search.c imap-ssl.c imap-store.c \
-	imap-tls.c interface.c ipv6.c keepalive.c localport.c \
-	maxconnects.c multi-app.c multi-debugcallback.c multi-double.c \
-	multi-formadd.c multi-legacy.c multi-post.c multi-single.c \
-	netrc.c parseurl.c persistent.c pop3-authzid.c pop3-dele.c \
-	pop3-list.c pop3-multi.c pop3-noop.c pop3-retr.c pop3-ssl.c \
-	pop3-stat.c pop3-tls.c pop3-top.c pop3-uidl.c post-callback.c \
-	postinmemory.c postit2.c postit2-formadd.c progressfunc.c \
-	protofeats.c range.c resolve.c rtsp-options.c sendrecv.c \
-	sepheaders.c sftpget.c sftpuploadresume.c \
+	imap-tls.c interface.c ipv6.c keepalive.c limit-rate.c \
+	localport.c log_failed_transfers.c maxconnects.c multi-app.c \
+	multi-debugcallback.c multi-double.c multi-formadd.c \
+	multi-legacy.c multi-post.c multi-single.c nagle.c netrc.c \
+	parseurl.c path-as-is.c persistent.c pop3-authzid.c \
+	pop3-dele.c pop3-list.c pop3-multi.c pop3-noop.c pop3-retr.c \
+	pop3-ssl.c pop3-stat.c pop3-tls.c pop3-top.c pop3-uidl.c \
+	post-callback.c postinmemory.c postit2.c postit2-formadd.c \
+	progressfunc.c protofeats.c range.c resolve.c rtsp-options.c \
+	sendrecv.c sepheaders.c sftpget.c sftpuploadresume.c \
 	shared-connection-cache.c simple.c simplepost.c simplessl.c \
 	smtp-authzid.c smtp-expn.c smtp-mail.c smtp-mime.c \
 	smtp-multi.c smtp-ssl.c smtp-tls.c smtp-vrfy.c sslbackend.c \
-	unixsocket.c url2file.c urlapi.c websocket.c websocket-cb.c
+	synctime.c trailer.c unixsocket.c url2file.c urlapi.c \
+	websocket.c websocket-cb.c websocket-updown.c
 DIST_SOURCES = 10-at-a-time.c address-scope.c altsvc.c anyauthput.c \
-	block_ip.c certinfo.c chkspeed.c connect-to.c \
-	cookie_interface.c debug.c default-scheme.c externalsocket.c \
-	fileupload.c ftp-wildcard.c ftpget.c ftpgetinfo.c ftpgetresp.c \
-	ftpsget.c ftpupload.c ftpuploadfrommem.c ftpuploadresume.c \
-	getinfo.c getinmemory.c getredirect.c getreferrer.c \
-	headerapi.c hsts-preload.c http-options.c http-post.c \
-	http2-download.c http2-pushinmemory.c http2-serverpush.c \
-	http2-upload.c http3.c http3-present.c httpcustomheader.c \
-	httpput.c httpput-postfields.c https.c imap-append.c \
+	aws-sigv4.c block_ip.c cainfo-blob.c certinfo.c chkspeed.c \
+	clientcert-blob.c conditional.c connect-to.c cookie.c \
+	cookie_interface.c cookiejar.c debug.c default-scheme.c doh.c \
+	externalsocket.c fileupload.c ftp-delete.c ftp-listonly.c \
+	ftp-wildcard.c ftpget.c ftpgetinfo.c ftpgetresp.c ftpsget.c \
+	ftpupload.c ftpuploadfrommem.c ftpuploadresume.c getinfo.c \
+	getinmemory.c getredirect.c getreferrer.c headerapi.c \
+	hsts-preload.c http-options.c http-post.c http2-download.c \
+	http2-pushinmemory.c http2-serverpush.c http2-upload.c http3.c \
+	http3-present.c httpcustomheader.c httpput.c \
+	httpput-postfields.c https.c httpsig.c imap-append.c \
 	imap-authzid.c imap-copy.c imap-create.c imap-delete.c \
 	imap-examine.c imap-fetch.c imap-list.c imap-lsub.c \
 	imap-multi.c imap-noop.c imap-search.c imap-ssl.c imap-store.c \
-	imap-tls.c interface.c ipv6.c keepalive.c localport.c \
-	maxconnects.c multi-app.c multi-debugcallback.c multi-double.c \
-	multi-formadd.c multi-legacy.c multi-post.c multi-single.c \
-	netrc.c parseurl.c persistent.c pop3-authzid.c pop3-dele.c \
-	pop3-list.c pop3-multi.c pop3-noop.c pop3-retr.c pop3-ssl.c \
-	pop3-stat.c pop3-tls.c pop3-top.c pop3-uidl.c post-callback.c \
-	postinmemory.c postit2.c postit2-formadd.c progressfunc.c \
-	protofeats.c range.c resolve.c rtsp-options.c sendrecv.c \
-	sepheaders.c sftpget.c sftpuploadresume.c \
+	imap-tls.c interface.c ipv6.c keepalive.c limit-rate.c \
+	localport.c log_failed_transfers.c maxconnects.c multi-app.c \
+	multi-debugcallback.c multi-double.c multi-formadd.c \
+	multi-legacy.c multi-post.c multi-single.c nagle.c netrc.c \
+	parseurl.c path-as-is.c persistent.c pop3-authzid.c \
+	pop3-dele.c pop3-list.c pop3-multi.c pop3-noop.c pop3-retr.c \
+	pop3-ssl.c pop3-stat.c pop3-tls.c pop3-top.c pop3-uidl.c \
+	post-callback.c postinmemory.c postit2.c postit2-formadd.c \
+	progressfunc.c protofeats.c range.c resolve.c rtsp-options.c \
+	sendrecv.c sepheaders.c sftpget.c sftpuploadresume.c \
 	shared-connection-cache.c simple.c simplepost.c simplessl.c \
 	smtp-authzid.c smtp-expn.c smtp-mail.c smtp-mime.c \
 	smtp-multi.c smtp-ssl.c smtp-tls.c smtp-vrfy.c sslbackend.c \
-	unixsocket.c url2file.c urlapi.c websocket.c websocket-cb.c
+	synctime.c trailer.c unixsocket.c url2file.c urlapi.c \
+	websocket.c websocket-cb.c websocket-updown.c
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -848,6 +938,7 @@ CCDEPMODE = @CCDEPMODE@
 # This might hold -Werror
 CFLAGS = @CFLAGS@ @CURL_CFLAG_EXTRAS@
 CFLAG_CURL_SYMBOL_HIDING = @CFLAG_CURL_SYMBOL_HIDING@
+CLANG_TIDY = @CLANG_TIDY@
 CONFIGURE_OPTIONS = @CONFIGURE_OPTIONS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
@@ -861,7 +952,9 @@ CURL_CPP = @CURL_CPP@
 CURL_LIBCURL_VERSIONED_SYMBOLS_PREFIX = @CURL_LIBCURL_VERSIONED_SYMBOLS_PREFIX@
 CURL_LIBCURL_VERSIONED_SYMBOLS_SONAME = @CURL_LIBCURL_VERSIONED_SYMBOLS_SONAME@
 CURL_NETWORK_AND_TIME_LIBS = @CURL_NETWORK_AND_TIME_LIBS@
+CURL_PACKAGE_MAINTAINER = @CURL_PACKAGE_MAINTAINER@
 CYGPATH_W = @CYGPATH_W@
+DANTED = @DANTED@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
 DLLTOOL = @DLLTOOL@
@@ -880,6 +973,7 @@ FILECMD = @FILECMD@
 FISH_FUNCTIONS_DIR = @FISH_FUNCTIONS_DIR@
 GCOV = @GCOV@
 GREP = @GREP@
+H2O = @H2O@
 HAVE_LIBZ = @HAVE_LIBZ@
 HTTPD = @HTTPD@
 HTTPD_NGHTTPX = @HTTPD_NGHTTPX@
@@ -931,7 +1025,9 @@ RANLIB = @RANLIB@
 RC = @RC@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
+SFTPD = @SFTPD@
 SHELL = @SHELL@
+SSHD = @SSHD@
 SSL_BACKENDS = @SSL_BACKENDS@
 STRIP = @STRIP@
 SUPPORT_FEATURES = @SUPPORT_FEATURES@
@@ -997,8 +1093,8 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AUTOMAKE_OPTIONS = foreign nostdinc
-EXTRA_DIST = README.md Makefile.example CMakeLists.txt \
-  $(COMPLICATED_EXAMPLES) .checksrc
+EXTRA_DIST = CMakeLists.txt .checksrc README.md Makefile.example \
+  $(COMPLICATED_MAY_BUILD) $(COMPLICATED_EXAMPLES)
 
 
 # Specify our include paths here, and do it relative to $(top_srcdir) and
@@ -1007,34 +1103,35 @@ EXTRA_DIST = README.md Makefile.example CMakeLists.txt \
 # might possibly already be installed in the system.
 #
 # $(top_srcdir)/include is for libcurl's external include files
-
 # Avoid libcurl obsolete stuff
-AM_CPPFLAGS = -I$(top_srcdir)/include -DCURL_NO_OLDIES $(am__append_1)
-LIBDIR = $(top_builddir)/lib
+AM_CPPFLAGS = -I$(top_srcdir)/include $(am__append_1) $(am__append_2) \
+	-DCURL_NO_OLDIES
 
 # Dependencies
-LDADD = $(LIBDIR)/libcurl.la @LIBCURL_PC_LIBS_PRIVATE@
+LDADD = $(top_builddir)/lib/libcurl.la
+
+# These examples require external dependencies that may be available during
+# the build.
+COMPLICATED_MAY_BUILD = \
+  cacertinmem.c \
+  multi-uv.c \
+  sessioninfo.c \
+  threaded.c \
+  usercertinmem.c
+
 
 # These examples require external dependencies that may not be commonly
 # available on POSIX systems, so do not bother attempting to compile them here.
 COMPLICATED_EXAMPLES = \
-  cacertinmem.c \
   crawler.c \
   ephiperfifo.c \
   evhiperfifo.c \
   ghiper.c \
   hiperfifo.c \
-  href_extractor.c \
   htmltidy.c \
   htmltitle.cpp \
   multi-event.c \
-  multi-uv.c \
-  multithread.c \
-  sessioninfo.c \
   smooth-gtk-thread.c \
-  synctime.c \
-  threaded-ssl.c \
-  usercertinmem.c \
   version-check.pl \
   xmlstream.c
 
@@ -1102,9 +1199,17 @@ anyauthput$(EXEEXT): $(anyauthput_OBJECTS) $(anyauthput_DEPENDENCIES) $(EXTRA_an
 	@rm -f anyauthput$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(anyauthput_OBJECTS) $(anyauthput_LDADD) $(LIBS)
 
+aws-sigv4$(EXEEXT): $(aws_sigv4_OBJECTS) $(aws_sigv4_DEPENDENCIES) $(EXTRA_aws_sigv4_DEPENDENCIES) 
+	@rm -f aws-sigv4$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(aws_sigv4_OBJECTS) $(aws_sigv4_LDADD) $(LIBS)
+
 block_ip$(EXEEXT): $(block_ip_OBJECTS) $(block_ip_DEPENDENCIES) $(EXTRA_block_ip_DEPENDENCIES) 
 	@rm -f block_ip$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(block_ip_OBJECTS) $(block_ip_LDADD) $(LIBS)
+
+cainfo-blob$(EXEEXT): $(cainfo_blob_OBJECTS) $(cainfo_blob_DEPENDENCIES) $(EXTRA_cainfo_blob_DEPENDENCIES) 
+	@rm -f cainfo-blob$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(cainfo_blob_OBJECTS) $(cainfo_blob_LDADD) $(LIBS)
 
 certinfo$(EXEEXT): $(certinfo_OBJECTS) $(certinfo_DEPENDENCIES) $(EXTRA_certinfo_DEPENDENCIES) 
 	@rm -f certinfo$(EXEEXT)
@@ -1114,13 +1219,29 @@ chkspeed$(EXEEXT): $(chkspeed_OBJECTS) $(chkspeed_DEPENDENCIES) $(EXTRA_chkspeed
 	@rm -f chkspeed$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(chkspeed_OBJECTS) $(chkspeed_LDADD) $(LIBS)
 
+clientcert-blob$(EXEEXT): $(clientcert_blob_OBJECTS) $(clientcert_blob_DEPENDENCIES) $(EXTRA_clientcert_blob_DEPENDENCIES) 
+	@rm -f clientcert-blob$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(clientcert_blob_OBJECTS) $(clientcert_blob_LDADD) $(LIBS)
+
+conditional$(EXEEXT): $(conditional_OBJECTS) $(conditional_DEPENDENCIES) $(EXTRA_conditional_DEPENDENCIES) 
+	@rm -f conditional$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(conditional_OBJECTS) $(conditional_LDADD) $(LIBS)
+
 connect-to$(EXEEXT): $(connect_to_OBJECTS) $(connect_to_DEPENDENCIES) $(EXTRA_connect_to_DEPENDENCIES) 
 	@rm -f connect-to$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(connect_to_OBJECTS) $(connect_to_LDADD) $(LIBS)
 
+cookie$(EXEEXT): $(cookie_OBJECTS) $(cookie_DEPENDENCIES) $(EXTRA_cookie_DEPENDENCIES) 
+	@rm -f cookie$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(cookie_OBJECTS) $(cookie_LDADD) $(LIBS)
+
 cookie_interface$(EXEEXT): $(cookie_interface_OBJECTS) $(cookie_interface_DEPENDENCIES) $(EXTRA_cookie_interface_DEPENDENCIES) 
 	@rm -f cookie_interface$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(cookie_interface_OBJECTS) $(cookie_interface_LDADD) $(LIBS)
+
+cookiejar$(EXEEXT): $(cookiejar_OBJECTS) $(cookiejar_DEPENDENCIES) $(EXTRA_cookiejar_DEPENDENCIES) 
+	@rm -f cookiejar$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(cookiejar_OBJECTS) $(cookiejar_LDADD) $(LIBS)
 
 debug$(EXEEXT): $(debug_OBJECTS) $(debug_DEPENDENCIES) $(EXTRA_debug_DEPENDENCIES) 
 	@rm -f debug$(EXEEXT)
@@ -1130,6 +1251,10 @@ default-scheme$(EXEEXT): $(default_scheme_OBJECTS) $(default_scheme_DEPENDENCIES
 	@rm -f default-scheme$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(default_scheme_OBJECTS) $(default_scheme_LDADD) $(LIBS)
 
+doh$(EXEEXT): $(doh_OBJECTS) $(doh_DEPENDENCIES) $(EXTRA_doh_DEPENDENCIES) 
+	@rm -f doh$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(doh_OBJECTS) $(doh_LDADD) $(LIBS)
+
 externalsocket$(EXEEXT): $(externalsocket_OBJECTS) $(externalsocket_DEPENDENCIES) $(EXTRA_externalsocket_DEPENDENCIES) 
 	@rm -f externalsocket$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(externalsocket_OBJECTS) $(externalsocket_LDADD) $(LIBS)
@@ -1137,6 +1262,14 @@ externalsocket$(EXEEXT): $(externalsocket_OBJECTS) $(externalsocket_DEPENDENCIES
 fileupload$(EXEEXT): $(fileupload_OBJECTS) $(fileupload_DEPENDENCIES) $(EXTRA_fileupload_DEPENDENCIES) 
 	@rm -f fileupload$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(fileupload_OBJECTS) $(fileupload_LDADD) $(LIBS)
+
+ftp-delete$(EXEEXT): $(ftp_delete_OBJECTS) $(ftp_delete_DEPENDENCIES) $(EXTRA_ftp_delete_DEPENDENCIES) 
+	@rm -f ftp-delete$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(ftp_delete_OBJECTS) $(ftp_delete_LDADD) $(LIBS)
+
+ftp-listonly$(EXEEXT): $(ftp_listonly_OBJECTS) $(ftp_listonly_DEPENDENCIES) $(EXTRA_ftp_listonly_DEPENDENCIES) 
+	@rm -f ftp-listonly$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(ftp_listonly_OBJECTS) $(ftp_listonly_LDADD) $(LIBS)
 
 ftp-wildcard$(EXEEXT): $(ftp_wildcard_OBJECTS) $(ftp_wildcard_DEPENDENCIES) $(EXTRA_ftp_wildcard_DEPENDENCIES) 
 	@rm -f ftp-wildcard$(EXEEXT)
@@ -1242,6 +1375,10 @@ https$(EXEEXT): $(https_OBJECTS) $(https_DEPENDENCIES) $(EXTRA_https_DEPENDENCIE
 	@rm -f https$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(https_OBJECTS) $(https_LDADD) $(LIBS)
 
+httpsig$(EXEEXT): $(httpsig_OBJECTS) $(httpsig_DEPENDENCIES) $(EXTRA_httpsig_DEPENDENCIES) 
+	@rm -f httpsig$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(httpsig_OBJECTS) $(httpsig_LDADD) $(LIBS)
+
 imap-append$(EXEEXT): $(imap_append_OBJECTS) $(imap_append_DEPENDENCIES) $(EXTRA_imap_append_DEPENDENCIES) 
 	@rm -f imap-append$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(imap_append_OBJECTS) $(imap_append_LDADD) $(LIBS)
@@ -1314,9 +1451,17 @@ keepalive$(EXEEXT): $(keepalive_OBJECTS) $(keepalive_DEPENDENCIES) $(EXTRA_keepa
 	@rm -f keepalive$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(keepalive_OBJECTS) $(keepalive_LDADD) $(LIBS)
 
+limit-rate$(EXEEXT): $(limit_rate_OBJECTS) $(limit_rate_DEPENDENCIES) $(EXTRA_limit_rate_DEPENDENCIES) 
+	@rm -f limit-rate$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(limit_rate_OBJECTS) $(limit_rate_LDADD) $(LIBS)
+
 localport$(EXEEXT): $(localport_OBJECTS) $(localport_DEPENDENCIES) $(EXTRA_localport_DEPENDENCIES) 
 	@rm -f localport$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(localport_OBJECTS) $(localport_LDADD) $(LIBS)
+
+log_failed_transfers$(EXEEXT): $(log_failed_transfers_OBJECTS) $(log_failed_transfers_DEPENDENCIES) $(EXTRA_log_failed_transfers_DEPENDENCIES) 
+	@rm -f log_failed_transfers$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(log_failed_transfers_OBJECTS) $(log_failed_transfers_LDADD) $(LIBS)
 
 maxconnects$(EXEEXT): $(maxconnects_OBJECTS) $(maxconnects_DEPENDENCIES) $(EXTRA_maxconnects_DEPENDENCIES) 
 	@rm -f maxconnects$(EXEEXT)
@@ -1350,6 +1495,10 @@ multi-single$(EXEEXT): $(multi_single_OBJECTS) $(multi_single_DEPENDENCIES) $(EX
 	@rm -f multi-single$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(multi_single_OBJECTS) $(multi_single_LDADD) $(LIBS)
 
+nagle$(EXEEXT): $(nagle_OBJECTS) $(nagle_DEPENDENCIES) $(EXTRA_nagle_DEPENDENCIES) 
+	@rm -f nagle$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(nagle_OBJECTS) $(nagle_LDADD) $(LIBS)
+
 netrc$(EXEEXT): $(netrc_OBJECTS) $(netrc_DEPENDENCIES) $(EXTRA_netrc_DEPENDENCIES) 
 	@rm -f netrc$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(netrc_OBJECTS) $(netrc_LDADD) $(LIBS)
@@ -1357,6 +1506,10 @@ netrc$(EXEEXT): $(netrc_OBJECTS) $(netrc_DEPENDENCIES) $(EXTRA_netrc_DEPENDENCIE
 parseurl$(EXEEXT): $(parseurl_OBJECTS) $(parseurl_DEPENDENCIES) $(EXTRA_parseurl_DEPENDENCIES) 
 	@rm -f parseurl$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(parseurl_OBJECTS) $(parseurl_LDADD) $(LIBS)
+
+path-as-is$(EXEEXT): $(path_as_is_OBJECTS) $(path_as_is_DEPENDENCIES) $(EXTRA_path_as_is_DEPENDENCIES) 
+	@rm -f path-as-is$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(path_as_is_OBJECTS) $(path_as_is_LDADD) $(LIBS)
 
 persistent$(EXEEXT): $(persistent_OBJECTS) $(persistent_DEPENDENCIES) $(EXTRA_persistent_DEPENDENCIES) 
 	@rm -f persistent$(EXEEXT)
@@ -1510,6 +1663,14 @@ sslbackend$(EXEEXT): $(sslbackend_OBJECTS) $(sslbackend_DEPENDENCIES) $(EXTRA_ss
 	@rm -f sslbackend$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sslbackend_OBJECTS) $(sslbackend_LDADD) $(LIBS)
 
+synctime$(EXEEXT): $(synctime_OBJECTS) $(synctime_DEPENDENCIES) $(EXTRA_synctime_DEPENDENCIES) 
+	@rm -f synctime$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(synctime_OBJECTS) $(synctime_LDADD) $(LIBS)
+
+trailer$(EXEEXT): $(trailer_OBJECTS) $(trailer_DEPENDENCIES) $(EXTRA_trailer_DEPENDENCIES) 
+	@rm -f trailer$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(trailer_OBJECTS) $(trailer_LDADD) $(LIBS)
+
 unixsocket$(EXEEXT): $(unixsocket_OBJECTS) $(unixsocket_DEPENDENCIES) $(EXTRA_unixsocket_DEPENDENCIES) 
 	@rm -f unixsocket$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(unixsocket_OBJECTS) $(unixsocket_LDADD) $(LIBS)
@@ -1530,6 +1691,10 @@ websocket-cb$(EXEEXT): $(websocket_cb_OBJECTS) $(websocket_cb_DEPENDENCIES) $(EX
 	@rm -f websocket-cb$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(websocket_cb_OBJECTS) $(websocket_cb_LDADD) $(LIBS)
 
+websocket-updown$(EXEEXT): $(websocket_updown_OBJECTS) $(websocket_updown_DEPENDENCIES) $(EXTRA_websocket_updown_DEPENDENCIES) 
+	@rm -f websocket-updown$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(websocket_updown_OBJECTS) $(websocket_updown_LDADD) $(LIBS)
+
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
@@ -1540,15 +1705,24 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/address-scope.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/altsvc.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/anyauthput.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/aws-sigv4.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/block_ip.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cainfo-blob.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/certinfo.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/chkspeed.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/clientcert-blob.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/conditional.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/connect-to.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cookie.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cookie_interface.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cookiejar.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/debug.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/default-scheme.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/doh.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/externalsocket.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fileupload.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ftp-delete.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ftp-listonly.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ftp-wildcard.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ftpget.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ftpgetinfo.Po@am__quote@ # am--include-marker
@@ -1575,6 +1749,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/httpput-postfields.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/httpput.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/https.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/httpsig.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/imap-append.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/imap-authzid.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/imap-copy.Po@am__quote@ # am--include-marker
@@ -1593,7 +1768,9 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/interface.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ipv6.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/keepalive.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/limit-rate.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/localport.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/log_failed_transfers.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/maxconnects.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/multi-app.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/multi-debugcallback.Po@am__quote@ # am--include-marker
@@ -1602,8 +1779,10 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/multi-legacy.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/multi-post.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/multi-single.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nagle.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/netrc.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/parseurl.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/path-as-is.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/persistent.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pop3-authzid.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pop3-dele.Po@am__quote@ # am--include-marker
@@ -1642,10 +1821,13 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/smtp-tls.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/smtp-vrfy.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sslbackend.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/synctime.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/trailer.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/unixsocket.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/url2file.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/urlapi.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/websocket-cb.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/websocket-updown.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/websocket.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
@@ -1771,7 +1953,9 @@ distdir-am: $(DISTFILES)
 check-am: all-am
 	$(MAKE) $(AM_MAKEFLAGS) $(check_PROGRAMS)
 check: check-am
-all-am: Makefile
+@DEBUGBUILD_FALSE@all-local:
+@NOT_CURL_CI_FALSE@all-local:
+all-am: Makefile all-local
 installdirs:
 install: install-am
 install-exec: install-exec-am
@@ -1813,15 +1997,24 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/address-scope.Po
 	-rm -f ./$(DEPDIR)/altsvc.Po
 	-rm -f ./$(DEPDIR)/anyauthput.Po
+	-rm -f ./$(DEPDIR)/aws-sigv4.Po
 	-rm -f ./$(DEPDIR)/block_ip.Po
+	-rm -f ./$(DEPDIR)/cainfo-blob.Po
 	-rm -f ./$(DEPDIR)/certinfo.Po
 	-rm -f ./$(DEPDIR)/chkspeed.Po
+	-rm -f ./$(DEPDIR)/clientcert-blob.Po
+	-rm -f ./$(DEPDIR)/conditional.Po
 	-rm -f ./$(DEPDIR)/connect-to.Po
+	-rm -f ./$(DEPDIR)/cookie.Po
 	-rm -f ./$(DEPDIR)/cookie_interface.Po
+	-rm -f ./$(DEPDIR)/cookiejar.Po
 	-rm -f ./$(DEPDIR)/debug.Po
 	-rm -f ./$(DEPDIR)/default-scheme.Po
+	-rm -f ./$(DEPDIR)/doh.Po
 	-rm -f ./$(DEPDIR)/externalsocket.Po
 	-rm -f ./$(DEPDIR)/fileupload.Po
+	-rm -f ./$(DEPDIR)/ftp-delete.Po
+	-rm -f ./$(DEPDIR)/ftp-listonly.Po
 	-rm -f ./$(DEPDIR)/ftp-wildcard.Po
 	-rm -f ./$(DEPDIR)/ftpget.Po
 	-rm -f ./$(DEPDIR)/ftpgetinfo.Po
@@ -1848,6 +2041,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/httpput-postfields.Po
 	-rm -f ./$(DEPDIR)/httpput.Po
 	-rm -f ./$(DEPDIR)/https.Po
+	-rm -f ./$(DEPDIR)/httpsig.Po
 	-rm -f ./$(DEPDIR)/imap-append.Po
 	-rm -f ./$(DEPDIR)/imap-authzid.Po
 	-rm -f ./$(DEPDIR)/imap-copy.Po
@@ -1866,7 +2060,9 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/interface.Po
 	-rm -f ./$(DEPDIR)/ipv6.Po
 	-rm -f ./$(DEPDIR)/keepalive.Po
+	-rm -f ./$(DEPDIR)/limit-rate.Po
 	-rm -f ./$(DEPDIR)/localport.Po
+	-rm -f ./$(DEPDIR)/log_failed_transfers.Po
 	-rm -f ./$(DEPDIR)/maxconnects.Po
 	-rm -f ./$(DEPDIR)/multi-app.Po
 	-rm -f ./$(DEPDIR)/multi-debugcallback.Po
@@ -1875,8 +2071,10 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/multi-legacy.Po
 	-rm -f ./$(DEPDIR)/multi-post.Po
 	-rm -f ./$(DEPDIR)/multi-single.Po
+	-rm -f ./$(DEPDIR)/nagle.Po
 	-rm -f ./$(DEPDIR)/netrc.Po
 	-rm -f ./$(DEPDIR)/parseurl.Po
+	-rm -f ./$(DEPDIR)/path-as-is.Po
 	-rm -f ./$(DEPDIR)/persistent.Po
 	-rm -f ./$(DEPDIR)/pop3-authzid.Po
 	-rm -f ./$(DEPDIR)/pop3-dele.Po
@@ -1915,10 +2113,13 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/smtp-tls.Po
 	-rm -f ./$(DEPDIR)/smtp-vrfy.Po
 	-rm -f ./$(DEPDIR)/sslbackend.Po
+	-rm -f ./$(DEPDIR)/synctime.Po
+	-rm -f ./$(DEPDIR)/trailer.Po
 	-rm -f ./$(DEPDIR)/unixsocket.Po
 	-rm -f ./$(DEPDIR)/url2file.Po
 	-rm -f ./$(DEPDIR)/urlapi.Po
 	-rm -f ./$(DEPDIR)/websocket-cb.Po
+	-rm -f ./$(DEPDIR)/websocket-updown.Po
 	-rm -f ./$(DEPDIR)/websocket.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
@@ -1969,15 +2170,24 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/address-scope.Po
 	-rm -f ./$(DEPDIR)/altsvc.Po
 	-rm -f ./$(DEPDIR)/anyauthput.Po
+	-rm -f ./$(DEPDIR)/aws-sigv4.Po
 	-rm -f ./$(DEPDIR)/block_ip.Po
+	-rm -f ./$(DEPDIR)/cainfo-blob.Po
 	-rm -f ./$(DEPDIR)/certinfo.Po
 	-rm -f ./$(DEPDIR)/chkspeed.Po
+	-rm -f ./$(DEPDIR)/clientcert-blob.Po
+	-rm -f ./$(DEPDIR)/conditional.Po
 	-rm -f ./$(DEPDIR)/connect-to.Po
+	-rm -f ./$(DEPDIR)/cookie.Po
 	-rm -f ./$(DEPDIR)/cookie_interface.Po
+	-rm -f ./$(DEPDIR)/cookiejar.Po
 	-rm -f ./$(DEPDIR)/debug.Po
 	-rm -f ./$(DEPDIR)/default-scheme.Po
+	-rm -f ./$(DEPDIR)/doh.Po
 	-rm -f ./$(DEPDIR)/externalsocket.Po
 	-rm -f ./$(DEPDIR)/fileupload.Po
+	-rm -f ./$(DEPDIR)/ftp-delete.Po
+	-rm -f ./$(DEPDIR)/ftp-listonly.Po
 	-rm -f ./$(DEPDIR)/ftp-wildcard.Po
 	-rm -f ./$(DEPDIR)/ftpget.Po
 	-rm -f ./$(DEPDIR)/ftpgetinfo.Po
@@ -2004,6 +2214,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/httpput-postfields.Po
 	-rm -f ./$(DEPDIR)/httpput.Po
 	-rm -f ./$(DEPDIR)/https.Po
+	-rm -f ./$(DEPDIR)/httpsig.Po
 	-rm -f ./$(DEPDIR)/imap-append.Po
 	-rm -f ./$(DEPDIR)/imap-authzid.Po
 	-rm -f ./$(DEPDIR)/imap-copy.Po
@@ -2022,7 +2233,9 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/interface.Po
 	-rm -f ./$(DEPDIR)/ipv6.Po
 	-rm -f ./$(DEPDIR)/keepalive.Po
+	-rm -f ./$(DEPDIR)/limit-rate.Po
 	-rm -f ./$(DEPDIR)/localport.Po
+	-rm -f ./$(DEPDIR)/log_failed_transfers.Po
 	-rm -f ./$(DEPDIR)/maxconnects.Po
 	-rm -f ./$(DEPDIR)/multi-app.Po
 	-rm -f ./$(DEPDIR)/multi-debugcallback.Po
@@ -2031,8 +2244,10 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/multi-legacy.Po
 	-rm -f ./$(DEPDIR)/multi-post.Po
 	-rm -f ./$(DEPDIR)/multi-single.Po
+	-rm -f ./$(DEPDIR)/nagle.Po
 	-rm -f ./$(DEPDIR)/netrc.Po
 	-rm -f ./$(DEPDIR)/parseurl.Po
+	-rm -f ./$(DEPDIR)/path-as-is.Po
 	-rm -f ./$(DEPDIR)/persistent.Po
 	-rm -f ./$(DEPDIR)/pop3-authzid.Po
 	-rm -f ./$(DEPDIR)/pop3-dele.Po
@@ -2071,10 +2286,13 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/smtp-tls.Po
 	-rm -f ./$(DEPDIR)/smtp-vrfy.Po
 	-rm -f ./$(DEPDIR)/sslbackend.Po
+	-rm -f ./$(DEPDIR)/synctime.Po
+	-rm -f ./$(DEPDIR)/trailer.Po
 	-rm -f ./$(DEPDIR)/unixsocket.Po
 	-rm -f ./$(DEPDIR)/url2file.Po
 	-rm -f ./$(DEPDIR)/urlapi.Po
 	-rm -f ./$(DEPDIR)/websocket-cb.Po
+	-rm -f ./$(DEPDIR)/websocket-updown.Po
 	-rm -f ./$(DEPDIR)/websocket.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
@@ -2096,16 +2314,16 @@ uninstall-am:
 
 .MAKE: check-am install-am install-strip
 
-.PHONY: CTAGS GTAGS TAGS all all-am am--depfiles check check-am clean \
-	clean-checkPROGRAMS clean-generic clean-libtool cscopelist-am \
-	ctags ctags-am distclean distclean-compile distclean-generic \
-	distclean-libtool distclean-tags distdir dvi dvi-am html \
-	html-am info info-am install install-am install-data \
-	install-data-am install-dvi install-dvi-am install-exec \
-	install-exec-am install-html install-html-am install-info \
-	install-info-am install-man install-pdf install-pdf-am \
-	install-ps install-ps-am install-strip installcheck \
-	installcheck-am installdirs maintainer-clean \
+.PHONY: CTAGS GTAGS TAGS all all-am all-local am--depfiles check \
+	check-am clean clean-checkPROGRAMS clean-generic clean-libtool \
+	cscopelist-am ctags ctags-am distclean distclean-compile \
+	distclean-generic distclean-libtool distclean-tags distdir dvi \
+	dvi-am html html-am info info-am install install-am \
+	install-data install-data-am install-dvi install-dvi-am \
+	install-exec install-exec-am install-html install-html-am \
+	install-info install-info-am install-man install-pdf \
+	install-pdf-am install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs maintainer-clean \
 	maintainer-clean-generic mostlyclean mostlyclean-compile \
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
 	tags tags-am uninstall uninstall-am
@@ -2113,12 +2331,15 @@ uninstall-am:
 .PRECIOUS: Makefile
 
 
-# Makefile.inc provides the check_PROGRAMS and COMPLICATED_EXAMPLES defines
+# Get check_PROGRAMS, COMPLICATED_MAY_BUILD, COMPLICATED_EXAMPLES variables
 
 all: $(check_PROGRAMS)
 
 checksrc:
 	$(CHECKSRC)(@PERL@ $(top_srcdir)/scripts/checksrc.pl -D$(srcdir) $(srcdir)/*.c)
+
+# for debug builds, we scan the sources on all regular make invokes
+@DEBUGBUILD_TRUE@@NOT_CURL_CI_TRUE@all-local: checksrc
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

@@ -12,10 +12,12 @@ See-also:
   - proxy-tlsuser
   - proxy-tlspassword
 Example:
-  - --proxy-tlsauthtype SRP -x https://proxy $URL
+  - --proxy-tlsauthtype SRP -x https://proxy.example $URL
 ---
 
 # `--proxy-tlsauthtype`
+
+Deprecated option. This has no functionality since 8.22.0.
 
 Set TLS authentication type with HTTPS proxy. The only supported option is
 `SRP`, for TLS-SRP (RFC 5054). This option works only if the underlying

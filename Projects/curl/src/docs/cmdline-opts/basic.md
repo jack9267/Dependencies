@@ -4,9 +4,9 @@ SPDX-License-Identifier: curl
 Long: basic
 Help: HTTP Basic Authentication
 Protocols: HTTP
-Category: auth
+Category: auth http
 Added: 7.10.6
-Multi: mutex
+Multi: boolean
 See-also:
   - proxy-basic
 Example:

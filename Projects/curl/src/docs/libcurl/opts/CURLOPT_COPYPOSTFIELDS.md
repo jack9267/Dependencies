@@ -11,6 +11,8 @@ See-also:
   - CURLOPT_UPLOAD (3)
 Protocol:
   - HTTP
+  - MQTT
+  - RTSP
 Added-in: 7.17.1
 ---
 
@@ -60,7 +62,8 @@ int main(void)
 {
   CURL *curl = curl_easy_init();
   if(curl) {
-    char local_buffer[1024]="data to send";
+    CURLcode result;
+    char local_buffer[1024] = "data to send";
     curl_easy_setopt(curl, CURLOPT_URL, "https://example.com");
 
     /* size of the data to copy from the buffer and send in the request */
@@ -69,7 +72,8 @@ int main(void)
     /* send data from the local stack */
     curl_easy_setopt(curl, CURLOPT_COPYPOSTFIELDS, local_buffer);
 
-    curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
   }
 }
 ~~~

@@ -1,7 +1,9 @@
+<?xml version="1.0" encoding="US-ASCII"?>
 <testcase>
 <info>
 <keywords>
 HTTP
+libtest
 </keywords>
 </info>
 
@@ -26,9 +28,6 @@ http
 <name>
 Pre-request callback for HTTP
 </name>
-<tool>
-libprereq
-</tool>
 
 <command>
 %HOSTIP:%HTTPPORT/%TESTNUMBER

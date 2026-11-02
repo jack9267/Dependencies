@@ -1,14 +1,16 @@
+<?xml version="1.0" encoding="US-ASCII"?>
 <testcase>
 <info>
 <keywords>
 HTTP
 HTTP POST
+Resume
 </keywords>
 </info>
 
 # Server-side
 <reply>
-<data>
+<data crlf="headers">
 HTTP/1.1 100 Continue swsclose
 Silly-header: yeeeees
 
@@ -24,10 +26,10 @@ Mime
 http
 </server>
 <name>
-HTTP multipart formpost with only a 100 reply
+HTTP multipart formpost with zero resume offset and only a 100 reply
 </name>
 <command>
-http://%HOSTIP:%HTTPPORT/%TESTNUMBER -F name=daniel
+http://%HOSTIP:%HTTPPORT/%TESTNUMBER -F name=daniel -C 0
 </command>
 </client>
 
@@ -37,7 +39,7 @@ http://%HOSTIP:%HTTPPORT/%TESTNUMBER -F name=daniel
 ^Content-Type: multipart/form-data.*
 ^-----------------------.*
 </strip>
-<protocol>
+<protocol crlf="yes">
 POST /%TESTNUMBER HTTP/1.1
 Host: %HOSTIP:%HTTPPORT
 User-Agent: curl/%VERSION

@@ -42,8 +42,7 @@ set, it returns error.
 These are the available protocols:
 
 DICT, FILE, FTP, FTPS, GOPHER, GOPHERS, HTTP, HTTPS, IMAP, IMAPS, LDAP, LDAPS,
-MQTT, POP3, POP3S, RTMP, RTMPE, RTMPS, RTMPT, RTMPTE, RTMPTS, RTSP, SCP, SFTP,
-SMB, SMBS, SMTP, SMTPS, TELNET, TFTP, WS, WSS
+MQTT, MQTTS, POP3, POP3S, RTSP, SCP, SFTP, SMTP, SMTPS, TELNET, TFTP, WS, WSS
 
 You can set "ALL" as a short-cut to enable all protocols. Note that by setting
 all, you may enable protocols that were not supported the day you write this
@@ -65,10 +64,11 @@ All protocols built-in
 # EXAMPLE
 
 ~~~c
-int main(int argc, char **argv)
+int main(int argc, char *argv[])
 {
   CURL *curl = curl_easy_init();
   if(curl) {
+    CURLcode result;
     /* pass in the URL from an external source */
     curl_easy_setopt(curl, CURLOPT_URL, argv[1]);
 
@@ -76,10 +76,17 @@ int main(int argc, char **argv)
     curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "http,tftp,sftp");
 
     /* Perform the request */
-    curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
   }
 }
 ~~~
+
+# HISTORY
+
+RTMP and its related protocol schemes are not supported since curl 8.20.0
+
+SMB and SMBS were removed in curl 8.23.0
 
 # %AVAILABILITY%
 

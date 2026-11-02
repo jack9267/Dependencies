@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="US-ASCII"?>
 <testcase>
 <info>
 <keywords>
@@ -6,10 +7,9 @@ variables
 </keywords>
 </info>
 
-#
 # Server-side
 <reply>
-<data crlf="yes">
+<data crlf="headers">
 HTTP/1.1 200 OK
 Date: Tue, 09 Nov 2010 14:49:00 GMT
 Server: test-server/fake
@@ -25,14 +25,13 @@ Funny-head: yesyes
 </data>
 </reply>
 
-#
 # Client-side
 <client>
 <server>
 http
 </server>
 <name>
-Variable from file that is JSON and URL encoded (with null byte)
+Variable from file that is JSON and URL encoded (with NUL byte)
 </name>
 <file name="%LOGDIR/junk">
 %hex[%01%02%03%00%04%05%06]hex%
@@ -42,7 +41,6 @@ http://%HOSTIP:%HTTPPORT/%TESTNUMBER --variable what@%LOGDIR/junk --variable sec
 </command>
 </client>
 
-#
 # Verify data after the test has been "shot"
 <verify>
 <protocol crlf="yes" nonewline="yes">

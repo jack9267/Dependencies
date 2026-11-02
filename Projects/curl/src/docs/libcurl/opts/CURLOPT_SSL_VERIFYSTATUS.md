@@ -38,6 +38,10 @@ using the "Certificate Status Request" TLS extension (aka. OCSP stapling).
 Note that if this option is enabled but the server does not support the TLS
 extension, the verification fails.
 
+For LDAP, this option only has an effect when using the OpenLDAP backend,
+which routes TLS through libcurl. It is not supported by Apple's OpenLDAP
+fork.
+
 # DEFAULT
 
 0
@@ -51,11 +55,11 @@ int main(void)
 {
   CURL *curl = curl_easy_init();
   if(curl) {
-    CURLcode res;
+    CURLcode result;
     curl_easy_setopt(curl, CURLOPT_URL, "https://example.com/");
     /* ask for OCSP stapling */
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYSTATUS, 1L);
-    res = curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
   }
 }

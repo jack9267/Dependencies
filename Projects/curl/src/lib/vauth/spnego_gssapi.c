@@ -23,26 +23,16 @@
  * RFC4178 Simple and Protected GSS-API Negotiation Mechanism
  *
  ***************************************************************************/
-
 #include "curl_setup.h"
 
 #if defined(HAVE_GSSAPI) && defined(USE_SPNEGO)
 
-#include <curl/curl.h>
-
 #include "vauth/vauth.h"
-#include "urldata.h"
-#include "curl_base64.h"
+#include "curlx/base64.h"
 #include "curl_gssapi.h"
-#include "warnless.h"
-#include "curl_multibyte.h"
-#include "sendf.h"
+#include "curl_trc.h"
 
-/* The last #include files should be: */
-#include "curl_memory.h"
-#include "memdebug.h"
-
-#if defined(__GNUC__) && defined(__APPLE__)
+#if defined(CURL_HAVE_DIAG) && defined(__APPLE__) && !defined(HAVE_GSSAPPLE)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
@@ -80,9 +70,8 @@ bool Curl_auth_is_spnego_supported(void)
  * Returns CURLE_OK on success.
  */
 CURLcode Curl_auth_decode_spnego_message(struct Curl_easy *data,
-                                         const char *user,
-                                         const char *password,
-                                         const char *service,
+                                         struct Curl_creds *creds,
+                                         const char *default_service,
                                          const char *host,
                                          const char *chlg64,
                                          struct negotiatedata *nego)
@@ -93,14 +82,14 @@ CURLcode Curl_auth_decode_spnego_message(struct Curl_easy *data,
   OM_uint32 major_status;
   OM_uint32 minor_status;
   OM_uint32 unused_status;
-  gss_buffer_desc spn_token = GSS_C_EMPTY_BUFFER;
   gss_buffer_desc input_token = GSS_C_EMPTY_BUFFER;
   gss_buffer_desc output_token = GSS_C_EMPTY_BUFFER;
   gss_channel_bindings_t chan_bindings = GSS_C_NO_CHANNEL_BINDINGS;
+#ifdef GSS_C_CHANNEL_BOUND_FLAG
   struct gss_channel_bindings_struct chan;
+#endif
 
-  (void) user;
-  (void) password;
+  (void)creds;
 
   if(nego->context && nego->status == GSS_S_COMPLETE) {
     /* We finished successfully our part of authentication, but server
@@ -111,7 +100,11 @@ CURLcode Curl_auth_decode_spnego_message(struct Curl_easy *data,
   }
 
   if(!nego->spn) {
+    gss_buffer_desc spn_token = GSS_C_EMPTY_BUFFER;
+
     /* Generate our SPN */
+    const char *service = Curl_creds_has_sasl_service(creds) ?
+      Curl_creds_sasl_service(creds) : default_service;
     char *spn = Curl_auth_build_spn(service, NULL, host);
     if(!spn)
       return CURLE_OUT_OF_MEMORY;
@@ -128,18 +121,18 @@ CURLcode Curl_auth_decode_spnego_message(struct Curl_easy *data,
       Curl_gss_log_error(data, "gss_import_name() failed: ",
                          major_status, minor_status);
 
-      free(spn);
+      curlx_free(spn);
 
       return CURLE_AUTH_ERROR;
     }
 
-    free(spn);
+    curlx_free(spn);
   }
 
   if(chlg64 && *chlg64) {
     /* Decode the base-64 encoded challenge message */
     if(*chlg64 != '=') {
-      result = Curl_base64_decode(chlg64, &chlg, &chlglen);
+      result = curlx_base64_decode(chlg64, &chlg, &chlglen);
       if(result)
         return result;
     }
@@ -156,12 +149,65 @@ CURLcode Curl_auth_decode_spnego_message(struct Curl_easy *data,
   }
 
   /* Set channel binding data if available */
-  if(nego->channel_binding_data.leng > 0) {
+#ifdef GSS_C_CHANNEL_BOUND_FLAG
+  if(curlx_dyn_len(&nego->channel_binding_data)) {
     memset(&chan, 0, sizeof(struct gss_channel_bindings_struct));
-    chan.application_data.length = nego->channel_binding_data.leng;
-    chan.application_data.value = nego->channel_binding_data.bufr;
+    chan.application_data.length = curlx_dyn_len(&nego->channel_binding_data);
+    chan.application_data.value = curlx_dyn_ptr(&nego->channel_binding_data);
     chan_bindings = &chan;
   }
+#endif
+
+#ifdef HAVE_GSS_SET_NEG_MECHS
+  /* Acquire explicit credentials and restrict SPNEGO sub-mechanisms to
+   * exclude NTLM. We enumerate all available mechanisms and filter out
+   * the NTLMSSP OID, matching SSPI's "!ntlm". */
+  if(nego->cred == GSS_C_NO_CREDENTIAL) {
+    /* OID 1.3.6.1.4.1.311.2.2.10 (NTLMSSP) */
+    static const gss_OID_desc ntlmssp_oid = {
+      10, CURL_UNCONST("\x2b\x06\x01\x04\x01\x82\x37\x02\x02\x0a")
+    };
+    gss_OID_set available_mechs = GSS_C_NO_OID_SET;
+    gss_OID_set filtered_mechs = GSS_C_NO_OID_SET;
+
+    /* Acquire default credentials for SPNEGO */
+    major_status = Curl_gss_acquire_cred(&minor_status, GSS_C_NO_NAME,
+                                    GSS_C_INDEFINITE, GSS_C_NO_OID_SET,
+                                    GSS_C_INITIATE, &nego->cred, NULL, NULL);
+    if(GSS_ERROR(major_status)) {
+      Curl_gss_log_error(data, "gss_acquire_cred() failed: ",
+                         major_status, minor_status);
+      curlx_safefree(input_token.value);
+      return CURLE_AUTH_ERROR;
+    }
+
+    /* Get all available mechanisms */
+    major_status = Curl_gss_indicate_mechs(&minor_status, &available_mechs);
+    if(!GSS_ERROR(major_status)) {
+      /* Build a set excluding NTLMSSP */
+      major_status = gss_create_empty_oid_set(&minor_status, &filtered_mechs);
+      if(!GSS_ERROR(major_status)) {
+        size_t i;
+        for(i = 0; i < available_mechs->count; i++) {
+          gss_OID oid = &available_mechs->elements[i];
+          if(oid->length != ntlmssp_oid.length ||
+             memcmp(oid->elements, ntlmssp_oid.elements, oid->length)) {
+            gss_add_oid_set_member(&minor_status, oid, &filtered_mechs);
+          }
+        }
+        /* Restrict SPNEGO to only use non-NTLM mechanisms */
+        major_status = Curl_gss_set_neg_mechs(&minor_status, nego->cred,
+                                              filtered_mechs);
+        if(GSS_ERROR(major_status)) {
+          Curl_gss_log_error(data, "gss_set_neg_mechs() failed: ",
+                             major_status, minor_status);
+        }
+        gss_release_oid_set(&minor_status, &filtered_mechs);
+      }
+      gss_release_oid_set(&minor_status, &available_mechs);
+    }
+  }
+#endif /* HAVE_GSS_SET_NEG_MECHS */
 
   /* Generate our challenge-response message */
   major_status = Curl_gss_init_sec_context(data,
@@ -173,10 +219,11 @@ CURLcode Curl_auth_decode_spnego_message(struct Curl_easy *data,
                                            &input_token,
                                            &output_token,
                                            TRUE,
-                                           NULL);
+                                           NULL,
+                                           nego->cred);
 
   /* Free the decoded challenge as it is not required anymore */
-  Curl_safefree(input_token.value);
+  curlx_safefree(input_token.value);
 
   nego->status = major_status;
   if(GSS_ERROR(major_status)) {
@@ -194,6 +241,29 @@ CURLcode Curl_auth_decode_spnego_message(struct Curl_easy *data,
       gss_release_buffer(&unused_status, &output_token);
 
     return CURLE_AUTH_ERROR;
+  }
+
+  /* Check if NTLM was selected and is disallowed */
+  if(nego->context != GSS_C_NO_CONTEXT) {
+    /* OID 1.3.6.1.4.1.311.2.2.10 (NTLMSSP) */
+    static const gss_OID_desc ntlmssp_oid = {
+      10, CURL_UNCONST("\x2b\x06\x01\x04\x01\x82\x37\x02\x02\x0a")
+    };
+    OM_uint32 inquire_major, inquire_minor;
+    gss_OID mech_type = GSS_C_NO_OID;
+
+    inquire_major = Curl_gss_inquire_context(&inquire_minor,
+                                             nego->context,
+                                             &mech_type);
+    if(!GSS_ERROR(inquire_major) && mech_type &&
+       mech_type->length == ntlmssp_oid.length &&
+       !memcmp(mech_type->elements, ntlmssp_oid.elements,
+               ntlmssp_oid.length)) {
+      infof(data, "SPNEGO chose NTLM, but NTLM is not allowed");
+      gss_release_buffer(&unused_status, &output_token);
+      Curl_auth_cleanup_spnego(nego);
+      return CURLE_AUTH_ERROR;
+    }
   }
 
   /* Free previous token */
@@ -216,7 +286,7 @@ CURLcode Curl_auth_decode_spnego_message(struct Curl_easy *data,
  * data        [in]     - The session handle.
  * nego        [in/out] - The Negotiate data struct being used and modified.
  * outptr      [in/out] - The address where a pointer to newly allocated memory
- *                        holding the result will be stored upon completion.
+ *                        holding the result is stored upon completion.
  * outlen      [out]    - The length of the output message.
  *
  * Returns CURLE_OK on success.
@@ -228,9 +298,9 @@ CURLcode Curl_auth_create_spnego_message(struct negotiatedata *nego,
   OM_uint32 minor_status;
 
   /* Base64 encode the already generated response */
-  result = Curl_base64_encode(nego->output_token.value,
-                              nego->output_token.length,
-                              outptr, outlen);
+  result = curlx_base64_encode(nego->output_token.value,
+                               nego->output_token.length,
+                               outptr, outlen);
 
   if(result) {
     gss_release_buffer(&minor_status, &nego->output_token);
@@ -267,7 +337,8 @@ void Curl_auth_cleanup_spnego(struct negotiatedata *nego)
 
   /* Free our security context */
   if(nego->context != GSS_C_NO_CONTEXT) {
-    gss_delete_sec_context(&minor_status, &nego->context, GSS_C_NO_BUFFER);
+    Curl_gss_delete_sec_context(&minor_status, &nego->context,
+                                GSS_C_NO_BUFFER);
     nego->context = GSS_C_NO_CONTEXT;
   }
 
@@ -276,13 +347,18 @@ void Curl_auth_cleanup_spnego(struct negotiatedata *nego)
     gss_release_buffer(&minor_status, &nego->output_token);
     nego->output_token.value = NULL;
     nego->output_token.length = 0;
-
   }
 
   /* Free the SPN */
   if(nego->spn != GSS_C_NO_NAME) {
     gss_release_name(&minor_status, &nego->spn);
     nego->spn = GSS_C_NO_NAME;
+  }
+
+  /* Free our credentials */
+  if(nego->cred != GSS_C_NO_CREDENTIAL) {
+    Curl_gss_release_cred(&minor_status, &nego->cred);
+    nego->cred = GSS_C_NO_CREDENTIAL;
   }
 
   /* Reset any variables */
@@ -293,7 +369,7 @@ void Curl_auth_cleanup_spnego(struct negotiatedata *nego)
   nego->havemultiplerequests = FALSE;
 }
 
-#if defined(__GNUC__) && defined(__APPLE__)
+#if defined(CURL_HAVE_DIAG) && defined(__APPLE__) && !defined(HAVE_GSSAPPLE)
 #pragma GCC diagnostic pop
 #endif
 

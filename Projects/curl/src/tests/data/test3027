@@ -1,9 +1,11 @@
+<?xml version="1.0" encoding="US-ASCII"?>
 <testcase>
 <info>
 <keywords>
 FTP
 CURLOPT_FILETIME
 MDTM fail
+libtest
 </keywords>
 </info>
 
@@ -27,9 +29,6 @@ ftp
 <name>
 Get a file via FTP but 550 after MDTM command
 </name>
-<tool>
-lib3027
-</tool>
 <command option="no-include">
 ftp://%HOSTIP:%FTPPORT/%TESTNUMBER
 </command>
@@ -40,10 +39,7 @@ data blobb
 
 # Verify data after the test has been "shot"
 <verify>
-<strip>
-QUIT
-</strip>
-<protocol>
+<protocol crlf="yes">
 USER anonymous
 PASS ftp@example.com
 PWD

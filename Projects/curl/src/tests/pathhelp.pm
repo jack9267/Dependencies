@@ -36,7 +36,7 @@
 # Forward slashes are simpler processed in Perl, do not require extra escaping
 # for shell (unlike back slashes) and accepted by Windows native programs, so
 # all functions return paths with only forward slashes.
-# All returned paths don't contain any duplicated slashes, only single slashes
+# All returned paths do not contain any duplicated slashes, only single slashes
 # are used as directory separators on output.
 # On non-Windows platforms functions acts as transparent wrappers for similar
 # Perl's functions or return unmodified string (depending on functionality),
@@ -51,7 +51,7 @@ package pathhelp;
 
 use strict;
 use warnings;
-use Cwd 'abs_path';
+use File::Spec;
 
 BEGIN {
     use base qw(Exporter);
@@ -59,21 +59,22 @@ BEGIN {
     our @EXPORT_OK = qw(
         os_is_win
         exe_ext
+        dirsepadd
+        shell_quote
         sys_native_abs_path
         sys_native_current_path
         build_sys_abs_path
     );
 }
 
-
 #######################################################################
 # Block for cached static variables
 #
 {
     # Cached static variable, Perl 5.0-compatible.
-    my $is_win = $^O eq 'MSWin32'
-              || $^O eq 'cygwin'
-              || $^O eq 'msys';
+    my $is_win = $^O eq 'MSWin32' ||
+                 $^O eq 'cygwin' ||
+                 $^O eq 'msys';
 
     # Returns boolean true if OS is any form of Windows.
     sub os_is_win {
@@ -117,20 +118,20 @@ sub sys_native_abs_path {
     my ($path) = @_;
 
     # Return untouched on non-Windows platforms.
-    return Cwd::abs_path($path) if !os_is_win();
+    return File::Spec->rel2abs($path) if !os_is_win();
 
     # Do not process empty path.
-    return $path if ($path eq '');
+    return $path if($path eq '');
 
     my $res;
     if($^O eq 'msys' || $^O eq 'cygwin') {
-        $res = Cygwin::posix_to_win_path(Cwd::abs_path($path));
+        $res = Cygwin::posix_to_win_path(File::Spec->rel2abs($path));
     }
     elsif($path =~ m{^/(cygdrive/)?([a-z])/(.*)}) {
         $res = uc($2) . ":/" . $3;
     }
     else {
-        $res = Cwd::abs_path($path);
+        $res = File::Spec->rel2abs($path);
     }
 
     $res =~ s{[/\\]+}{/}g;
@@ -146,14 +147,14 @@ sub build_sys_abs_path {
     my ($path) = @_;
 
     # Return untouched on non-Windows platforms.
-    return Cwd::abs_path($path) if !os_is_win();
+    return File::Spec->rel2abs($path) if !os_is_win();
 
     my $res;
     if($^O eq 'msys' || $^O eq 'cygwin') {
         $res = Cygwin::win_to_posix_path($path, 1);
     }
     else {
-        $res = Cwd::abs_path($path);
+        $res = File::Spec->rel2abs($path);
 
         if($res =~ m{^([A-Za-z]):(.*)}) {
             $res = "/" . lc($1) . $2;
@@ -169,17 +170,45 @@ sub build_sys_abs_path {
 #
 sub exe_ext {
     my ($component, @arr) = @_;
-    if ($ENV{'CURL_TEST_EXE_EXT'}) {
+    if($ENV{'CURL_TEST_EXE_EXT'}) {
         return $ENV{'CURL_TEST_EXE_EXT'};
     }
-    if ($ENV{'CURL_TEST_EXE_EXT_'.$component}) {
-        return $ENV{'CURL_TEST_EXE_EXT_'.$component};
+    if($ENV{'CURL_TEST_EXE_EXT_' . $component}) {
+        return $ENV{'CURL_TEST_EXE_EXT_' . $component};
     }
-    if ($^O eq 'MSWin32' || $^O eq 'cygwin' || $^O eq 'msys' ||
-        $^O eq 'dos' || $^O eq 'os2') {
+    if($^O eq 'MSWin32' || $^O eq 'cygwin' || $^O eq 'msys' ||
+       $^O eq 'dos' || $^O eq 'os2') {
         return '.exe';
     }
     return '';
+}
+
+#***************************************************************************
+# Add ending slash if missing
+#
+sub dirsepadd {
+    my ($dir) = @_;
+    $dir =~ s/\/$//;
+    return $dir . '/';
+}
+
+#######################################################################
+# Quote an argument for passing safely to a Bourne shell
+# This does the same thing as String::ShellQuote but does not need a package.
+#
+sub shell_quote {
+    my ($s) = @_;
+    if($^O eq 'MSWin32') {
+        $s = '"' . $s . '"';
+    }
+    else {
+        if($s !~ m/^[-+=.,_\/:a-zA-Z0-9]+$/) {
+            # string contains a "dangerous" character--quote it
+            $s =~ s/'/'"'"'/g;
+            $s = "'" . $s . "'";
+        }
+    }
+    return $s;
 }
 
 1;    # End of module

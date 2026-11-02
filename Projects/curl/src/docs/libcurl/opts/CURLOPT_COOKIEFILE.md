@@ -29,7 +29,7 @@ CURLcode curl_easy_setopt(CURL *handle, CURLOPT_COOKIEFILE, char *filename);
 
 Pass a pointer to a null-terminated string as parameter. It should point to
 the filename of your file holding cookie data to read. The cookie data can be
-in either the old Netscape / Mozilla cookie data format or just regular HTTP
+in either the old Netscape / Mozilla cookie data format or regular HTTP
 headers (Set-Cookie style) dumped to a file.
 
 It also enables the cookie engine, making libcurl parse and send cookies on
@@ -37,16 +37,15 @@ subsequent requests with this handle.
 
 By passing the empty string ("") to this option, you enable the cookie engine
 without reading any initial cookies. If you tell libcurl the filename is "-"
-(just a single minus sign), libcurl instead reads from stdin.
+(a single minus sign), libcurl instead reads from stdin.
 
-This option only **reads** cookies. To make libcurl write cookies to file,
-see CURLOPT_COOKIEJAR(3).
+This option only **reads** cookies. To make libcurl write cookies to file, see
+CURLOPT_COOKIEJAR(3).
 
-If you read cookies from a plain HTTP headers file and it does not specify a
-domain in the Set-Cookie line, then the cookie is not sent since the cookie
-domain cannot match the target URL's. To address this, set a domain in
-Set-Cookie line (doing that includes subdomains) or preferably: use the
-Netscape format.
+If you read cookies from a plain HTTP headers file, make sure each
+`Set-Cookie` line specifies a `Domain` attribute. Without an explicit domain,
+libcurl cannot reliably associate the cookie with a host and it may be applied
+in unexpected ways. We suggest using the Netscape file format instead.
 
 The application does not have to keep the string around after setting this
 option.
@@ -54,6 +53,11 @@ option.
 If you use this option multiple times, you add more files to read cookies
 from. Setting this option to NULL disables the cookie engine and clears the
 list of files to read cookies from.
+
+The cookies are loaded from the specified file(s) when the transfer starts,
+not when this option is set.
+
+libcurl ignores filenames which do not exist or point to a directory.
 
 # SECURITY CONCERNS
 
@@ -75,13 +79,13 @@ int main(void)
 {
   CURL *curl = curl_easy_init();
   if(curl) {
-    CURLcode res;
+    CURLcode result;
     curl_easy_setopt(curl, CURLOPT_URL, "https://example.com/foo.bin");
 
     /* get cookies from an existing file */
     curl_easy_setopt(curl, CURLOPT_COOKIEFILE, "/tmp/cookies.txt");
 
-    res = curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
 
     curl_easy_cleanup(curl);
   }

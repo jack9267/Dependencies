@@ -1,8 +1,10 @@
+<?xml version="1.0" encoding="US-ASCII"?>
 <testcase>
 <info>
 <keywords>
 HTTP
 IPv6
+libtest
 </keywords>
 </info>
 
@@ -20,6 +22,10 @@ Content-Length: 0
 
 # Client-side
 <client>
+<features>
+http
+IPv6
+</features>
 <server>
 http-ipv6
 </server>
@@ -28,7 +34,7 @@ http-ipv6
 Pre-request callback for HTTP IPv6
 </name>
 <tool>
-libprereq
+lib2082
 </tool>
 
 <command>

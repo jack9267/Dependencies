@@ -21,175 +21,203 @@
  * SPDX-License-Identifier: curl
  *
  ***************************************************************************/
-#include "curlcheck.h"
-#include "netrc.h"
-#include "memdebug.h" /* LAST include file */
+#include "unitcheck.h"
 
 #ifndef CURL_DISABLE_NETRC
+#include "netrc.h"
+#include "creds.h"
 
-static char *s_login;
-static char *s_password;
-
-static CURLcode unit_setup(void)
+static CURLcode t1304_setup(struct Curl_easy **easy)
 {
-  s_password = NULL;
-  s_login = NULL;
-  return CURLE_OK;
+  CURLcode result = CURLE_OK;
+
+  global_init(CURL_GLOBAL_ALL);
+  *easy = curl_easy_init();
+  if(!*easy) {
+    curl_global_cleanup();
+    return CURLE_OUT_OF_MEMORY;
+  }
+  return result;
 }
 
-static void unit_stop(void)
+static void t1304_stop(struct Curl_easy *easy)
 {
-  Curl_safefree(s_password);
-  Curl_safefree(s_login);
+  curl_easy_cleanup(easy);
+  curl_global_cleanup();
 }
 
-UNITTEST_START
+static bool t1304_no_user(struct Curl_creds *creds)
 {
-  int result;
+  return !creds || !creds->user[0];
+}
+
+static bool t1304_no_passwd(struct Curl_creds *creds)
+{
+  return !creds || !creds->passwd[0];
+}
+
+static void t1304_empty_literals(struct Curl_easy *data, const char *filename)
+{
+  static const struct {
+    const char *content;
+    NETRCcode result;
+    const char *login;
+    const char *passwd;
+  } tests[] = {
+    { "default login \"\"", NETRC_OK, "", "" },
+    { "default password \"\"", NETRC_OK, "", "" },
+    { "default login \"\" password secret", NETRC_OK, "", "secret" },
+    { "default password \"\" login admin", NETRC_OK, "admin", "" },
+    { "default login \"\" password \"\"", NETRC_OK, "", "" },
+    { "machine \"\" login ignored password ignored",
+      NETRC_NO_MATCH, NULL, NULL },
+    { "machine \"\" login ignored password ignored\n"
+      "machine example.com login admin password passwd",
+      NETRC_OK, "admin", "passwd" },
+    { "machine example.com login \"\" password \"\"", NETRC_OK, "", "" }
+  };
+  size_t i;
+
+  for(i = 0; i < CURL_ARRAYSIZE(tests); ++i) {
+    struct store_netrc store;
+    struct Curl_creds *creds = NULL;
+    CURLcode result;
+    NETRCcode res;
+
+    /* Each cached file starts a fresh lexer, so an empty first literal
+     * cannot rely on an allocation from a previous nonempty literal. */
+    Curl_netrc_init(&store);
+    result = curlx_dyn_add(&store.filebuf, tests[i].content);
+    fail_unless(result == CURLE_OK, "could not store netrc content");
+    store.filename = curlx_strdup(filename);
+    fail_unless(store.filename, "could not store netrc filename");
+    if(!result && store.filename) {
+      store.loaded = TRUE;
+      res = Curl_netrc_scan(data, &store, "example.com", NULL,
+                            filename, &creds);
+      fail_unless(res == tests[i].result, "unexpected netrc result");
+      if(tests[i].result == NETRC_OK) {
+        fail_unless(creds, "credentials should have been found");
+        fail_unless(!strcmp(Curl_creds_user(creds), tests[i].login),
+                    "unexpected login");
+        fail_unless(!strcmp(Curl_creds_passwd(creds), tests[i].passwd),
+                    "unexpected password");
+      }
+      else
+        fail_unless(!creds, "credentials should not have been found");
+    }
+    Curl_creds_unlink(&creds);
+    Curl_netrc_cleanup(&store);
+  }
+}
+
+static CURLcode test_unit1304(const char *arg)
+{
+  struct Curl_creds *cr_out = NULL;
+  struct Curl_easy *data;
+  NETRCcode res;
   struct store_netrc store;
+
+  UNITTEST_BEGIN(t1304_setup(&data))
 
   /*
    * Test a non existent host in our netrc file.
    */
   Curl_netrc_init(&store);
-  result = Curl_parsenetrc(&store,
-                           "test.example.com", &s_login, &s_password, arg);
-  fail_unless(result == 1, "Host not found should return 1");
-  abort_unless(s_password == NULL, "password did not return NULL!");
-  abort_unless(s_login == NULL, "user did not return NULL!");
+  res = Curl_netrc_scan(data, &store, "test.example.com", NULL, arg, &cr_out);
+  fail_unless(res == NETRC_NO_MATCH, "expected no match");
+  fail_unless(!cr_out, "creds did not return NULL!");
   Curl_netrc_cleanup(&store);
 
   /*
    * Test a non existent login in our netrc file.
    */
-  s_login = (char *)"me";
   Curl_netrc_init(&store);
-  result = Curl_parsenetrc(&store,
-                           "example.com", &s_login, &s_password, arg);
-  fail_unless(result == 0, "Host should have been found");
-  abort_unless(s_password == NULL, "password is not NULL!");
+  res = Curl_netrc_scan(data, &store, "example.com", "me", arg, &cr_out);
+  fail_unless(res == NETRC_NO_MATCH, "expected no match");
+  fail_unless(t1304_no_passwd(cr_out), "password is not NULL!");
   Curl_netrc_cleanup(&store);
 
   /*
    * Test a non existent login and host in our netrc file.
    */
-  s_login = (char *)"me";
   Curl_netrc_init(&store);
-  result = Curl_parsenetrc(&store,
-                           "test.example.com", &s_login, &s_password, arg);
-  fail_unless(result == 1, "Host not found should return 1");
-  abort_unless(s_password == NULL, "password is not NULL!");
+  res = Curl_netrc_scan(data, &store, "test.example.com", "me", arg, &cr_out);
+  fail_unless(res == NETRC_NO_MATCH, "expected no match");
+  fail_unless(t1304_no_passwd(cr_out), "password is not NULL!");
   Curl_netrc_cleanup(&store);
 
   /*
    * Test a non existent login (substring of an existing one) in our
    * netrc file.
    */
-  s_login = (char *)"admi";
   Curl_netrc_init(&store);
-  result = Curl_parsenetrc(&store,
-                           "example.com", &s_login, &s_password, arg);
-  fail_unless(result == 0, "Host should have been found");
-  abort_unless(s_password == NULL, "password is not NULL!");
+  res = Curl_netrc_scan(data, &store, "example.com", "a", arg, &cr_out);
+  fail_unless(res == NETRC_NO_MATCH, "expected no match");
+  fail_unless(t1304_no_passwd(cr_out), "password is not NULL!");
   Curl_netrc_cleanup(&store);
 
   /*
    * Test a non existent login (superstring of an existing one)
    * in our netrc file.
    */
-  s_login = (char *)"adminn";
   Curl_netrc_init(&store);
-  result = Curl_parsenetrc(&store,
-                           "example.com", &s_login, &s_password, arg);
-  fail_unless(result == 0, "Host should have been found");
-  abort_unless(s_password == NULL, "password is not NULL!");
+  res = Curl_netrc_scan(
+    data, &store, "example.com", "administrator", arg, &cr_out);
+  fail_unless(res == NETRC_NO_MATCH, "expected no match");
+  fail_unless(t1304_no_passwd(cr_out), "password is not NULL!");
   Curl_netrc_cleanup(&store);
 
   /*
-   * Test for the first existing host in our netrc file
-   * with s_login[0] = 0.
+   * Test for the first existing host in our netrc file with no user
    */
-  s_login = NULL;
   Curl_netrc_init(&store);
-  result = Curl_parsenetrc(&store,
-                           "example.com", &s_login, &s_password, arg);
-  fail_unless(result == 0, "Host should have been found");
-  abort_unless(s_password != NULL, "returned NULL!");
-  fail_unless(strncmp(s_password, "passwd", 6) == 0,
+  res = Curl_netrc_scan(data, &store, "example.com", NULL, arg, &cr_out);
+  fail_unless(res == NETRC_OK, "Host should have been found");
+  fail_unless(!strncmp(Curl_creds_passwd(cr_out), "passwd", 6),
               "password should be 'passwd'");
-  abort_unless(s_login != NULL, "returned NULL!");
-  fail_unless(strncmp(s_login, "admin", 5) == 0, "login should be 'admin'");
+  fail_unless(!t1304_no_user(cr_out), "returned NULL!");
+  fail_unless(!strncmp(Curl_creds_user(cr_out), "admin", 5),
+              "login should be 'admin'");
   Curl_netrc_cleanup(&store);
 
   /*
-   * Test for the first existing host in our netrc file
-   * with s_login[0] != 0.
+   * Test for the second existing host in our netrc file with no user
    */
-  free(s_password);
-  free(s_login);
-  s_password = NULL;
-  s_login = NULL;
   Curl_netrc_init(&store);
-  result = Curl_parsenetrc(&store,
-                           "example.com", &s_login, &s_password, arg);
-  fail_unless(result == 0, "Host should have been found");
-  abort_unless(s_password != NULL, "returned NULL!");
-  fail_unless(strncmp(s_password, "passwd", 6) == 0,
-              "password should be 'passwd'");
-  abort_unless(s_login != NULL, "returned NULL!");
-  fail_unless(strncmp(s_login, "admin", 5) == 0, "login should be 'admin'");
+  res = Curl_netrc_scan(data, &store, "curl.example.com", NULL, arg, &cr_out);
+  fail_unless(res == NETRC_OK, "Host should have been found");
+  fail_unless(!strncmp(Curl_creds_passwd(cr_out), "none", 4),
+                      "password should be 'none'");
+  fail_unless(!t1304_no_user(cr_out), "returned NULL!");
+  fail_unless(!strncmp(Curl_creds_user(cr_out), "none", 4),
+              "login should be 'none'");
   Curl_netrc_cleanup(&store);
 
   /*
-   * Test for the second existing host in our netrc file
-   * with s_login[0] = 0.
+   * Test for the last host where we do not want to see the password
+   * if the login does not match.
    */
-  free(s_password);
-  s_password = NULL;
-  free(s_login);
-  s_login = NULL;
   Curl_netrc_init(&store);
-  result = Curl_parsenetrc(&store,
-                           "curl.example.com", &s_login, &s_password, arg);
-  fail_unless(result == 0, "Host should have been found");
-  abort_unless(s_password != NULL, "returned NULL!");
-  fail_unless(strncmp(s_password, "none", 4) == 0,
-              "password should be 'none'");
-  abort_unless(s_login != NULL, "returned NULL!");
-  fail_unless(strncmp(s_login, "none", 4) == 0, "login should be 'none'");
+  res = Curl_netrc_scan(
+    data, &store, "curl.example.com", "hilarious", arg, &cr_out);
+  fail_unless(res == NETRC_NO_MATCH, "expect no match");
+  fail_unless(!Curl_creds_has_passwd(cr_out), "password must be NULL");
   Curl_netrc_cleanup(&store);
 
-  /*
-   * Test for the second existing host in our netrc file
-   * with s_login[0] != 0.
-   */
-  free(s_password);
-  free(s_login);
-  s_password = NULL;
-  s_login = NULL;
-  Curl_netrc_init(&store);
-  result = Curl_parsenetrc(&store,
-                           "curl.example.com", &s_login, &s_password, arg);
-  fail_unless(result == 0, "Host should have been found");
-  abort_unless(s_password != NULL, "returned NULL!");
-  fail_unless(strncmp(s_password, "none", 4) == 0,
-              "password should be 'none'");
-  abort_unless(s_login != NULL, "returned NULL!");
-  fail_unless(strncmp(s_login, "none", 4) == 0, "login should be 'none'");
-  Curl_netrc_cleanup(&store);
+  Curl_creds_unlink(&cr_out);
 
+  t1304_empty_literals(data, arg);
+
+  UNITTEST_END(t1304_stop(data))
 }
-UNITTEST_STOP
 
 #else
-static CURLcode unit_setup(void)
+
+static CURLcode test_unit1304(const char *arg)
 {
-  return CURLE_OK;
+  UNITTEST_BEGIN_SIMPLE
+  UNITTEST_END_SIMPLE
 }
-static void unit_stop(void)
-{
-}
-UNITTEST_START
-UNITTEST_STOP
 
 #endif

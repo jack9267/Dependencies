@@ -37,6 +37,10 @@ When doing uploads with FTP, the resume position is where in the local/source
 file libcurl should try to resume the upload from and it then appends the
 source file to the remote target file.
 
+HTTP uploads using POST or PUT cannot be resumed. curl_easy_perform(3) returns
+CURLE_BAD_FUNCTION_ARGUMENT when this option is set to a non-zero value for
+such an upload.
+
 If you need to resume a transfer beyond the 2GB limit, use
 CURLOPT_RESUME_FROM_LARGE(3) instead.
 
@@ -53,7 +57,8 @@ int main(void)
 {
   CURL *curl = curl_easy_init();
   if(curl) {
-    long size_of_file;
+    CURLcode result;
+    long size_of_file = 6789;
 
     curl_easy_setopt(curl, CURLOPT_URL, "ftp://example.com");
 
@@ -67,7 +72,8 @@ int main(void)
     curl_easy_setopt(curl, CURLOPT_INFILESIZE, size_of_file);
 
     /* Perform the request */
-    curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
   }
 }
 ~~~

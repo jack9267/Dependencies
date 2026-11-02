@@ -34,7 +34,7 @@ A [Test Clutch](https://github.com/dfandrich/testclutch) instance generates
 regular reports on curl CI test results at https://testclutch.curl.se/ as well
 as writing comments on curl pull requests whose tests have failed. The jobs
 are hosted on a Virtuozzo Application Platform PaaS instance and is managed by
-Dan Fandrich. The configuration code is is available and managed at
+Dan Fandrich. The configuration code is available and managed at
 https://github.com/dfandrich/testclutch-curl-web
 
 ## Autobuilds
@@ -60,11 +60,11 @@ account.
 
 We regularly run our code through the [Coverity static code
 analyzer](https://scan.coverity.com/) thanks to them offering this service to
-us for free.
+us free of charge.
 
 ## CodeSonar
 
-[CodeSonar](https://codesecure.com/our-products/codesonar/) analyzes the curl
+[CodeSonar](https://www.adacore.com/codesonar) analyzes the curl
 source code daily and emails Daniel Stenberg whenever it finds suspected
 problems in the source code. I hope and expect that we can invite other
 maintainers to access these reports soon.
@@ -76,7 +76,7 @@ domain names, including `curl.se` and `curl.dev`. Daniel Stenberg owns these
 domain names.
 
 Until a few years ago, the curl website was present at `curl.haxx.se`. The
-`haxx.se` domain is owned by Haxx AB, administrated by Daniel Stenberg. The
+`haxx.se` domain is owned by Haxx AB, administered by Daniel Stenberg. The
 curl.haxx.se name is meant to keep working and be redirecting to curl.se for
 the foreseeable future.
 
@@ -90,7 +90,7 @@ thus take up to 20 minutes until it takes effect on the origin server.
 The content on `curl.dev` is available and managed at
 https://github.com/curl/curl.dev/
 
-The content on `everything-curl.dev` is available and managed at
+The content on `everything.curl.dev` is available and managed at
 https://github.com/curl/everything-curl/
 
 The machine hosting the website contents for these three sites is owned by
@@ -100,11 +100,11 @@ company). The machine is physically located in Sweden.
 curl release tarballs are hosted on https://curl.se/download.html. They are
 uploaded there at release-time by the release manager.
 
-curl-for-win downloads are hosted on https://curl.se/windows and are uploaded
+curl-for-win downloads are hosted on https://curl.se/windows/ and are uploaded
 to the server by Viktor Szakats.
 
-curl-for-QNX downloads are hosted on <https://curl.se/qnx> and are uploaded to
-the server by Daniel Stenberg.
+curl-for-QNX downloads are hosted on <https://curl.se/qnx/> and are uploaded
+to the server by Daniel Stenberg.
 
 Daily release tarball-like snapshots are generated automatically and are
 provided for download at <https://curl.se/snapshots/>.
@@ -139,7 +139,7 @@ anycast access to the site. Should be snappy from virtually everywhere across
 the globe.
 
 The CDN servers support HTTP/1, HTTP/2 and HTTP/3. They set HSTS for a year.
-The `HTTP://` version of the site redirects to `HTTPS://`.
+The `http://` version of the site redirects to `https://`.
 
 Fastly manages the TLS certificates from Let's Encrypt for the servers they
 run on the behalf of curl.
@@ -172,14 +172,6 @@ instances used for this.
 We use a few rare additional curl related email aliases in the curl domains.
 They go through the mail server `mail.haxx.se` maintained by Daniel Stenberg
 
-## Bug-bounty
-
-We run a [bug-bounty](https://curl.se/docs/bugbounty.html) on HackerOne. The
-setup runs entirely at https://hackerone.com/curl.
-
-The money part for the bug bounty is sponsored by the [Internet Bug
-Bounty](https://hackerone.com/ibb).
-
 ## Open Collective
 
 We use [Open Collective](https://opencollective.com/curl) as our "fiscal
@@ -191,3 +183,19 @@ Collective.
 We have stickers, coffee mugs and coasters. They are managed by Daniel who
 sits on the inventory. The best way to get your hands on curl merchandise is
 to attend events where Daniel is physically.
+
+## Chat
+
+Some curl developers, maintainers, users and enthusiasts use IRC for real-time
+chat about curl and related topics. This done in the `#curl` channel on the
+`libra.chat` IRC network. **Daniel Stenberg** (`bagder`) is registered owner
+of the channel. We do not run any IRC servers or services ourselves.
+
+`curlbot` is a service in the channel that shows details about GitHub issues
+and pull requests when publicly mentioned using #[number]. The bot is run by
+user `TheAssassin`.
+
+There is a Matrix bridge to the IRC channel called `matrix.curl.se`. The
+bridge is setup and run by **Sergio Durigan Junior** and **Daniel Stenberg**.
+
+[curl online chat documentation](https://curl.se/docs/irc.html)

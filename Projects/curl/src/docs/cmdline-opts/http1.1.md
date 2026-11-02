@@ -6,7 +6,7 @@ Tags: Versions
 Protocols: HTTP
 Added: 7.33.0
 Mutexed: http1.0 http2 http2-prior-knowledge http3
-Help: Use HTTP 1.1
+Help: Use HTTP/1.1
 Category: http
 Multi: mutex
 See-also:
@@ -18,4 +18,4 @@ Example:
 
 # `--http1.1`
 
-Use HTTP version 1.1. This is the default with HTTP:// URLs.
+Use HTTP version 1.1. This is the default with `http://` URLs.

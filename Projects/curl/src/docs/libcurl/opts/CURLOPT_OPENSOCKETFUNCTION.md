@@ -22,7 +22,7 @@ CURLOPT_OPENSOCKETFUNCTION - callback for opening socket
 ~~~c
 #include <curl/curl.h>
 
-typedef enum  {
+typedef enum {
   CURLSOCKTYPE_IPCXN,  /* socket created for a specific IP connection */
 } curlsocktype;
 
@@ -80,7 +80,7 @@ signal that it already is connected.
 
 The equivalent of this:
 ~~~c
-   return socket(addr->family, addr->socktype, addr->protocol);
+  return socket(addr->family, addr->socktype, addr->protocol);
 ~~~
 
 # %PROTOCOLS%
@@ -104,16 +104,16 @@ static curl_socket_t opensocket(void *clientp,
 static int sockopt_callback(void *clientp, curl_socket_t curlfd,
                             curlsocktype purpose)
 {
-  /* This return code was added in libcurl 7.21.5 */
   return CURL_SOCKOPT_ALREADY_CONNECTED;
 }
+
+extern int sockfd; /* the already connected one */
 
 int main(void)
 {
   CURL *curl = curl_easy_init();
   if(curl) {
-    CURLcode res;
-    extern int sockfd; /* the already connected one */
+    CURLcode result;
     /* libcurl thinks that you connect to the host
      * and port that you specify in the URL option. */
     curl_easy_setopt(curl, CURLOPT_URL, "http://99.99.99.99:9999");
@@ -124,7 +124,7 @@ int main(void)
     /* call this function to set options for the socket */
     curl_easy_setopt(curl, CURLOPT_SOCKOPTFUNCTION, sockopt_callback);
 
-    res = curl_easy_perform(curl);
+    result = curl_easy_perform(curl);
 
     curl_easy_cleanup(curl);
   }

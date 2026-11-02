@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 #***************************************************************************
 #                                  _   _ ____  _
 #  Project                     ___| | | |  _ \| |
@@ -26,9 +25,6 @@
 #
 """DICT server."""
 
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
 import argparse
 import logging
 import os
@@ -40,6 +36,7 @@ try:  # Python 2
     import SocketServer as socketserver  # type: ignore
 except ImportError:  # Python 3
     import socketserver
+
 
 log = logging.getLogger(__name__)
 HOST = "localhost"
@@ -55,7 +52,7 @@ def dictserver(options):
         pid = os.getpid()
         # see tests/server/util.c function write_pidfile
         if os.name == "nt":
-            pid += 65536
+            pid += 4194304
         with open(options.pidfile, "w") as f:
             f.write(str(pid))
 
@@ -90,19 +87,19 @@ class DictHandler(socketserver.BaseRequestHandler):
                 pid = os.getpid()
                 # see tests/server/util.c function write_pidfile
                 if os.name == "nt":
-                    pid += 65536
+                    pid += 4194304
                 response_data = VERIFIED_RSP.format(pid=pid)
             else:
                 log.debug("[DICT] Received normal request")
                 response_data = "No matches"
 
             # Send back a failure to find.
-            response = "552 {0}\n".format(response_data)
+            response = f"552 {response_data}\n"
             log.debug("[DICT] Responding with %r", response)
             self.request.sendall(response.encode("utf-8"))
 
-        except IOError:
-            log.exception("[DICT] IOError hit during request")
+        except OSError:
+            log.exception("[DICT] OSError hit during request")
 
 
 def get_options():
@@ -115,9 +112,9 @@ def get_options():
     parser.add_argument("--verbose", action="store", type=int, default=0,
                         help="verbose output")
     parser.add_argument("--pidfile", action="store",
-                        help="file name for the PID")
+                        help="filename for the PID")
     parser.add_argument("--logfile", action="store",
-                        help="file name for the log")
+                        help="filename for the log")
     parser.add_argument("--srcdir", action="store", help="test directory")
     parser.add_argument("--id", action="store", help="server ID")
     parser.add_argument("--ipv4", action="store_true", default=0,
@@ -140,7 +137,7 @@ def setup_logging(options):
         handler.setLevel(logging.DEBUG)
         root_logger.addHandler(handler)
     else:
-        # The logfile wasn't specified. Add a stdout logger.
+        # The logfile was not specified. Add a stdout logger.
         add_stdout = True
 
     if options.verbose:
@@ -157,7 +154,7 @@ def setup_logging(options):
         root_logger.addHandler(stdout_handler)
 
 
-class ScriptRC(object):
+class ScriptRC:
     """Enum for script return codes."""
 
     SUCCESS = 0

@@ -37,8 +37,12 @@ Removing an easy handle while being in use is perfectly legal and effectively
 halts the transfer in progress involving that easy handle. All other easy
 handles and transfers remain unaffected.
 
-It is fine to remove a handle at any time during a transfer, just not from
+It is fine to remove a handle at any time during a transfer, but not from
 within any libcurl callback function.
+
+An internal handle, such as one passed to a CURLMOPT_NOTIFYFUNCTION(3)
+callback, cannot be removed and makes this function return
+CURLM_BAD_EASY_HANDLE.
 
 Removing an easy handle from the multi handle before the corresponding
 transfer is complete might cause libcurl to close the connection - if the

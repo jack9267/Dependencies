@@ -21,17 +21,12 @@
  * SPDX-License-Identifier: curl
  *
  ***************************************************************************/
-#include "test.h"
+#include "first.h"
 
-#include "testutil.h"
-#include "warnless.h"
-#include "memdebug.h"
-
-static const char testcmd[] = "A1 IDLE\r\n";
-static char testbuf[1024];
-
-CURLcode test(char *URL)
+static CURLcode test_lib677(const char *URL)
 {
+  static const char testcmd[] = "A1 IDLE\r\n";
+  static char testbuf[1024];
   CURLM *mcurl;
   CURL *curl = NULL;
   int mrun;
@@ -39,9 +34,9 @@ CURLcode test(char *URL)
   time_t start = time(NULL);
   int state = 0;
   ssize_t pos = 0;
-  CURLcode res = CURLE_OK;
+  CURLcode result = CURLE_OK;
 
-  global_init(CURL_GLOBAL_DEFAULT);
+  global_init(CURL_GLOBAL_ALL);
   multi_init(mcurl);
   easy_init(curl);
 
@@ -65,7 +60,7 @@ CURLcode test(char *URL)
         curl_easy_getinfo(curl, CURLINFO_ACTIVESOCKET, &sock);
         if(sock == CURL_SOCKET_BAD)
           goto test_cleanup;
-        printf("Connected fine, extracted socket. Moving on\n");
+        curl_mprintf("Connected fine, extracted socket. Moving on\n");
       }
     }
 
@@ -82,22 +77,22 @@ CURLcode test(char *URL)
 
       if(!state) {
         CURLcode ec;
-        ec = curl_easy_send(curl, testcmd + pos,
-                            sizeof(testcmd) - 1 - pos, &len);
+        ec = curl_easy_send(curl, testcmd + pos, CURL_CSTRLEN(testcmd) - pos,
+                            &len);
         if(ec == CURLE_AGAIN) {
           continue;
         }
         else if(ec) {
-          fprintf(stderr, "curl_easy_send() failed, with code %d (%s)\n",
-                  (int)ec, curl_easy_strerror(ec));
-          res = ec;
+          curl_mfprintf(stderr, "curl_easy_send() failed, with code %d (%s)\n",
+                        (int)ec, curl_easy_strerror(ec));
+          result = ec;
           goto test_cleanup;
         }
         if(len > 0)
           pos += len;
         else
           pos = 0;
-        if(pos == sizeof(testcmd) - 1) {
+        if(pos == CURL_CSTRLEN(testcmd)) {
           state++;
           pos = 0;
         }
@@ -109,9 +104,9 @@ CURLcode test(char *URL)
           continue;
         }
         else if(ec) {
-          fprintf(stderr, "curl_easy_recv() failed, with code %d (%s)\n",
-                  (int)ec, curl_easy_strerror(ec));
-          res = ec;
+          curl_mfprintf(stderr, "curl_easy_recv() failed, with code %d (%s)\n",
+                        (int)ec, curl_easy_strerror(ec));
+          result = ec;
           goto test_cleanup;
         }
         if(len > 0)
@@ -133,5 +128,5 @@ test_cleanup:
   curl_multi_cleanup(mcurl);
 
   curl_global_cleanup();
-  return res;
+  return result;
 }

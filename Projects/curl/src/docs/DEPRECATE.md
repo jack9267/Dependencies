@@ -12,48 +12,84 @@ email the
 as soon as possible and explain to us why this is a problem for you and
 how your use case cannot be satisfied properly using a workaround.
 
-## TLS libraries without 1.3 support
+## drop NTLM support
 
-curl drops support for TLS libraries without TLS 1.3 capability after May
-2025.
+The NTLM authentication method has weak security and is rarely used these
+days. It has been deprecated by Microsoft and does not work over HTTP/2 or
+HTTP/3.
 
-It requires that a curl build using the library should be able to negotiate
-and use TLS 1.3, or else it is not good enough.
+NTLM support gets removed in September 2026
 
-As of May 2024, the libraries that need to get fixed to remain supported after
-May 2025 are: BearSSL and Secure Transport.
+## Local crypto implementations
 
-## msh3 support
+Since the dawn of time, curl bundles code for a few crypto and hash algorithms
+in order to enable functionality for builds without TLS libraries. This list
+includes MD4, MD5, SHA256, SHA256_512 and perhaps something more.
 
-The msh3 backed for QUIC and HTTP/3 was introduced in April 2022 but has never
-been made to work properly. It has seen no visible traction or developer
-activity from the msh3 main author (or anyone else seemingly interested) in
-two years. As a non-functional backend, it only adds friction and "weight" to
-the development and maintenance.
+Meanwhile, curl is almost always built to use a TLS/crypto library which for
+sure has better maintained and better performing versions of these algorithms.
 
-Meanwhile, we have a fully working backend in the ngtcp2 one and we have two
-fully working backends in OpenSSL-QUIC and quiche well on their way of ending
-their experimental status in a future.
+Also, the local curl implementations are not as widely tested since curl
+builds without TLS are rare.
 
-We remove msh3 support from the curl source tree in July 2025.
+Since these implementations are going away, a good idea is to verify ahead of
+time that builds using your preferred TLS library use the crypto functions
+provided by that library and are not bundled by curl.
 
-## winbuild build system
+The removal of local crypto functions subsequently disables some functions in
+future curl versions when built without TLS support. For example Digest.
 
-curl drops support for the winbuild build method after September 2025.
+Local crypto gets removed in October 2026.
 
-We recommend migrating to CMake. See the migration guide in
-`docs/INSTALL-CMAKE.md`.
+## HTTP/2 Server Push
+
+This protocol feature has been deprecated in specifications, by major browsers,
+and in server implementations. It was never supported by the curl command line
+tool, only by libcurl.
+
+We estimate that barely any libcurl users still use this feature.
+
+HTTP/2 Server Push gets removed in March 2027.
+
+## Common Name support in TLS certificates for OpenSSL
+
+The Common Name, (`CN`) field is deprecated since RFC 2818. It was downgraded
+to a SHOULD in RFC 6125 and finally removed in RFC 9525. Browsers have not
+supported this field since 2012.
+
+In the release after 8.23.0 curl removes support for this field in code we
+control - which primarily means in the OpenSSL (and forks) backend. The other
+TLS libraries provide their own functions for verification.
+
+Pending PR: https://github.com/curl/curl/pull/22845
 
 ## Past removals
 
- - Pipelining
- - axTLS
- - PolarSSL
- - NPN
- - Support for systems without 64-bit data types
- - NSS
- - gskit
- - MinGW v1
- - NTLM_WB
- - space-separated `NOPROXY` patterns
- - hyper
+- axTLS (removed in 7.63.0)
+- Pipelining (removed in 7.65.0)
+- PolarSSL (removed in 7.69.0)
+- NPN (removed in 7.86.0)
+- Support for systems without 64-bit data types (removed in 8.0.0)
+- NSS (removed in 8.3.0)
+- gskit (removed in 8.3.0)
+- MinGW v1 (removed in 8.4.0)
+- NTLM_WB (removed in 8.8.0)
+- space-separated `NOPROXY` patterns (removed in 8.9.0)
+- hyper (removed in 8.12.0)
+- Support for Visual Studio 2005 and older (removed in 8.13.0)
+- Secure Transport (removed in 8.15.0)
+- BearSSL (removed in 8.15.0)
+- msh3 (removed in 8.16.0)
+- winbuild build system (removed in 8.17.0)
+- Windows CE (removed in 8.18.0)
+- Support for Visual Studio 2008 (removed in 8.18.0)
+- OpenSSL 1.1.1 and older (removed in 8.18.0)
+- Support for Windows XP (removed in 8.19.0)
+- OpenSSL-QUIC (removed in 8.19.0)
+- CMake 3.17 and older (removed in 8.20.0)
+- RTMP (removed in 8.20.0)
+- SMB (became opt-in in 8.20.0)
+- NTLM (became opt-in in 8.20.0)
+- c-ares < 1.16.0 (removed in 8.20.0)
+- TLS-SRP (removed in 8.22.0)
+- SMB support (removed in 8.23.0)

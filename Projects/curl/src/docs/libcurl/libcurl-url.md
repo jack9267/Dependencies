@@ -45,7 +45,7 @@ When done with it, clean it up with curl_url_cleanup(3)
 
 # DUPLICATE
 
-When you need a copy of a handle, just duplicate it with curl_url_dup(3):
+When you need a copy of a handle, duplicate it with curl_url_dup(3):
 ~~~c
   CURLU *nh = curl_url_dup(h);
 ~~~
@@ -108,8 +108,8 @@ with it.
 
 # SET PARTS
 
-A user set individual URL parts, either after having parsed a full URL or
-instead of parsing such.
+A user can set individual URL parts, either after having parsed a full URL or
+instead of parsing one.
 
 ~~~c
   rc = curl_url_set(urlp, CURLUPART_FRAGMENT, "anchor", 0);

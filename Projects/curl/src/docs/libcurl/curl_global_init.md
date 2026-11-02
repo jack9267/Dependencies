@@ -50,10 +50,10 @@ the `threadsafe` feature set (added in 7.84.0).
 
 If this is not thread-safe (the bit mentioned above is not set), you must not
 call this function when any other thread in the program (i.e. a thread sharing
-the same memory) is running. This does not just mean no other thread that is
-using libcurl. Because curl_global_init(3) calls functions of other libraries
-that are similarly thread unsafe, it could conflict with any other thread that
-uses these other libraries.
+the same memory) is running. This does not only mean other threads that use
+libcurl. Because curl_global_init(3) calls functions of other libraries that
+are similarly thread-unsafe, it could conflict with any other thread that uses
+these other libraries.
 
 If you are initializing libcurl from a Windows DLL you should not initialize
 it from *DllMain* or a static initializer because Windows holds the loader
@@ -84,14 +84,18 @@ backend libcurl uses.
 Doing TLS based transfers without having the TLS layer initialized may lead to
 unexpected behaviors.
 
-## CURL_GLOBAL_WIN32
+## CURL_GLOBAL_WINSOCK
 
-Initialize the Win32 socket libraries.
+Initialize the Windows sockets library (Winsock).
 
 The implication here is that if this bit is not set, the initialization of
 Winsock has to be done by the application or you risk getting undefined
 behaviors. This option exists for when the initialization is handled outside
 of libcurl so there is no need for libcurl to do it again.
+
+Prior to 8.23.0 this flag was called CURL_GLOBAL_WIN32. The name was changed
+to eliminate confusion. Most of libcurl's Windows initialization is required
+and is not controlled by this flag.
 
 ## CURL_GLOBAL_NOTHING
 
@@ -99,7 +103,7 @@ Initialize nothing extra. This sets no bit.
 
 ## CURL_GLOBAL_DEFAULT
 
-A sensible default. It initializes both SSL and Win32. Right now, this equals
+A sensible default. It initializes both SSL and Winsock. Right now, this equals
 the functionality of the **CURL_GLOBAL_ALL** mask.
 
 ## CURL_GLOBAL_ACK_EINTR
@@ -108,7 +112,7 @@ This bit has no point since 7.69.0 but its behavior is instead the default.
 
 Before 7.69.0: when this flag is set, curl acknowledges EINTR condition when
 connecting or when waiting for data. Otherwise, curl waits until full timeout
-elapses. (Added in 7.30.0)
+elapses.
 
 # %PROTOCOLS%
 
@@ -117,11 +121,16 @@ elapses. (Added in 7.30.0)
 ~~~c
 int main(void)
 {
-  curl_global_init(CURL_GLOBAL_DEFAULT);
+  CURLcode result;
 
-  /* use libcurl, then before exiting... */
+  result = curl_global_init(CURL_GLOBAL_DEFAULT);
 
-  curl_global_cleanup();
+  if(result == CURLE_OK) {
+
+    /* use libcurl, then before exiting... */
+
+    curl_global_cleanup();
+  }
 }
 ~~~
 

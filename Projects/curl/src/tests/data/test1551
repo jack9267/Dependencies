@@ -1,7 +1,9 @@
+<?xml version="1.0" encoding="US-ASCII"?>
 <testcase>
 <info>
 <keywords>
 multi
+libtest
 </keywords>
 </info>
 
@@ -34,9 +36,6 @@ redirected
 http
 </server>
 # tool is what to use instead of 'curl'
-<tool>
-lib%TESTNUMBER
-</tool>
 
 <name>
 re-run redirected transfer without setting URL again
@@ -47,7 +46,7 @@ http://%HOSTIP:%HTTPPORT/%TESTNUMBER
 </client>
 
 <verify>
-<protocol>
+<protocol crlf="headers">
 GET /%TESTNUMBER HTTP/1.1
 Host: %HOSTIP:%HTTPPORT
 Accept: */*

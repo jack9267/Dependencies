@@ -25,6 +25,7 @@ include(CheckCSourceCompiles)
 include(CheckCSourceRuns)
 include(CheckTypeSize)
 
+# #include header if condition is true
 macro(curl_add_header_include _check _header)
   if(${_check})
     set(_source_epilogue "${_source_epilogue}
@@ -41,7 +42,7 @@ if(NOT DEFINED HAVE_STRUCT_SOCKADDR_STORAGE)
   if(WIN32)
     set(CMAKE_EXTRA_INCLUDE_FILES "winsock2.h")
     list(APPEND CMAKE_REQUIRED_LIBRARIES "ws2_32")
-  elseif(HAVE_SYS_SOCKET_H)
+  else()
     set(CMAKE_EXTRA_INCLUDE_FILES "sys/socket.h")
   endif()
   check_type_size("struct sockaddr_storage" SIZEOF_STRUCT_SOCKADDR_STORAGE)
@@ -49,24 +50,13 @@ if(NOT DEFINED HAVE_STRUCT_SOCKADDR_STORAGE)
   cmake_pop_check_state()
 endif()
 
-if(NOT WIN32)
-  set(_source_epilogue "#undef inline")
-  curl_add_header_include(HAVE_SYS_TYPES_H "sys/types.h")
-  curl_add_header_include(HAVE_SYS_SOCKET_H "sys/socket.h")
-  check_c_source_compiles("${_source_epilogue}
-    int main(void)
-    {
-      int flag = MSG_NOSIGNAL;
-      (void)flag;
-      return 0;
-    }" HAVE_MSG_NOSIGNAL)
-endif()
-
 set(_source_epilogue "#undef inline")
-curl_add_header_include(HAVE_SYS_TIME_H "sys/time.h")
 check_c_source_compiles("${_source_epilogue}
   #ifdef _MSC_VER
   #include <winsock2.h>
+  #endif
+  #ifndef _WIN32
+  #include <sys/time.h>
   #endif
   #include <time.h>
   int main(void)
@@ -87,12 +77,14 @@ if(WIN32)
   set(HAVE_GETADDRINFO_THREADSAFE ${HAVE_GETADDRINFO})
 elseif(NOT HAVE_GETADDRINFO)
   set(HAVE_GETADDRINFO_THREADSAFE FALSE)
-elseif(APPLE OR
-       CMAKE_SYSTEM_NAME STREQUAL "AIX" OR
-       CMAKE_SYSTEM_NAME STREQUAL "FreeBSD" OR
-       CMAKE_SYSTEM_NAME STREQUAL "HP-UX" OR
-       CMAKE_SYSTEM_NAME STREQUAL "MidnightBSD" OR
-       CMAKE_SYSTEM_NAME STREQUAL "NetBSD" OR
+elseif(APPLE OR  # Darwin 9+ / macOS 10.5+
+       AIX OR CMAKE_SYSTEM_NAME STREQUAL "AIX" OR  # 5.2+
+       CMAKE_SYSTEM_NAME STREQUAL "DragonFlyBSD" OR  # 2.2.0+
+       CMAKE_SYSTEM_NAME STREQUAL "FreeBSD" OR  # 5.5+
+       CMAKE_SYSTEM_NAME STREQUAL "HP-UX" OR  # 11.11+
+       CMAKE_SYSTEM_NAME STREQUAL "MidnightBSD" OR  # all versions
+       CMAKE_SYSTEM_NAME STREQUAL "NetBSD" OR  # 4+
+       CMAKE_SYSTEM_NAME STREQUAL "OpenBSD" OR  # 5.4+
        CMAKE_SYSTEM_NAME STREQUAL "SunOS")
   set(HAVE_GETADDRINFO_THREADSAFE TRUE)
 elseif(BSD OR CMAKE_SYSTEM_NAME MATCHES "BSD")
@@ -100,18 +92,19 @@ elseif(BSD OR CMAKE_SYSTEM_NAME MATCHES "BSD")
 endif()
 
 if(NOT DEFINED HAVE_GETADDRINFO_THREADSAFE)
-  set(_source_epilogue "#undef inline")
-  curl_add_header_include(HAVE_SYS_SOCKET_H "sys/socket.h")
-  curl_add_header_include(HAVE_SYS_TIME_H "sys/time.h")
+  set(_source_epilogue "#undef inline
+    #ifndef _WIN32
+    #include <sys/socket.h>
+    #include <sys/time.h>
+    #endif")
   curl_add_header_include(HAVE_NETDB_H "netdb.h")
   check_c_source_compiles("${_source_epilogue}
     int main(void)
     {
-    #ifdef h_errno
-      return 0;
-    #else
+    #ifndef h_errno
       #error force compilation error
     #endif
+      return 0;
     }" HAVE_H_ERRNO)
 
   if(NOT HAVE_H_ERRNO)
@@ -127,12 +120,11 @@ if(NOT DEFINED HAVE_GETADDRINFO_THREADSAFE)
         int main(void)
         {
         #if defined(_POSIX_C_SOURCE) && (_POSIX_C_SOURCE >= 200809L)
-          return 0;
         #elif defined(_XOPEN_SOURCE) && (_XOPEN_SOURCE >= 700)
-          return 0;
         #else
           #error force compilation error
         #endif
+          return 0;
         }" HAVE_H_ERRNO_SBS_ISSUE_7)
     endif()
   endif()
@@ -145,8 +137,8 @@ endif()
 if(NOT WIN32 AND NOT DEFINED HAVE_CLOCK_GETTIME_MONOTONIC_RAW)
   set(_source_epilogue "#undef inline")
   curl_add_header_include(HAVE_SYS_TYPES_H "sys/types.h")
-  curl_add_header_include(HAVE_SYS_TIME_H "sys/time.h")
   check_c_source_compiles("${_source_epilogue}
+    #include <sys/time.h>
     #include <time.h>
     int main(void)
     {

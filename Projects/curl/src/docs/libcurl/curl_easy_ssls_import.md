@@ -13,7 +13,6 @@ Protocol:
 TLS-backend:
   - GnuTLS
   - OpenSSL
-  - BearSSL
   - wolfSSL
   - mbedTLS
 Added-in: 8.12.0
@@ -21,7 +20,7 @@ Added-in: 8.12.0
 
 # NAME
 
-curl_easy_ssls_export - export SSL sessions
+curl_easy_ssls_import - import SSL sessions
 
 # SYNOPSIS
 
@@ -45,16 +44,30 @@ Import of session tickets from other curl versions may fail due to changes
 in the handling of **shmac** or **sdata**. A session ticket which has
 already expired is silently discarded.
 
+The session key identifies origin and used TLS configurations. Configuration
+parameters identified by a file path are only matched to the path, not the
+file's content. It is the applications responsibility to handle updates to
+CA, CRL or key files, e.g. discarding previous sessions. Otherwise,
+imported sessions may establish trusted connections to servers that would fail
+to verify otherwise.
+
+Most TLS sessions handed out by servers have a short lifetime. If
+continued use of these sessions is acceptable can only be decided by
+the application. Also, TLS session that are tied to client authentication,
+e.g. a client certificate, are never exported by libcurl.
+
 # %PROTOCOLS%
 
 # EXAMPLE
 
 ~~~c
+extern unsigned char *shmac, *sdata;
+
 int main(void)
 {
   CURLSHcode sh;
   CURLSH *share = curl_share_init();
-  CURLcode rc;
+  CURLcode result;
   CURL *curl;
 
   sh = curl_share_setopt(share, CURLSHOPT_SHARE, CURL_LOCK_DATA_SSL_SESSION);
@@ -63,13 +76,12 @@ int main(void)
 
   curl = curl_easy_init();
   if(curl) {
-    unsigned char *shmac, *sdata;
-    size_t hlen, slen;
+    size_t hlen = 4, slen = 5;
 
     curl_easy_setopt(curl, CURLOPT_SHARE, share);
 
     /* read shmac and sdata from storage */
-    rc = curl_easy_ssls_import(curl, NULL, shmac, hlen, sdata, slen);
+    result = curl_easy_ssls_import(curl, NULL, shmac, hlen, sdata, slen);
 
     /* always cleanup */
     curl_easy_cleanup(curl);
