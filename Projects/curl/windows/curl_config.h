@@ -1,5 +1,5 @@
 /* Made by curl 8.23.0's own CMake for Windows (Visual Studio 2022, CURL_TARGET_WINDOWS_VERSION=0x0600)
- * against the vendored LibreSSL and zlib, with the features premake5.lua's curl section names; the
+ * against the vendored LibreSSL, zlib and zstd, with the features premake5.lua's curl section names; the
  * three sizes that differ between Win32 and x64 follow _WIN64. Regenerate after updating curl. */
 
 /***************************************************************************
@@ -402,7 +402,7 @@
 /* #undef HAVE_BROTLI */
 
 /* if zstd is available */
-/* #undef HAVE_ZSTD */
+#define HAVE_ZSTD 1
 
 /* Define to 1 if you have the <locale.h> header file. */
 #define HAVE_LOCALE_H 1

@@ -59,7 +59,8 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
 - **Windows builds from `Projects/curl/windows/curl_config.h`**, not curl's `config-win32.h`, which is for
   Visual Studio 2010-2013 only since 8.13. It is made by curl's own CMake: configure `src` with
   `-A Win32` and `-A x64`, `-DCURL_TARGET_WINDOWS_VERSION=0x0600`, OpenSSL pointed at this LibreSSL (on MSVC
-  `FindOpenSSL` reads `LIB_EAY_RELEASE`/`SSL_EAY_RELEASE`, not `OPENSSL_*_LIBRARY`) and zlib, and the features
+  `FindOpenSSL` reads `LIB_EAY_RELEASE`/`SSL_EAY_RELEASE`, not `OPENSSL_*_LIBRARY`), zlib, and zstd
+  (`-DCURL_ZSTD=ON`, `ZSTD_INCLUDE_DIR`/`ZSTD_LIBRARY`), and the features
   `CURL_DISABLE_OPENSSL_AUTO_LOAD_CONFIG` on, everything else at curl's defaults (LDAP is Windows' own `wldap32`, which XP has); then take
   `lib/curl_config.h`. Only `SIZEOF_SIZE_T`, `SIZEOF_CURL_SOCKET_T` and `ssize_t` differ between the two,
   and the header picks them by `_WIN64`. Regenerate it after updating curl; the features belong there, not
@@ -69,7 +70,7 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
 
 ## zstd (`Projects/zstd`)
 
-- **1.5.7, stock** (2026-11-02, added for Galactic's own use). `zstd_static` and `zstd.dll` from `lib/`
+- **1.5.7, stock** (2026-11-02), for Galactic's own use and for curl, which accepts zstd responses (`HAVE_ZSTD`). `zstd_static` and `zstd.dll` from `lib/`
   (common, compress, decompress, dictBuilder), with `zstd.h`, `zdict.h` and `zstd_errors.h` in `include\`.
   Two symlinks in the release's command-line tests (`tests/cli-tests/bin/unzstd`, `zstdcat`) cannot be made
   on Windows and are left out; nothing builds from them.

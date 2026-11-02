@@ -854,19 +854,19 @@ dep("curl", {
 	systems = { "windows", "ios" },
 	defines = not WINDOWS_TARGET and {
 		"HAVE_CONFIG_H", "BUILDING_LIBCURL", "CURL_STATICLIB", "USE_OPENSSL", "HAVE_LIBZ", "HAVE_ZLIB_H",
-		"CURL_DISABLE_OPENSSL_AUTO_LOAD_CONFIG",
+		"HAVE_ZSTD", "CURL_DISABLE_OPENSSL_AUTO_LOAD_CONFIG",
 	} or {
 		"HAVE_CONFIG_H", "BUILDING_LIBCURL", "CURL_STATICLIB", "_WIN32_WINNT=0x0600",
 	},
 	includedirs = table.join({ WINDOWS_TARGET and "Projects/curl/windows" or "Projects/curl/apple" },
 		{ "Projects/curl/src/include", "Projects/curl/src/lib",
-		"Projects/libressl/src/include", "Projects/zlib/include" }),
-	-- The DLL drops CURL_STATICLIB, compiles the version .rc, and links the ssl/crypto/zlib DLLs and bcrypt
+		"Projects/libressl/src/include", "Projects/zlib/include", "Projects/zstd/src/lib" }),
+	-- The DLL drops CURL_STATICLIB, compiles the version .rc, and links the ssl/crypto/zlib/zstd DLLs and bcrypt
 	-- (wldap32/ws2_32/crypt32/iphlpapi are already workspace-scope).
 	shared = { {
 		dropdefines = { "CURL_STATICLIB" },
 		addfiles    = { "Projects/curl/src/lib/**.rc" },
-		extra       = function() links { "ssl", "crypto", "zlib", "bcrypt" } end,
+		extra       = function() links { "ssl", "crypto", "zlib", "zstd", "bcrypt" } end,
 	} },
 	files = WINDOWS_TARGET and { "Projects/curl/src/lib/**.c" } or {
 		"Projects/curl/src/lib/*.c", "Projects/curl/src/lib/curlx/*.c", "Projects/curl/src/lib/vauth/*.c",
