@@ -80,6 +80,17 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   `lib/curl_config.h`. Only `SIZEOF_SIZE_T`, `SIZEOF_CURL_SOCKET_T` and `ssize_t` differ between the two,
   and the header picks them by `_WIN64`. Regenerate it after updating curl; the features belong there, not
   in `premake5.lua`.
+- **Linux builds LibreSSL and curl too** (2026-11-05, `crypto_static`, `ssl_static`, `curl_static`; premake's `TLS`
+  list), so a program there can link them statically and run without the libssl/libcurl packages (jbuild's
+  `TLS_LDLIBS`/`CURL_LDLIBS`). LibreSSL's Linux defines are what its own CMake finds on glibc 2.39, less
+  `arc4random_buf`, `strlcpy` and `strlcat` (glibc has them only from 2.36/2.38), which come from LibreSSL's compat
+  sources instead. `Projects/curl/linux/curl_config.h` was made by curl 8.23.0's CMake on Ubuntu 24.04 x64 with TLS,
+  zlib, zstd and the optional libraries off (`-DCURL_ENABLE_SSL=OFF -DCURL_USE_OPENSSL=OFF -DCURL_ZLIB=OFF
+  -DCURL_ZSTD=OFF -DCURL_BROTLI=OFF -DUSE_NGHTTP2=OFF -DUSE_LIBIDN2=OFF -DCURL_USE_LIBPSL=OFF -DCURL_USE_LIBSSH2=OFF
+  -DCURL_USE_GSSAPI=OFF -DCURL_DISABLE_LDAP=ON`), as the Apple one, the defines adding TLS and compression; its CA
+  bundle and path, which CMake wrote as "none", are taken out (Galactic gives curl its certificates in memory). It
+  says `SIZEOF_SIZE_T 8`: x64 only. FreeBSD keeps its base OpenSSL. Seen: Galactic's UnitTests and a server program
+  linked with them on Linux, `ldd` showing no libcurl, libssl or libcrypto, the tests passing and the server running.
 - **`Projects/curl/apple/curl_config.h` is still 8.12.1's.** It has to be made again by curl's CMake on macOS
   before the iOS build can be trusted with 8.23.0 (not done).
 

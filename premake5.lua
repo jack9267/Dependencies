@@ -148,6 +148,10 @@ local WINDOWS = { "windows" }
 local GUI     = { "windows", "macosx", "ios", "android" }
 local WINDOWS_TARGET = os.target() == "windows"
 local IOS_TARGET = os.target() == "ios"
+local LINUX_TARGET = os.target() == "linux"
+-- Where LibreSSL and curl are built: with a renderer, and on Linux too, so a program there can link them
+-- statically and run on a machine without the libssl/libcurl packages. FreeBSD keeps its base system's OpenSSL.
+local TLS = table.join(GUI, { "linux" })
 
 -- iOS has no system(); lua's os.execute and squirrel's system lib are its only callers here. A
 -- force-included shim turns just those calls into a no-op ("no shell"), leaving everything else - and
@@ -679,9 +683,9 @@ headers_project {
 	{ dir = "Projects/libzip/src/include", systems = WINDOWS },
 	{ dir = "Projects/rapidjson/include", systems = WINDOWS },
 	{ dir = "Projects/SDL/src/include", systems = GUI },
-	{ dir = "Projects/libressl/src/include", systems = GUI },
+	{ dir = "Projects/libressl/src/include", systems = TLS },
 	-- graphics / network / UI
-	{ dir = "Projects/curl/src/include", systems = GUI },
+	{ dir = "Projects/curl/src/include", systems = TLS },
 	{ dir = "Projects/pixman/include", systems = WINDOWS },
 	{ dir = "Projects/cairo/include", systems = WINDOWS },
 	{ dir = "Projects/litehtml/litehtml/include", systems = WINDOWS },
@@ -715,6 +719,16 @@ local libressl_defines = WINDOWS_TARGET and {
 	"_CRT_SECURE_NO_WARNINGS", "_CRT_DEPRECATED_NO_WARNINGS", "_REENTRANT", "_POSIX_THREAD_SAFE_FUNCTIONS",
 	"WIN32_LEAN_AND_MEAN", "_WIN32_WINNT=0x0600", "NO_SYSLOG", "inline=__inline", "HAVE_LITTLE_ENDIAN",
 	"HAVE_STRNLEN", "OPENSSL_NO_ASM", "SIZEOF_TIME_T=8",
+} or LINUX_TARGET and {
+	-- glibc, as LibreSSL's own CMake finds it (2.39), less arc4random_buf/strlcpy/strlcat: glibc has those only
+	-- from 2.36/2.38, and LibreSSL's compat copies keep a program running on an older one.
+	"LIBRESSL_INTERNAL", "OPENSSL_NO_HW_PADLOCK", "__BEGIN_HIDDEN_DECLS=", "__END_HIDDEN_DECLS=",
+	"OPENSSL_NO_ASM", "SIZEOF_TIME_T=8", "_DEFAULT_SOURCE", "_BSD_SOURCE", "_GNU_SOURCE", "_POSIX_SOURCE",
+	"HAVE_ARPA_NAMESER_H", "HAVE_ASPRINTF", "HAVE_CLOCK_GETTIME", "HAVE_ENDIAN_H", "HAVE_ERR_H",
+	"HAVE_EXPLICIT_BZERO", "HAVE_FTRUNCATE", "HAVE_GETAUXVAL", "HAVE_GETDELIM", "HAVE_GETENTROPY",
+	"HAVE_GETLINE", "HAVE_GETOPT", "HAVE_GETPAGESIZE", "HAVE_MEMMEM", "HAVE_NETINET_IP_H", "HAVE_REALLOCARRAY",
+	"HAVE_RESOLV_H", "HAVE_STRCASECMP", "HAVE_STRNDUP", "HAVE_STRNLEN", "HAVE_STRSEP", "HAVE_SYSLOG",
+	"HAVE_VSYSLOG",
 } or {
 	-- The libc of macOS, iOS and Android has these, so the compat headers use the system's.
 	"LIBRESSL_INTERNAL", "OPENSSL_NO_HW_PADLOCK", "__BEGIN_HIDDEN_DECLS=", "__END_HIDDEN_DECLS=",
@@ -738,11 +752,14 @@ local LIBRESSL_PLATFORM = srcs("Projects/libressl/src/crypto", WINDOWS_TARGET an
 	"compat/getpagesize", "compat/getprogname_windows", "compat/strcasecmp", "compat/strlcat",
 	"compat/strlcpy", "compat/strndup", "compat/strsep", "compat/strtonum", "compat/explicit_bzero_win",
 	"compat/arc4random", "compat/arc4random_uniform", "compat/getentropy_win", "compat/timingsafe_bcmp",
+} or LINUX_TARGET and {
+	-- What LibreSSL's CMake compiles on glibc, and the three left out of the defines above.
+	"compat/getprogname_linux", "compat/strtonum", "compat/timingsafe_bcmp", "compat/strlcat", "compat/strlcpy",
+	"compat/arc4random", "compat/arc4random_uniform",
 } or { "compat/explicit_bzero" })
-local LIBRESSL_COMPAT = table.join(LIBRESSL_PLATFORM, srcs("Projects/libressl/src/crypto", {
-	"compat/freezero", "compat/reallocarray", "compat/recallocarray", "compat/syslog_r",
-	"compat/timingsafe_memcmp",
-}))
+local LIBRESSL_COMPAT = table.join(LIBRESSL_PLATFORM, srcs("Projects/libressl/src/crypto", table.join({
+	"compat/freezero", "compat/recallocarray", "compat/syslog_r", "compat/timingsafe_memcmp",
+}, LINUX_TARGET and {} or { "compat/reallocarray" })))
 
 -- Each library's hidden/ (its own copies of the public headers, marking what is internal) comes before
 -- include/, as in the CMake build.
@@ -871,7 +888,7 @@ local LIBRESSL_SSL_BYTESTRING = srcs("Projects/libressl/src/ssl", {
 })
 
 dep("crypto", {
-	systems     = GUI,
+	systems     = TLS,
 	defines     = table.join(libressl_defines, { "LIBRESSL_CRYPTO_INTERNAL" }),
 	includedirs = libressl_crypto_includes,
 	-- DLL is crypto-57 (major version from src/crypto/VERSION), import library crypto.lib. Exports via
@@ -887,7 +904,7 @@ dep("crypto", {
 })
 
 dep("ssl", {
-	systems     = GUI,
+	systems     = TLS,
 	defines     = libressl_defines,
 	includedirs = libressl_ssl_includes,
 	-- DLL is ssl-60 (src/ssl/VERSION), import library ssl.lib; exports via the generated .def and links
@@ -920,14 +937,14 @@ dep("ssl", {
 -- 8.19.0 curl refuses anything older); what it calls from Vista on - BCryptGenRandom, if_nametoindex and
 -- the rest - YY-Thunks supplies on XP builds, as for LibreSSL.
 dep("curl", {
-	systems = { "windows", "ios" },
+	systems = { "windows", "ios", "linux" },
 	defines = not WINDOWS_TARGET and {
 		"HAVE_CONFIG_H", "BUILDING_LIBCURL", "CURL_STATICLIB", "USE_OPENSSL", "HAVE_LIBZ", "HAVE_ZLIB_H",
 		"HAVE_ZSTD", "CURL_DISABLE_OPENSSL_AUTO_LOAD_CONFIG",
 	} or {
 		"HAVE_CONFIG_H", "BUILDING_LIBCURL", "CURL_STATICLIB", "_WIN32_WINNT=0x0600",
 	},
-	includedirs = table.join({ WINDOWS_TARGET and "Projects/curl/windows" or "Projects/curl/apple" },
+	includedirs = table.join({ WINDOWS_TARGET and "Projects/curl/windows" or LINUX_TARGET and "Projects/curl/linux" or "Projects/curl/apple" },
 		{ "Projects/curl/src/include", "Projects/curl/src/lib",
 		"Projects/libressl/src/include", "Projects/zlib/include", "Projects/zstd/src/lib" }),
 	-- The DLL drops CURL_STATICLIB, compiles the version .rc, and links the ssl/crypto/zlib/zstd DLLs and bcrypt
