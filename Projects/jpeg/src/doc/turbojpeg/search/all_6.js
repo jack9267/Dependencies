@@ -1,0 +1,4 @@
+var searchData=
+[
+  ['jpeg_20destination_20buffer_20management_0',['JPEG Destination Buffer Management',['../group___turbo_j_p_e_g.html#autotoc_md1',1,'']]]
+];

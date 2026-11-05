@@ -433,18 +433,37 @@ dep("glew", {
 	files   = { "Projects/glew/src/glew.c" },
 })
 
+-- jpeg: libjpeg-turbo, plain C - no SIMD and so no NASM, which keeps it running on Windows XP and lets one
+-- compile serve every architecture. The source list is the release's own CMakeLists.txt's JPEG_SOURCES,
+-- with arithmetic coding (jaricom/jcarith/jdarith); after an update, take it again from there. Since 3.0
+-- the library handles 8-, 12- and 16-bit samples by compiling some files once per precision: the
+-- release's src/wrapper/<name>-<bits>.c files do that (each defines BITS_IN_JSAMPLE and includes the
+-- file). jconfig.h (public, in include) and jconfigint.h/jversion.h (config) are written by hand from the
+-- release's .in templates for every target. No TurboJPEG API and no tools.
+local JPEG_WRAPPED = {
+	{ "jcapistd", 8, 12, 16 }, { "jccoefct", 8, 12 }, { "jccolor", 8, 12, 16 }, { "jcdctmgr", 8, 12 },
+	{ "jcdiffct", 8, 12, 16 }, { "jclossls", 8, 12, 16 }, { "jcmainct", 8, 12, 16 },
+	{ "jcprepct", 8, 12, 16 }, { "jcsample", 8, 12, 16 }, { "jdapistd", 8, 12, 16 },
+	{ "jdcoefct", 8, 12 }, { "jdcolor", 8, 12, 16 }, { "jddctmgr", 8, 12 }, { "jddiffct", 8, 12, 16 },
+	{ "jdlossls", 8, 12, 16 }, { "jdmainct", 8, 12, 16 }, { "jdmerge", 8, 12 },
+	{ "jdpostct", 8, 12, 16 }, { "jdsample", 8, 12, 16 }, { "jfdctfst", 8, 12 }, { "jfdctint", 8, 12 },
+	{ "jidctflt", 8, 12 }, { "jidctfst", 8, 12 }, { "jidctint", 8, 12 }, { "jidctred", 8, 12 },
+	{ "jquant1", 8, 12 }, { "jquant2", 8, 12 }, { "jutils", 8, 12, 16 },
+}
+local JPEG_SOURCES = srcs("Projects/jpeg/src/src", {
+	"jcapimin", "jchuff", "jcicc", "jcinit", "jclhuff", "jcmarker", "jcmaster", "jcomapi", "jcparam",
+	"jcphuff", "jctrans", "jdapimin", "jdatadst", "jdatasrc", "jdhuff", "jdicc", "jdinput", "jdlhuff",
+	"jdmarker", "jdmaster", "jdphuff", "jdtrans", "jerror", "jfdctflt", "jmemmgr", "jmemnobs",
+	"jpeg_nbits", "jaricom", "jcarith", "jdarith" })
+for _, w in ipairs(JPEG_WRAPPED) do
+	for i = 2, #w do
+		JPEG_SOURCES[#JPEG_SOURCES + 1] = "Projects/jpeg/src/src/wrapper/" .. w[1] .. "-" .. w[i] .. ".c"
+	end
+end
+
 dep("jpeg", {
-	systems = WINDOWS,
-	includedirs = { "Projects/jpeg/include", "Projects/jpeg/src" },
-	files = srcs("Projects/jpeg/src", {
-		"jcapimin", "jcapistd", "jccoefct", "jccolor", "jcdctmgr", "jchuff", "jcinit", "jcmainct",
-		"jcmarker", "jcmaster", "jcomapi", "jcparam", "jcphuff", "jcprepct", "jcsample", "jctrans",
-		"jdapimin", "jdapistd", "jdatadst", "jdatasrc", "jdcoefct", "jdcolor", "jddctmgr", "jdhuff",
-		"jdinput", "jdmainct", "jdmarker", "jdmaster", "jdmerge", "jdphuff", "jdpostct", "jdsample",
-		"jdtrans", "jerror", "jfdctflt", "jfdctfst", "jfdctint", "jidctflt", "jidctfst", "jidctint",
-		"jidctred", "jmemansi", "jmemmgr", "jquant1", "jquant2", "jutils", "rdbmp", "rdcolmap",
-		"rdgif", "rdppm", "rdrle", "rdswitch", "rdtarga", "transupp", "wrbmp", "wrgif", "wrppm",
-		"wrrle", "wrtarga" }),
+	includedirs = { "Projects/jpeg/include", "Projects/jpeg/config", "Projects/jpeg/src/src" },
+	files = JPEG_SOURCES,
 })
 
 dep("pcre2-8", {
@@ -614,6 +633,10 @@ headers_project {
 	{ file = "Projects/zstd/src/lib/zdict.h" },
 	{ file = "Projects/zstd/src/lib/zstd_errors.h" },
 	{ dir = "Projects/png/include" },
+	{ file = "Projects/jpeg/include/jconfig.h" },
+	{ file = "Projects/jpeg/src/src/jpeglib.h" },
+	{ file = "Projects/jpeg/src/src/jmorecfg.h" },
+	{ file = "Projects/jpeg/src/src/jerror.h" },
 	{ dir = "Projects/tinyxml/include" },
 	{ dir = "Projects/lua5.3/include" },
 	{ dir = "Projects/lua5.4/include" },
@@ -649,10 +672,6 @@ headers_project {
 	{ dir = "Projects/glew/include", systems = WINDOWS },
 	{ dir = "Projects/pcre2/include", systems = WINDOWS },
 	{ files = "Projects/harfbuzz/src/*.h", systems = WINDOWS },
-	{ dir = "Projects/jpeg/include", systems = WINDOWS },
-	{ file = "Projects/jpeg/src/jmorecfg.h", systems = WINDOWS },
-	{ file = "Projects/jpeg/src/jpeglib.h", systems = WINDOWS },
-	{ file = "Projects/jpeg/src/jerror.h", systems = WINDOWS },
 	-- misc
 	{ dir = "Projects/MinHook/include", systems = WINDOWS },
 	{ files = "Projects/asmjit/src/src/*.h", recursive = true, systems = WINDOWS },

@@ -80,6 +80,29 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
 - **`ZSTD_DISABLE_ASM` everywhere**: the x86_64 assembly decoder is GCC/clang-only, and the Apple build compiles
   every architecture in one go. MSVC always uses the C decoder anyway.
 
+## jpeg (`Projects/jpeg`)
+
+- **libjpeg-turbo 3.2.1, stock** (2026-11-05, replacing IJG libjpeg 6b from 1998), still `jpeg_static`. `src` is the
+  release tarball unchanged; built for every target now (6b was Windows-only), with `jpeglib.h`, `jmorecfg.h`,
+  `jerror.h` and `jconfig.h` in `include\`. Galactic reads JPEG images with it (`CMipLevel::LoadJPEG`).
+- **Plain C: no SIMD, so no NASM** (`WITH_SIMD` undefined), as the user asked: the x86 SIMD code needs NASM to build,
+  and plain C runs on any CPU XP does; it also lets one Apple compile serve every architecture. Arithmetic coding is in; the TurboJPEG API and the tools are not built.
+- **The source list is the release's own `CMakeLists.txt` `JPEG_SOURCES`** plus `jaricom`/`jcarith`/`jdarith`; after an
+  update, take it again from there. Since 3.0 a third of the files are compiled once per sample size (8, 12 and 16
+  bits): the release's `src/src/wrapper/<name>-<bits>.c` each define `BITS_IN_JSAMPLE` and include the file, so
+  premake lists the wrappers (`JPEG_WRAPPED` in premake5.lua) rather than compiling one file three times.
+- **`jconfig.h` (`include/`, public) and `jconfigint.h`/`jversion.h` (`config/`, the library's own) are written by
+  hand** from the release's `.in` templates, for every target at once: the 6.2 API (`JPEG_LIB_VERSION 62`),
+  `SIZEOF_SIZE_T` and the inline/visibility/thread-local spellings chosen by the preprocessor. Regenerate them from
+  the new templates after an update. On Windows `jconfig.h` keeps libjpeg's `boolean` = `unsigned char` (as 6b's did),
+  guarded against `rpcndr.h`. Only TurboJPEG uses thread-local storage, and YY-Thunks makes it work on XP anyway.
+- **After updating to it, build the `headers` project** before anything that uses it: `include\` still holds 6b's
+  `jpeglib.h`/`jmorecfg.h`, and Galactic then fails to compile (`JCS_EXT_BGRA` undeclared, `INT32` redefined).
+- Built and tested on Linux and Windows (2026-11-05: x86 and x64, Debug and Release; through Galactic, every one of
+  10,970 JPEGs on the laptop decoded with no crash under cdb, and a sample matched Windows' own decoder pixel for
+  pixel); the macOS, iOS and Android builds of it are untested. `Projects/jpeg/CMakeLists.txt` has the same list for
+  the old CMake build.
+
 ## AngelScript (`Projects/angelscript`)
 
 - **2.38.0, stock** (2026-11-02), for a planned Galactic scripting backend. `src` is the SDK folder of the release

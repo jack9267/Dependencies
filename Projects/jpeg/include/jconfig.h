@@ -1,47 +1,41 @@
-/* jconfig.vc --- jconfig.h for Microsoft Visual C++ on Windows 95 or NT. */
-/* see jconfig.doc for explanations */
+/* jconfig.h for libjpeg-turbo 3.2.1, written by hand from src/src/jconfig.h.in for every target this
+ * repo builds (Windows, Linux, macOS, iOS, Android): the libjpeg 6.2 API, arithmetic coding, the
+ * in-memory source and destination managers, and no SIMD - plain C only, which is what lets the same
+ * library run on Windows XP and build for every architecture in one go. */
 
-#include <stdio.h>
+#define JPEG_LIB_VERSION  62
 
-#define HAVE_PROTOTYPES
-#define HAVE_UNSIGNED_CHAR
-#define HAVE_UNSIGNED_SHORT
-/* #define void char */
-/* #define const */
-#undef CHAR_IS_UNSIGNED
-#define HAVE_STDDEF_H
-#define HAVE_STDLIB_H
-#undef NEED_BSD_STRINGS
-#undef NEED_SYS_TYPES_H
-#undef NEED_FAR_POINTERS	/* we presume a 32-bit flat memory model */
-#undef NEED_SHORT_EXTERNAL_NAMES
-#undef INCOMPLETE_TYPES_BROKEN
+#define LIBJPEG_TURBO_VERSION  3.2.1
 
-/* Define "boolean" as unsigned char, not int, per Windows custom */
-#ifndef __RPCNDR_H__		/* don't conflict if rpcndr.h already read */
-typedef unsigned char boolean;
+#define LIBJPEG_TURBO_VERSION_NUMBER  3002001
+
+#define C_ARITH_CODING_SUPPORTED 1
+
+#define D_ARITH_CODING_SUPPORTED 1
+
+#define MEM_SRCDST_SUPPORTED  1
+
+/* WITH_SIMD is deliberately not defined. */
+
+#ifndef BITS_IN_JSAMPLE
+#define BITS_IN_JSAMPLE  8
 #endif
-#define HAVE_BOOLEAN		/* prevent jmorecfg.h from redefining it */
 
-
-#ifdef JPEG_INTERNALS
+#ifdef _WIN32
 
 #undef RIGHT_SHIFT_IS_UNSIGNED
 
-#endif /* JPEG_INTERNALS */
+/* Define "boolean" as unsigned char, not int, per Windows custom */
+#ifndef __RPCNDR_H__            /* don't conflict if rpcndr.h already read */
+typedef unsigned char boolean;
+#endif
+#define HAVE_BOOLEAN            /* prevent jmorecfg.h from redefining it */
 
-#ifdef JPEG_CJPEG_DJPEG
+/* Define "INT32" as int, not long, per Windows custom */
+#if !(defined(_BASETSD_H_) || defined(_BASETSD_H))   /* don't conflict if basetsd.h already read */
+typedef short INT16;
+typedef signed int INT32;
+#endif
+#define XMD_H                   /* prevent jmorecfg.h from redefining it */
 
-#define BMP_SUPPORTED		/* BMP image file format */
-#define GIF_SUPPORTED		/* GIF image file format */
-#define PPM_SUPPORTED		/* PBMPLUS PPM/PGM image file format */
-#undef RLE_SUPPORTED		/* Utah RLE image file format */
-#define TARGA_SUPPORTED		/* Targa image file format */
-
-#define TWO_FILE_COMMANDLINE	/* optional */
-#define USE_SETMODE		/* Microsoft has setmode() */
-#undef NEED_SIGNAL_CATCHER
-#undef DONT_USE_B_MODE
-#undef PROGRESS_REPORT		/* optional */
-
-#endif /* JPEG_CJPEG_DJPEG */
+#endif
