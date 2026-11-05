@@ -207,6 +207,7 @@ static inline int ff_vfprintf(FF_FILE *fp, const char *fmt, va_list ap) {
 #include <arpa/inet.h>
 #include <dirent.h>
 #include <netdb.h>
+#include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <signal.h>
 #include <stdbool.h>

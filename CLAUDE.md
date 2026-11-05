@@ -20,6 +20,21 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   include them (`(Get-Item <file>).LastWriteTime = Get-Date`) and confirm their names appear in the build
   output.
 
+## FreeBSD (`make TARGET=freebsd`)
+
+- **Built like Linux** (2026-11-05): the core set with no `systems` list, from premake's `bsd` fragment
+  (`.jbuild/make/bsd.mk`), into `Lib/freebsd/<Config>`. No GUI libraries, and no SDL, LibreSSL or curl: OpenSSL
+  is FreeBSD's base system's, curl and SDL2 its packages (`pkg install curl sdl2`), which jbuild's
+  `dependencies.mk` finds under `/usr/local`. On FreeBSD run `gmake` (FreeBSD's make is not GNU make); from Linux,
+  `make TARGET=freebsd FREEBSD_SYSROOT=<FreeBSD 14 base.txz unpacked> -j2 release debug` (jbuild's CLAUDE.md).
+- **One source fix**: mongoose 7.1's `mongoose.h` now includes `<netinet/in.h>` itself. glibc's `<arpa/inet.h>`
+  brings it in; FreeBSD's does not (POSIX doesn't require it), so `sockaddr_in` and `IPPROTO_TCP` were unknown.
+  Later mongoose releases include it the same way. Everything else compiled as it is.
+- **Built against a real FreeBSD 14.5 sysroot and used** (2026-11-05): every library cross-compiled from Linux,
+  Release and Debug, then linked into Galactic's UnitTests and tools and a server program, which ran on FreeBSD
+  14.5 in QEMU with every test passing (the sysroot and the VM: jbuild's and Galactic's CLAUDE.md). Not tried: a
+  build on FreeBSD itself (`gmake -j4 release debug`).
+
 ## LibreSSL (`Projects/libressl`)
 
 - **4.4.0, stock** (2026-11-02, from 2.7.5). `src` is the release tarball unchanged. 2.7.5 carried one patch,
