@@ -165,3 +165,17 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   (and `-laaudio`, which needs API 26). Not yet built for Android.
 - Vorbis is not built in (that needs `extras/stb_vorbis.c` or the libvorbis decoder); MP3, FLAC and WAV are.
 
+## litehtml (`Projects/litehtml`)
+
+- **Upstream master 6293d441 (v0.10 + 55, 2026-11-07), stock** (2026-11-07). `src` is
+  github.com/litehtml/litehtml unchanged; it was a submodule of the fork jack9267/litehtml (upstream 436f49c of
+  2022 with four patches, and no shared history with upstream). Gumbo is upstream's copy inside it (0.14.1).
+  `CMakeLists.txt` beside `src` is the old CMake build's wrapper, not what is built.
+- **Gumbo's public headers are only `gumbo.h` and `tag_enum.h`**, installed to `include\gumbo\`: its `src`
+  folder also holds internal headers with generic names (`util.h`, `vector.h`, `parser.h`), so it is not copied
+  whole. No consumer includes gumbo; litehtml's public headers no longer do either.
+- **This version is not source-compatible with the 2022 one** that Galactic's `litehtml_LucasGUI`, ModLauncher
+  and GTAC were written against. The old version used wchar, `litehtml::context`, `html_tag::render` and the old
+  `document_container`; the fork also changed `draw_text` to take the element and made `fix_tables_layout`
+  public. Don't install a build with it until they are ported.
+

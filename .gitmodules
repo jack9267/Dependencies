@@ -10,10 +10,6 @@
 	path = Projects/RakNet/src
 	url = https://github.com/jack9267/RakNet
 	branch = master
-[submodule "Projects/litehtml"]
-	path = Projects/litehtml
-	url = https://github.com/jack9267/litehtml
-	branch = master
 [submodule "jbuild"]
 	path = jbuild
 	url = https://github.com/jack9267/jbuild.git

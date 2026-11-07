@@ -688,8 +688,10 @@ headers_project {
 	{ dir = "Projects/curl/src/include", systems = TLS },
 	{ dir = "Projects/pixman/include", systems = WINDOWS },
 	{ dir = "Projects/cairo/include", systems = WINDOWS },
-	{ dir = "Projects/litehtml/litehtml/include", systems = WINDOWS },
-	{ dir = "Projects/litehtml/litehtml/src/gumbo/include", systems = WINDOWS },
+	{ dir = "Projects/litehtml/src/include", systems = WINDOWS },
+	-- gumbo's public headers only (its src holds the internal ones), where its own CMake installs them
+	{ file = "Projects/litehtml/src/src/gumbo/src/gumbo.h", to = "gumbo", systems = WINDOWS },
+	{ file = "Projects/litehtml/src/src/gumbo/src/tag_enum.h", to = "gumbo", systems = WINDOWS },
 	{ dir = "Projects/RmlUi/Include", systems = GUI },
 	{ dir = "Projects/flac/src/include/FLAC", to = "FLAC", systems = WINDOWS },
 	{ dir = "Projects/flac/src/include/FLAC++", to = "FLAC++", systems = WINDOWS },
@@ -1149,21 +1151,19 @@ dep("cairo", {
 dep("litehtml", {
 	systems = WINDOWS,
 	projname = "litehtml", lang = "C++",
-	includedirs = { "Projects/litehtml/litehtml/include",
-		"Projects/litehtml/litehtml/include/litehtml",
-		"Projects/litehtml/litehtml/src/gumbo/include",
-		"Projects/litehtml/litehtml/src/gumbo/visualc/include" },
-	files = { "Projects/litehtml/litehtml/src/*.cpp" },
+	includedirs = { "Projects/litehtml/src/include",
+		"Projects/litehtml/src/include/litehtml",
+		"Projects/litehtml/src/src/gumbo/src",
+		"Projects/litehtml/src/src/gumbo/visualc/include" },
+	files = { "Projects/litehtml/src/src/*.cpp" },
 })
 
 dep("gumbo", {
 	systems = WINDOWS,
 	projname = "gumbo",
-	includedirs = { "Projects/litehtml/litehtml/src/gumbo",
-		"Projects/litehtml/litehtml/src/gumbo/include",
-		"Projects/litehtml/litehtml/src/gumbo/include/gumbo",
-		"Projects/litehtml/litehtml/src/gumbo/visualc/include" },
-	files = { "Projects/litehtml/litehtml/src/gumbo/*.c" },
+	includedirs = { "Projects/litehtml/src/src/gumbo/src",
+		"Projects/litehtml/src/src/gumbo/visualc/include" },
+	files = { "Projects/litehtml/src/src/gumbo/src/*.c" },
 })
 
 dep("rmlui_core", {
