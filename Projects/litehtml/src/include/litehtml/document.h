@@ -118,6 +118,9 @@ namespace litehtml
         void                         add_fixed_box(const position& pos);
         void                         add_media_list(const media_query_list_list::ptr& list);
         bool                         media_changed();
+        // Apply the styles again and rebuild the render tree, for a stylesheet applied after the document was made
+        // (root()->apply_stylesheet() of one that arrived late). Call render() after it.
+        void                         restyle();
         bool                         lang_changed();
         bool                         match_lang(const std::string& lang);
         void                         add_tabular(const std::shared_ptr<render_item>& el);

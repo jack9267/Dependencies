@@ -903,6 +903,25 @@ namespace litehtml
         return false;
     }
 
+    void document::restyle()
+    {
+        if(!m_root)
+        {
+            return;
+        }
+        m_root->refresh_styles();
+        m_root->compute_styles();
+        // The render tree is built again from the new styles, as createFromString() built it. The tabular list
+        // holds the old tree's items, so it is started again for fix_tables_layout().
+        m_tabular_elements.clear();
+        m_root_render = m_root->create_render_item(nullptr);
+        fix_tables_layout();
+        if(m_root_render)
+        {
+            m_root_render = m_root_render->init();
+        }
+    }
+
     bool document::lang_changed()
     {
         if(!m_media_lists.empty())
