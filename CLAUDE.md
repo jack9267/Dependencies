@@ -167,15 +167,25 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
 
 ## litehtml (`Projects/litehtml`)
 
-- **Upstream master 6293d441 (v0.10 + 55, 2026-11-07), stock** (2026-11-07). `src` is
-  github.com/litehtml/litehtml unchanged; it was a submodule of the fork jack9267/litehtml (upstream 436f49c of
-  2022 with four patches, and no shared history with upstream). Gumbo is upstream's copy inside it (0.14.1).
-  `CMakeLists.txt` beside `src` is the old CMake build's wrapper, not what is built.
+- **Upstream master 6293d441 (v0.10 + 55, 2026-11-07), with two patches of ours** (2026-11-08). `src` is
+  github.com/litehtml/litehtml as it was copied in, plus the patches below; it was a submodule of the fork
+  jack9267/litehtml (upstream 436f49c of 2022 with four patches, and no shared history with upstream). Gumbo is
+  upstream's copy inside it (0.14.1). `CMakeLists.txt` beside `src` is the old CMake build's wrapper, not what is
+  built. **After an update, put the patches back** (each is its own commit, so `git show` gives it):
+  - **`document::restyle()`** (`document.h`/`.cpp`): styles applied again and the render tree rebuilt, for a
+    stylesheet given to `root()->apply_stylesheet()` after the document was made - Galactic's HTML view gets
+    `@import`ed sheets over the network that way. `media_changed()` does nearly the same but leaves out
+    `fix_tables_layout()` (and never clears `m_tabular_elements`, which `restyle()` does before rebuilding).
+  - **`draw_text` with the element** (`document_container.h`, `el_text.cpp`, `html_tag.cpp`): a second virtual
+    that also takes the element the text is for (the text element, or the list item for its marker), calling the
+    original unless overridden, so other containers compile unchanged. Galactic reads its
+    `--lucasgui-text-shadow` custom property from it: upstream draws no `text-shadow` and its parser keeps only
+    properties it knows, and `--` ones.
 - **Gumbo's public headers are only `gumbo.h` and `tag_enum.h`**, installed to `include\gumbo\`: its `src`
   folder also holds internal headers with generic names (`util.h`, `vector.h`, `parser.h`), so it is not copied
   whole. No consumer includes gumbo; litehtml's public headers no longer do either.
 - **This version is not source-compatible with the 2022 one** that Galactic's `litehtml_LucasGUI`, ModLauncher
   and GTAC were written against. The old version used wchar, `litehtml::context`, `html_tag::render` and the old
-  `document_container`; the fork also changed `draw_text` to take the element and made `fix_tables_layout`
-  public. Don't install a build with it until they are ported.
+  `document_container`; the fork also changed `draw_text` to take the element (now the overload above) and made
+  `fix_tables_layout` public (now inside `restyle()`). Don't install a build with it until they are ported.
 

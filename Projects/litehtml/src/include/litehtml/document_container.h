@@ -39,6 +39,14 @@ namespace litehtml
         virtual pixel_t            text_width(const char* text, litehtml::uint_ptr hFont)                           = 0;
         virtual void               draw_text(litehtml::uint_ptr hdc, const char* text, litehtml::uint_ptr hFont,
                                              litehtml::web_color color, const litehtml::position& pos)              = 0;
+        // draw_text with the element the text is for: the text element itself, or the list item for its marker. What
+        // litehtml calls; it calls the one above unless a container overrides it, to read what else styles the text.
+        virtual void               draw_text(litehtml::uint_ptr hdc, const char* text, litehtml::uint_ptr hFont,
+                                             litehtml::web_color color, const litehtml::position& pos,
+                                             const std::shared_ptr<litehtml::element>& /*el*/)
+        {
+            draw_text(hdc, text, hFont, color, pos);
+        }
         virtual pixel_t            pt_to_px(float pt) const                                                         = 0;
         virtual pixel_t            get_default_font_size() const                                                    = 0;
         virtual const char*        get_default_font_name() const                                                    = 0;

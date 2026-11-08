@@ -1196,7 +1196,8 @@ namespace litehtml
                     text_pos.move_to(text_pos.right() - tw, text_pos.y);
                     text_pos.width = tw;
                     text_pos.round();
-                    get_document()->container()->draw_text(hdc, marker_text.c_str(), lm.font, lm.color, text_pos);
+                    get_document()->container()->draw_text(hdc, marker_text.c_str(), lm.font, lm.color, text_pos,
+                                                           shared_from_this());
                 }
             }
         } else
