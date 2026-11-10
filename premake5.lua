@@ -284,9 +284,9 @@ dep("miniaudio", {
 -- against a server loop that sleeps between polls. Used only inside mongoose.c, so consumers need not match.
 dep("mongoose6", { includedirs = { "Projects/mongoose6/include/mongoose6" },
 	defines = { "MG_TCP_IO_SIZE=65536", "MG_MAX_HTTP_SEND_MBUF=65536" } })
--- mongoose7: MG_IO_SIZE (default 512) is the step its buffers grow and round by, and half of how much of a
--- served file static_cb keeps queued - 1 KB per poll otherwise, the same crawl as mongoose6's defaults.
--- 32 KB gives 64 KB of a file at a time. Used only inside mongoose.c.
+-- mongoose7: MG_IO_SIZE is the step its buffers grow and round by, and how much of a served file static_cb
+-- keeps queued. 7.23's default is 16 KB (7.1's was 512, and queued twice that); 32 KB a file at a time.
+-- Used only inside mongoose.c.
 dep("mongoose7", { includedirs = { "Projects/mongoose7/include/mongoose7" },
 	defines = { "MG_IO_SIZE=32768" } })
 
