@@ -287,8 +287,13 @@ dep("mongoose6", { includedirs = { "Projects/mongoose6/include/mongoose6" },
 -- mongoose7: MG_IO_SIZE is the step its buffers grow and round by, and how much of a served file static_cb
 -- keeps queued. 7.23's default is 16 KB (7.1's was 512, and queued twice that); 32 KB a file at a time.
 -- Used only inside mongoose.c.
-dep("mongoose7", { includedirs = { "Projects/mongoose7/include/mongoose7" },
-	defines = { "MG_IO_SIZE=32768" } })
+-- TLS is its OpenSSL backend (MG_TLS_OPENSSL), on our LibreSSL where that is built and on the system's OpenSSL
+-- elsewhere (FreeBSD's base); a program linking it links ssl_static and crypto_static (or -lssl -lcrypto). Only
+-- mongoose.c needs MG_TLS: what mongoose.h declares for a consumer (mg_tls_opts, mg_tls_init) is the same with
+-- any backend, and struct mg_tls is reached only through the connection's pointer.
+dep("mongoose7", { includedirs = table.join({ "Projects/mongoose7/include/mongoose7" },
+		table.contains(TLS, os.target()) and { "Projects/libressl/src/include" } or {}),
+	defines = { "MG_IO_SIZE=32768", "MG_TLS=MG_TLS_OPENSSL" } })
 
 -- sqlite: one translation unit. The version .rc is for the DLL only (RC_VERONLY gates it); a static
 -- lib needs neither.

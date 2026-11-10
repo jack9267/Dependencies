@@ -38,14 +38,24 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
 
 ## mongoose 7 (`Projects/mongoose7`)
 
-- **7.23, stock** (2026-11-10, from 7.1): `mongoose.c`/`mongoose.h` from the `7.23` tag, unchanged but for CRLF.
-  Nothing links it yet - Galactic is on `mongoose6` - it is here for a port of Galactic's web servers. Its
+- **7.23** (2026-11-10, from 7.1): `mongoose.c`/`mongoose.h` from the `7.23` tag, unchanged but for CRLF and one
+  line (below). Nothing links it yet - Galactic is on `mongoose6` - it is here for a port of Galactic's web servers. Its
   `mg_http_serve_file` reads through `struct mg_fs` (stat, open, read, seek, close), answers `If-None-Match` with
   304 and one `Range` with 206/416, and keeps the connection open; it sends no `Last-Modified`. Built Win32/x64,
   Debug/Release, with no warnings; the Debug library imports only what XP has (sockets with `select`,
   `GetTickCount`, `FindFirstFileW`...). Not built off Windows yet. `_WIN32_WINNT` is not defined for it, so
   `mongoose.h` sets 0x0600 - harmless today (nothing Vista-only is called), but check the imports again after an
   update.
+- **TLS is its OpenSSL backend on our LibreSSL** (`MG_TLS=MG_TLS_OPENSSL`, LibreSSL's headers where LibreSSL is
+  built; FreeBSD's base OpenSSL there). A program linking `mongoose7_static` links `ssl_static` and `crypto_static`
+  too (and `bcrypt`, as for curl). Consumers need no define: `mongoose.h` declares the same for any backend.
+  **The one patch**: `BIO_set_init(bio, 1)` after mongoose makes its BIO in `mg_tls_init`. OpenSSL's `BIO_new`
+  marks a BIO whose method has no `create` initialised; LibreSSL's doesn't, so every read failed with
+  `BIO_R_UNINITIALIZED` ("tls hs: rc -1") and no handshake ever finished. Keep it across an update. Seen working
+  (Debug Win32): an HTTPS server on it, with a self-signed RSA certificate, answered curl with 200. The client
+  side (`mg_http_connect` to `https://`, checking a CA) is not tried yet.
+- **No compression**: it links no zlib/zstd. `mg_http_serve_file` only sends `<file>.gz` beside a file, when one is
+  there and the client takes gzip; WebSockets have no `permessage-deflate`.
 
 ## LibreSSL (`Projects/libressl`)
 

@@ -21343,6 +21343,10 @@ if (c->is_client && opts->name.buf != NULL && opts->name.len > 0 && opts->name.b
 
   bio = BIO_new(tls->bm);
   BIO_set_data(bio, c);
+  // Dependencies: OpenSSL's BIO_new marks a BIO whose method has no create
+  // callback initialised; LibreSSL's doesn't, and every read then fails with
+  // BIO_R_UNINITIALIZED, so the handshake never starts.
+  BIO_set_init(bio, 1);
   SSL_set_bio(tls->ssl, bio, bio);
 
   c->is_tls = 1;
