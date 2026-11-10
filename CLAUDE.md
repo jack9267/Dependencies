@@ -48,7 +48,7 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   update.
 - **TLS is its OpenSSL backend on our LibreSSL** (`MG_TLS=MG_TLS_OPENSSL`, LibreSSL's headers where LibreSSL is
   built; FreeBSD's base OpenSSL there). A program linking `mongoose7_static` links `ssl_static` and `crypto_static`
-  too (and `bcrypt`, as for curl). Consumers need no define: `mongoose.h` declares the same for any backend.
+  too - no `bcrypt`, as YY-Thunks gives LibreSSL its `BCryptGenRandom` (see LibreSSL below). Consumers need no define: `mongoose.h` declares the same for any backend.
   **The one patch**: `BIO_set_init(bio, 1)` after mongoose makes its BIO in `mg_tls_init`. OpenSSL's `BIO_new`
   marks a BIO whose method has no `create` initialised; LibreSSL's doesn't, so every read failed with
   `BIO_R_UNINITIALIZED` ("tls hs: rc -1") and no handshake ever finished. Keep it across an update. Seen working
