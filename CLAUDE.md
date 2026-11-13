@@ -128,6 +128,22 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
 - **`ZSTD_DISABLE_ASM` everywhere**: the x86_64 assembly decoder is GCC/clang-only, and the Apple build compiles
   every architecture in one go. MSVC always uses the C decoder anyway.
 
+## zlib (`Projects/zlib`)
+
+- **1.4, stock** (2026-11-13, from 1.3.1; tarball checked against zlib.net's SHA-256). `src` is the release's
+  top-level files only - not `contrib`, `examples`, `test` or the per-platform folders - and `include` holds copies
+  of its `zlib.h` and `zconf.h`, unchanged. After an update copy both again: consumers compile against `include`.
+  `zlib_static` and `zlib.dll` (`ZLIB_DLL`) from `src/*.c`; `ZLIB_DEBUG=1` in Debug.
+- **Our names are ours, not 1.4's CMake's**: its MSVC build now calls the libraries `libz`/`libzs`; premake keeps
+  `zlib_static`/`zlib`, so nothing linking them changes.
+- **64-bit offsets on Windows now need `_LARGEFILE64_SOURCE` or `_FILE_OFFSET_BITS=64`** in the program (1.4's
+  note); `z_off_t` stays `long`, as in 1.3.1. Nothing here or in Galactic, ModLauncher or GTAC uses the `*64` gz
+  functions (freetype's `src/gzip` is its own copy of zlib).
+- Built x86 and x64, Debug and Release, with png, freetype, harfbuzz, libzip, curl and cairo rebuilt on it, no
+  warnings; `zlib.dll` imports only `KERNEL32` and `msvcrt`, nothing XP lacks. A test linking `zlib_static` passed
+  in all four: version, the crc32/adler32 check values, compress/uncompress at levels 1/5/9, gzip in memory, and a
+  `.gz` file through `gzopen`.
+
 ## jpeg (`Projects/jpeg`)
 
 - **libjpeg-turbo 3.2.1, stock** (2026-11-05, replacing IJG libjpeg 6b from 1998), still `jpeg_static`. `src` is the
