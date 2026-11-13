@@ -240,6 +240,32 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   compiling that overflows 2.5 MB in Debug (`c00000fd` under cdb). Without even that, test 2's "large nest" overflows
   in x64 Debug. The library's own default limit (250) is what keeps compiling within an ordinary stack.
 
+## MinHook (`Projects/MinHook`)
+
+- **Master at `8af6b4acae5a9388fd742b56fa79ece89d96f823` (2026-09-07), stock** (2026-11-13, the user's choice over the
+  v1.3.4 release of 2025-03), Windows only; `VERSION` says `1.3.4+` and the commit. It replaced a 2021 master snapshot
+  from between 1.3.3 and 1.3.4 (added 2021-08-25; it had no `VERSION`). Not the whole tree: its `dll_resources`,
+  `include` and `src`, and `LICENSE.txt`, at the top of `Projects/MinHook` as before. For ModLauncher's `HackSupport`
+  (GTAC links it too).
+- **Why master**: 17 commits past 1.3.4, from the maintainer - trampoline jump operands signed (a negative offset was
+  stored unsigned), a missing `VirtualQuery` check, and a rework of the instruction-length decoder (HDE, `src/hde`,
+  both 32- and 64-bit; VEX/EVEX/XOP, the `0F 38`/`0F 3A` maps, bounds-checked reads, table fixes, checked by them
+  against Zydis and Intel XED). A function the old decoder couldn't measure was refused (`MH_ERROR_UNSUPPORTED_FUNCTION`);
+  more functions can be hooked now - one starting with AVX instructions, for one.
+- **Checked against dumpbin**: every instruction `dumpbin /disasm` finds in `ntdll`, `kernelbase`, `ucrtbase`, `d3d11`
+  and `d3dcompiler_47` (System32 and SysWOW64, 6.7 million) measured by HDE: the new one gives dumpbin's length for
+  every one; the old one differed on about 5,600, nearly all flagged as errors (so refused), but some **wrong and not
+  flagged** - `popcnt` (`F3 0F B8`) and `psadbw` (`66 0F F6`) - which could have made a bad trampoline. What the new one
+  still flags (and MinHook refuses) is undecodable as code anyway - `lock ret`, `lock push`, data in the code section.
+  The scratch harness wasn't kept: dumpbin's output parsed to each instruction's bytes, then `hde32_disasm`/
+  `hde64_disasm` over them (dumpbin indents a continuation line 12 spaces after an 8-digit address, 20 after 16).
+- Tested, x86 and x64, Debug and Release, static and DLL: a C function hooked and unhooked 2000 times while another
+  thread calls it, `MH_CreateHookApi` (`GetCurrentProcessId`, `QueryPerformanceFrequency`) through the queue, and
+  hand-written functions starting with AVX (`vmovdqu`, `vzeroupper`), a `jmp rel32`, a `jmp rel8` and a `je` backwards,
+  each through its detour and its trampoline. The old copy refused only the AVX one. Hooking on and off is slow either
+  way (about 70 ms here: every switch snapshots every thread on the system with ToolHelp) - no change. The DLL imports
+  `KERNEL32` and `msvcrt`, and exports the `.def`'s 12 functions.
+
 ## libogg (`Projects/ogg`)
 
 - **1.3.6, stock** (2026-11-13, from 1.3.4; tarball checked against xiph's `SHA256SUMS`). `src` is the whole release;
