@@ -268,6 +268,30 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   pixel); the macOS, iOS and Android builds of it are untested. `Projects/jpeg/CMakeLists.txt` has the same list for
   the old CMake build.
 
+## HarfBuzz (`Projects/harfbuzz`)
+
+- **15.1.0, stock** (2026-11-13, from 2.6.6 of 2020; tarball checked against the SHA-256 GitHub gives for the
+  release asset), Windows only. `Projects/harfbuzz/src` is the release's `src` folder alone (8.7 MB of the 111 MB
+  tarball); its `*.h` - all public, `hb*.h` - are copied to `include\`. Linked by GTAC's client programs
+  (`harfbuzz_static`) but called by nothing yet - freetype's `FT_CONFIG_OPTION_USE_HARFBUZZ` is off; it is there for
+  LucasGUI's planned shaping.
+- **`harfbuzz` is the amalgamated `harfbuzz.cc`** with FreeType (`HAVE_FREETYPE=1`); the other backends in it (GDI,
+  DirectWrite, Uniscribe, CoreText, glib, Graphite2, wasm) compile to nothing without their `HAVE_*`. `/bigobj` and
+  `/utf-8`, as harfbuzz's own builds give MSVC (x64 Debug fails C1128 without `/bigobj`).
+- **`harfbuzz-subset` is meson's `hb_subset_sources`**, read from `src/meson.build` by premake - not
+  `harfbuzz-subset.cc`, which despite its name holds most of libharfbuzz too. meson's list repeats five of
+  libharfbuzz's files (`hb-static`, `hb-number`, `hb-ot-cff1/2-table`, `OT/Var/VARC/VARC`); since our libharfbuzz is
+  one amalgamated object, a static subset with them failed to link beside `harfbuzz_static` (LNK2005). So the static
+  library leaves out whatever `harfbuzz.cc` includes (premake works it out; 18 of 23 files) and a program links both;
+  the DLL keeps all 23, as `harfbuzz.dll` exports none of those internals.
+- **API**: `harfbuzz.dll` exports all 384 of 2.6.6's functions (564 now). `harfbuzz-subset` lost 2.6.6's subset API
+  (`hb_subset`, `hb_subset_input_set_drop_hints`/`retain_gids`/..., 12 in all) for `hb_subset_or_fail` and
+  `hb_subset_input_set_flags`. New imports are CRT functions XP's msvcrt has, and `InitializeCriticalSection`.
+- Tested, x86 and x64, Debug and Release, linking `harfbuzz_static` and `harfbuzz-subset_static` together with
+  freetype: Latin kerning through `hb-ft` (Arial has no `fi` ligature), Arabic lam-alef ligature and right-to-left
+  clusters, Devanagari reordering (Nirmala UI: the i sign before its consonant), and Arial subset to "Hello" (5 of
+  4652 glyphs), which FreeType opens with the right cmap.
+
 ## AngelScript (`Projects/angelscript`)
 
 - **2.39.0, stock** (2026-11-13, from 2.38.0 of 2026-11-02), for Galactic's AngelScript backend. `src` is the SDK

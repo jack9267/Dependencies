@@ -453,11 +453,45 @@ dep("freetype", {
 	end)(),
 })
 
--- harfbuzz uses its single amalgamated .cc; subset is its own library.
+-- harfbuzz: Projects/harfbuzz/src is the release's src folder alone. The library is its amalgamated harfbuzz.cc, with FreeType (HAVE_FREETYPE);
+-- the other backends in it (GDI, DirectWrite, Uniscribe, CoreText, glib, Graphite2, wasm) compile to nothing
+-- without their HAVE_*. Subset is its own library, from meson's hb_subset_sources, read from src/meson.build -
+-- not harfbuzz-subset.cc, which despite its name holds most of libharfbuzz too. meson's list repeats a few of
+-- libharfbuzz's files (hb-static, hb-number, the CFF tables, VARC): its libraries keep their objects apart, but
+-- ours is one amalgamated object, so a static harfbuzz-subset with them could not be linked beside
+-- harfbuzz_static (LNK2005). The static one leaves out whatever harfbuzz.cc includes - a program links both - and
+-- the DLL keeps meson's whole list, as harfbuzz.dll exports none of those internals.
+local function harfbuzz_meson_sources(var)
+	local text = io.readfile(path.join(_SCRIPT_DIR, "Projects/harfbuzz/src/meson.build")) or ""
+	local block = text:match(var .. "%s*=%s*files%((.-)%)")
+	if not block then error("harfbuzz: no " .. var .. " in src/meson.build") end
+	local t = {}
+	for f in block:gmatch("'([^']+%.cc)'") do t[#t + 1] = f end
+	return t
+end
+local function harfbuzz_paths(list)
+	local t = {}
+	for _, f in ipairs(list) do t[#t + 1] = "Projects/harfbuzz/src/" .. f end
+	return t
+end
+local HARFBUZZ_SUBSET_SOURCES = harfbuzz_meson_sources("hb_subset_sources")
+local HARFBUZZ_SUBSET_ONLY = (function()
+	local inCore = {}
+	for f in (io.readfile(path.join(_SCRIPT_DIR, "Projects/harfbuzz/src/harfbuzz.cc")) or ""):gmatch('#include "([^"]+%.cc)"') do
+		inCore[f] = true
+	end
+	local t = {}
+	for _, f in ipairs(HARFBUZZ_SUBSET_SOURCES) do if not inCore[f] then t[#t + 1] = f end end
+	if #t == 0 or #t == #HARFBUZZ_SUBSET_SOURCES then error("harfbuzz: could not split the subset sources from harfbuzz.cc's") end
+	return t
+end)()
+-- /bigobj and /utf-8, as harfbuzz's own meson and CMake builds give MSVC (C1128 on x64 Debug without /bigobj).
+local HARFBUZZ_MSVC_OPTIONS = { "/bigobj", "/utf-8" }
 dep("harfbuzz", {
 	systems = WINDOWS,
 	lang        = "C++",
 	defines     = { "HAVE_FREETYPE=1" },
+	buildoptions = HARFBUZZ_MSVC_OPTIONS,
 	includedirs = { "Projects/harfbuzz/src", "Projects/freetype/include" },
 	shared      = { { defines = { "HB_DLL_EXPORT" }, extra = function() links { "zlib", "freetype" } end } },
 	files       = { "Projects/harfbuzz/src/harfbuzz.cc" },
@@ -467,13 +501,11 @@ dep("harfbuzz-subset", {
 	systems = WINDOWS,
 	lang        = "C++",
 	defines     = { "HAVE_FREETYPE=1" },
+	buildoptions = HARFBUZZ_MSVC_OPTIONS,
 	includedirs = { "Projects/harfbuzz/src", "Projects/freetype/include" },
-	shared      = { { defines = { "HB_DLL_EXPORT" },
+	shared      = { { defines = { "HB_DLL_EXPORT" }, files = harfbuzz_paths(HARFBUZZ_SUBSET_SOURCES),
 		extra = function() links { "harfbuzz", "zlib", "freetype" } end } },
-	files = srcs("Projects/harfbuzz/src", {
-		"hb-number", "hb-ot-cff1-table", "hb-ot-cff2-table", "hb-static", "hb-subset",
-		"hb-subset-cff1", "hb-subset-cff2", "hb-subset-cff-common", "hb-subset-input",
-		"hb-subset-plan" }, "cc"),
+	files = harfbuzz_paths(HARFBUZZ_SUBSET_ONLY),
 })
 
 dep("glew", {

@@ -26,6 +26,8 @@
 #ifndef HB_CFF_INTERP_COMMON_HH
 #define HB_CFF_INTERP_COMMON_HH
 
+extern HB_INTERNAL const unsigned char *endchar_str;
+
 namespace CFF {
 
 using namespace OT;
@@ -217,20 +219,33 @@ inline unsigned int OpCode_Size (op_code_t op) { return Is_OpCode_ESC (op) ? 2: 
 
 struct number_t
 {
-  void init () { set_real (0.0); }
-  void fini () {}
-
   void set_int (int v)       { value = v; }
-  int to_int () const        { return value; }
+  bool to_int (int *v) const
+  {
+    if (unlikely (!(value >= INT_MIN && value <= INT_MAX)))
+    {
+      *v = 0;
+      return false;
+    }
+    *v = (int) value;
+    return true;
+  }
+  int to_int () const
+  {
+    int v;
+    if (likely (to_int (&v))) return v;
+    return value < 0 ? INT_MIN : value > 0 ? INT_MAX : 0;
+  }
 
   void set_fixed (int32_t v) { value = v / 65536.0; }
-  int32_t to_fixed () const  { return value * 65536.0; }
+  int32_t to_fixed () const
+  { return (int32_t) hb_clamp (value * 65536.0, (double) INT32_MIN, (double) INT32_MAX); }
 
   void set_real (double v)   { value = v; }
   double to_real () const    { return value; }
 
   bool in_int_range () const
-  { return ((double) (int16_t) to_int () == value); }
+  { return value >= INT16_MIN && value <= INT16_MAX && (double) (int16_t) value == value; }
 
   bool operator >  (const number_t &n) const { return value > n.to_real (); }
   bool operator <  (const number_t &n) const { return n > *this; }
@@ -245,12 +260,15 @@ struct number_t
   }
 
   protected:
-  double value;
+  double value = 0.;
 };
 
 /* byte string */
 struct UnsizedByteStr : UnsizedArrayOf <HBUINT8>
 {
+  hb_ubytes_t as_ubytes (unsigned l) const
+  { return hb_ubytes_t ((const unsigned char *) this, l); }
+
   // encode 2-byte int (Dict/CharString) or 4-byte int (Dict)
   template <typename T, typename V>
   static bool serialize_int (hb_serialize_context_t *c, op_code_t intOp, V value)
@@ -263,7 +281,7 @@ struct UnsizedByteStr : UnsizedArrayOf <HBUINT8>
 
     T *ip = c->allocate_size<T> (T::static_size);
     if (unlikely (!ip)) return_trace (false);
-    return_trace (c->check_assign (*ip, value));
+    return_trace (c->check_assign (*ip, value, HB_SERIALIZE_ERROR_INT_OVERFLOW));
   }
 
   template <typename V>
@@ -277,131 +295,90 @@ struct UnsizedByteStr : UnsizedArrayOf <HBUINT8>
   /* Defining null_size allows a Null object may be created. Should be safe because:
    * A descendent struct Dict uses a Null pointer to indicate a missing table,
    * checked before access.
-   * byte_str_t, a wrapper struct pairing a byte pointer along with its length, always
-   * checks the length before access. A Null pointer is used as the initial pointer
-   * along with zero length by the default ctor.
    */
   DEFINE_SIZE_MIN(0);
-};
-
-/* Holder of a section of byte string within a CFFIndex entry */
-struct byte_str_t : hb_ubytes_t
-{
-  byte_str_t ()
-    : hb_ubytes_t () {}
-  byte_str_t (const UnsizedByteStr& s, unsigned int l)
-    : hb_ubytes_t ((const unsigned char*)&s, l) {}
-  byte_str_t (const unsigned char *s, unsigned int l)
-    : hb_ubytes_t (s, l) {}
-  byte_str_t (const hb_ubytes_t &ub)	/* conversion from hb_ubytes_t */
-    : hb_ubytes_t (ub) {}
-
-  /* sub-string */
-  byte_str_t sub_str (unsigned int offset, unsigned int len_) const
-  { return byte_str_t (hb_ubytes_t::sub_array (offset, len_)); }
-
-  bool check_limit (unsigned int offset, unsigned int count) const
-  { return (offset + count <= length); }
 };
 
 /* A byte string associated with the current offset and an error condition */
 struct byte_str_ref_t
 {
-  byte_str_ref_t () { init (); }
+  byte_str_ref_t ()
+    : str () {}
 
-  void init ()
-  {
-    str = byte_str_t ();
-    offset = 0;
-    error = false;
-  }
+  byte_str_ref_t (const hb_ubytes_t &str_, unsigned int offset_ = 0)
+    : str (str_) { set_offset (offset_); }
 
-  void fini () {}
-
-  byte_str_ref_t (const byte_str_t &str_, unsigned int offset_ = 0)
-    : str (str_), offset (offset_), error (false) {}
-
-  void reset (const byte_str_t &str_, unsigned int offset_ = 0)
+  void reset (const hb_ubytes_t &str_, unsigned int offset_ = 0)
   {
     str = str_;
-    offset = offset_;
-    error = false;
+    set_offset (offset_);
   }
 
   const unsigned char& operator [] (int i) {
-    if (unlikely ((unsigned int) (offset + i) >= str.length))
+    if (unlikely ((unsigned int) (get_offset () + i) >= str.length))
     {
       set_error ();
       return Null (unsigned char);
     }
-    return str[offset + i];
+    return str.arrayZ[get_offset () + i];
   }
 
-  /* Conversion to byte_str_t */
-  operator byte_str_t () const { return str.sub_str (offset, str.length - offset); }
+  unsigned char head_unchecked () const { return str.arrayZ[get_offset ()]; }
 
-  byte_str_t sub_str (unsigned int offset_, unsigned int len_) const
-  { return str.sub_str (offset_, len_); }
+  /* Conversion to hb_ubytes_t */
+  operator hb_ubytes_t () const { return str.sub_array (get_offset ()); }
+
+  hb_ubytes_t sub_array (unsigned int offset_, unsigned int len_) const
+  { return str.sub_array (offset_, len_); }
 
   bool avail (unsigned int count=1) const
-  { return (!in_error () && str.check_limit (offset, count)); }
+  { return get_offset () + count <= str.length; }
   void inc (unsigned int count=1)
   {
-    if (likely (!in_error () && (offset <= str.length) && (offset + count <= str.length)))
-    {
-      offset += count;
-    }
-    else
-    {
-      offset = str.length;
-      set_error ();
-    }
+    /* Automatically puts us in error if count is out-of-range. */
+    set_offset (get_offset () + count);
   }
 
-  void set_error ()      { error = true; }
-  bool in_error () const { return error; }
+  /* We (ab)use ubytes backwards_length as a cursor (called offset),
+   * as well as to store error condition. */
 
-  byte_str_t       str;
-  unsigned int  offset; /* beginning of the sub-string within str */
+  unsigned get_offset () const { return str.backwards_length; }
+  void set_offset (unsigned offset) { str.backwards_length = offset; }
+
+  void set_error ()      { str.backwards_length = str.length + 1; }
+  bool in_error () const { return str.backwards_length > str.length; }
+
+  unsigned total_size () const { return str.length; }
 
   protected:
-  bool	  error;
+  hb_ubytes_t       str;
 };
-
-typedef hb_vector_t<byte_str_t> byte_str_array_t;
 
 /* stack */
 template <typename ELEM, int LIMIT>
 struct cff_stack_t
 {
-  void init ()
-  {
-    error = false;
-    count = 0;
-    elements.init ();
-    elements.resize (kSizeLimit);
-    for (unsigned int i = 0; i < elements.length; i++)
-      elements[i].init ();
-  }
-  void fini () { elements.fini_deep (); }
-
   ELEM& operator [] (unsigned int i)
   {
-    if (unlikely (i >= count)) set_error ();
-    return elements[i];
+    if (unlikely (i >= length))
+    {
+      set_error ();
+      return Crap (ELEM);
+    }
+    return arrayZ[i];
   }
 
   void push (const ELEM &v)
   {
-    if (likely (count < elements.length))
-      elements[count++] = v;
+    if (likely (length < LIMIT))
+      arrayZ[length++] = v;
     else
       set_error ();
   }
   ELEM &push ()
   {
-    if (likely (count < elements.length))
-      return elements[count++];
+    if (likely (length < LIMIT))
+      return arrayZ[length++];
     else
     {
       set_error ();
@@ -411,8 +388,8 @@ struct cff_stack_t
 
   ELEM& pop ()
   {
-    if (likely (count > 0))
-      return elements[--count];
+    if (likely (length > 0))
+      return arrayZ[--length];
     else
     {
       set_error ();
@@ -421,44 +398,44 @@ struct cff_stack_t
   }
   void pop (unsigned int n)
   {
-    if (likely (count >= n))
-      count -= n;
+    if (likely (length >= n))
+      length -= n;
     else
       set_error ();
   }
 
   const ELEM& peek ()
   {
-    if (unlikely (count < 0))
+    if (unlikely (length == 0))
     {
       set_error ();
       return Null (ELEM);
     }
-    return elements[count - 1];
+    return arrayZ[length - 1];
   }
 
   void unpop ()
   {
-    if (likely (count < elements.length))
-      count++;
+    if (likely (length < LIMIT))
+      length++;
     else
       set_error ();
   }
 
-  void clear () { count = 0; }
+  void clear () { length = 0; }
 
-  bool in_error () const { return (error || elements.in_error ()); }
+  bool in_error () const { return (error); }
   void set_error ()      { error = true; }
 
-  unsigned int get_count () const { return count; }
-  bool is_empty () const          { return !count; }
+  unsigned int get_count () const { return length; }
+  bool is_empty () const          { return !length; }
 
-  static constexpr unsigned kSizeLimit = LIMIT;
+  hb_array_t<const ELEM> sub_array (unsigned start, unsigned length) const
+  { return hb_array_t<const ELEM> (arrayZ).sub_array (start, length); }
 
-  protected:
-  bool error;
-  unsigned int count;
-  hb_vector_t<ELEM> elements;
+  bool error = false;
+  unsigned int length = 0;
+  ELEM arrayZ[LIMIT];
 };
 
 /* argument stack */
@@ -485,7 +462,13 @@ struct arg_stack_t : cff_stack_t<ARG, 513>
 
   ARG& pop_num () { return this->pop (); }
 
-  int pop_int ()  { return this->pop ().to_int (); }
+  int pop_int ()
+  {
+    int v;
+    if (unlikely (!this->pop ().to_int (&v)))
+      S::set_error ();
+    return v;
+  }
 
   unsigned int pop_uint ()
   {
@@ -500,7 +483,7 @@ struct arg_stack_t : cff_stack_t<ARG, 513>
 
   void push_longint_from_substr (byte_str_ref_t& str_ref)
   {
-    push_int ((str_ref[0] << 24) | (str_ref[1] << 16) | (str_ref[2] << 8) | (str_ref[3]));
+    push_int ((int) ((uint32_t (str_ref[0]) << 24) | (str_ref[1] << 16) | (str_ref[2] << 8) | (str_ref[3])));
     str_ref.inc (4);
   }
 
@@ -513,9 +496,6 @@ struct arg_stack_t : cff_stack_t<ARG, 513>
     return true;
   }
 
-  hb_array_t<const ARG> get_subarray (unsigned int start) const
-  { return S::elements.sub_array (start); }
-
   private:
   typedef cff_stack_t<ARG, 513> S;
 };
@@ -523,11 +503,15 @@ struct arg_stack_t : cff_stack_t<ARG, 513>
 /* an operator prefixed by its operands in a byte string */
 struct op_str_t
 {
-  void init () {}
-  void fini () {}
+  /* Borrow the encoded bytes. DICT entries with accumulated blends can
+   * exceed the length of an individual charstring token. */
 
-  op_code_t  op;
-  byte_str_t str;
+  const unsigned char *ptr = nullptr;
+
+  op_code_t  op = OpCode_Invalid;
+
+  /* DICT entries can contain many blends before their final operator. */
+  unsigned length = 0;
 };
 
 /* base of OP_SERIALIZER */
@@ -538,9 +522,11 @@ struct op_serializer_t
   {
     TRACE_SERIALIZE (this);
 
-    HBUINT8 *d = c->allocate_size<HBUINT8> (opstr.str.length);
+    unsigned char *d = c->allocate_size<unsigned char> (opstr.length);
     if (unlikely (!d)) return_trace (false);
-    memcpy (d, &opstr.str[0], opstr.str.length);
+    /* Faster than hb_memcpy for small strings. */
+    for (unsigned i = 0; i < opstr.length; i++)
+      d[i] = opstr.ptr[i];
     return_trace (true);
   }
 };
@@ -553,34 +539,32 @@ struct parsed_values_t
     opStart = 0;
     values.init ();
   }
-  void fini () { values.fini_deep (); }
+  void fini () { values.fini (); }
 
-  void add_op (op_code_t op, const byte_str_ref_t& str_ref = byte_str_ref_t ())
+  void alloc (unsigned n)
   {
-    VAL *val = values.push ();
-    val->op = op;
-    val->str = str_ref.str.sub_str (opStart, str_ref.offset - opStart);
-    opStart = str_ref.offset;
+    values.alloc_exact (n);
   }
 
-  void add_op (op_code_t op, const byte_str_ref_t& str_ref, const VAL &v)
+  void add_op (op_code_t op, const byte_str_ref_t& str_ref = byte_str_ref_t (), const VAL &v = VAL ())
   {
     VAL *val = values.push (v);
     val->op = op;
-    val->str = str_ref.sub_str ( opStart, str_ref.offset - opStart);
-    opStart = str_ref.offset;
+    auto arr = str_ref.sub_array (opStart, str_ref.get_offset () - opStart);
+    val->ptr = arr.arrayZ;
+    val->length = arr.length;
+    opStart = str_ref.get_offset ();
   }
 
   bool has_op (op_code_t op) const
   {
-    for (unsigned int i = 0; i < get_count (); i++)
-      if (get_value (i).op == op) return true;
+    for (const auto& v : values)
+      if (v.op == op) return true;
     return false;
   }
 
   unsigned get_count () const { return values.length; }
-  const VAL &get_value (unsigned int i)   const { return values[i]; }
-  const VAL &operator [] (unsigned int i) const { return get_value (i); }
+  const VAL &operator [] (unsigned int i) const { return values[i]; }
 
   unsigned int       opStart;
   hb_vector_t<VAL>   values;
@@ -589,32 +573,29 @@ struct parsed_values_t
 template <typename ARG=number_t>
 struct interp_env_t
 {
-  void init (const byte_str_t &str_)
+  interp_env_t () {}
+  interp_env_t (const hb_ubytes_t &str_)
   {
     str_ref.reset (str_);
-    argStack.init ();
-    error = false;
   }
-  void fini () { argStack.fini (); }
-
   bool in_error () const
-  { return error || str_ref.in_error () || argStack.in_error (); }
+  { return str_ref.in_error () || argStack.in_error (); }
 
-  void set_error () { error = true; }
+  void set_error () { str_ref.set_error (); }
 
   op_code_t fetch_op ()
   {
     op_code_t  op = OpCode_Invalid;
     if (unlikely (!str_ref.avail ()))
       return OpCode_Invalid;
-    op = (op_code_t)(unsigned char)str_ref[0];
+    op = (op_code_t) str_ref.head_unchecked ();
+    str_ref.inc ();
     if (op == OpCode_escape) {
       if (unlikely (!str_ref.avail ()))
 	return OpCode_Invalid;
-      op = Make_OpCode_ESC(str_ref[1]);
+      op = Make_OpCode_ESC (str_ref.head_unchecked ());
       str_ref.inc ();
     }
-    str_ref.inc ();
     return op;
   }
 
@@ -629,11 +610,9 @@ struct interp_env_t
 		str_ref;
   arg_stack_t<ARG>
 		argStack;
-  protected:
-  bool		error;
 };
 
-typedef interp_env_t<> num_interp_env_t;
+using num_interp_env_t =  interp_env_t<>;
 
 template <typename ARG=number_t>
 struct opset_t
@@ -666,7 +645,6 @@ struct opset_t
 	} else {
 	  /* invalid unknown operator */
 	  env.clear_args ();
-	  env.set_error ();
 	}
 	break;
     }
@@ -676,11 +654,8 @@ struct opset_t
 template <typename ENV>
 struct interpreter_t
 {
-  ~interpreter_t() { fini (); }
-
-  void fini () { env.fini (); }
-
-  ENV env;
+  interpreter_t (ENV& env_) : env (env_) {}
+  ENV& env;
 };
 
 } /* namespace CFF */

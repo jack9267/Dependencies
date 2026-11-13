@@ -31,7 +31,6 @@
 #include "hb-set.hh"
 #include "hb-ot-layout-common.hh"
 
-
 template <typename T>
 struct array_iter_t : hb_iter_with_fallback_t<array_iter_t<T>, T&>
 {
@@ -85,7 +84,7 @@ test_iterator_non_default_constructable (Iter it)
   it = it + 10;
   it = 10 + it;
 
-  assert (*it == it[0]);
+  hb_always_assert (*it == it[0]);
 
   static_assert (true || it.is_random_access_iterator, "");
   static_assert (true || it.is_sorted_iterator, "");
@@ -97,7 +96,7 @@ static void
 test_iterator (Iter it)
 {
   Iter default_constructed;
-  assert (!default_constructed);
+  hb_always_assert (!default_constructed);
 
   test_iterator_non_default_constructable (it);
 }
@@ -112,6 +111,93 @@ test_iterable (const Iterable &lst = Null (Iterable))
 
   // Test that can take iterator from.
   test_iterator (lst.iter ());
+}
+
+template <typename It>
+static void check_sequential (It it)
+{
+  int i = 1;
+  for (int v : +it) {
+    hb_always_assert (v == i++);
+  }
+}
+
+static void test_concat ()
+{
+  hb_vector_t<int> a = {1, 2, 3};
+  hb_vector_t<int> b = {4, 5};
+
+  hb_vector_t<int> c = {};
+  hb_vector_t<int> d = {1, 2, 3, 4, 5};
+
+  auto it1 = hb_concat (a, b);
+  hb_always_assert (it1.len () == 5);
+  hb_always_assert (it1.is_random_access_iterator);
+  auto it2 = hb_concat (c, d);
+  hb_always_assert (it2.len () == 5);
+  auto it3 = hb_concat (d, c);
+  hb_always_assert (it3.len () == 5);
+  for (int i = 0; i < 5; i++) {
+    hb_always_assert(it1[i] == i + 1);
+    hb_always_assert(it2[i] == i + 1);
+    hb_always_assert(it3[i] == i + 1);
+  }
+
+  check_sequential (it1);
+  check_sequential (it2);
+  check_sequential (it3);
+
+  auto it4 = +it1;
+  it4 += 0;
+  hb_always_assert (*it4 == 1);
+
+  it4 += 2;
+  hb_always_assert (*it4 == 3);
+  hb_always_assert (it4);
+  hb_always_assert (it4.len () == 3);
+
+  it4 += 2;
+  hb_always_assert (*it4 == 5);
+  hb_always_assert (it4);
+  hb_always_assert (it4.len () == 1);
+
+  it4++;
+  hb_always_assert (!it4);
+  hb_always_assert (it4.len () == 0);
+
+  auto it5 = +it1;
+  it5 += 3;
+  hb_always_assert (*it5 == 4);
+
+  hb_set_t s_a = {1, 2, 3};
+  hb_set_t s_b = {4, 5};
+  auto it6 = hb_concat (s_a, s_b);
+  hb_always_assert (!it6.is_random_access_iterator);
+  check_sequential (it6);
+  hb_always_assert (it6.len () == 5);
+
+  it6 += 0;
+  hb_always_assert (*it6 == 1);
+
+  it6 += 3;
+  hb_always_assert (*it6 == 4);
+  hb_always_assert (it6);
+  hb_always_assert (it6.len () == 2);
+}
+
+static void
+test_backward_filter ()
+{
+  hb_vector_t<int> V = {2, 4, 5, 7, 8, 9, 10};
+  auto it = hb_iter (V) | hb_filter ([] (int x) { return x % 2 != 0; });
+  it += 2;
+  hb_always_assert (*it == 9);
+  --it;
+  hb_always_assert (*it == 7);
+  --it;
+  hb_always_assert (*it == 5);
+  --it;
+  hb_always_assert (*it == 5);
 }
 
 int
@@ -154,7 +240,7 @@ main (int argc, char **argv)
   test_iterable<hb_sorted_array_t<const int>> ();
   test_iterable<hb_vector_t<float>> ();
   test_iterable<hb_set_t> ();
-  test_iterable<OT::Coverage> ();
+  test_iterable<OT::Array16Of<OT::HBUINT16>> ();
 
   test_iterator (hb_zip (st, v));
   test_iterator_non_default_constructable (hb_enumerate (st));
@@ -164,16 +250,16 @@ main (int argc, char **argv)
   test_iterator_non_default_constructable (hb_iter (st) | hb_filter ());
   test_iterator_non_default_constructable (hb_iter (st) | hb_map (hb_lidentity));
 
-  assert (true == hb_all (st));
-  assert (false == hb_all (st, 42u));
-  assert (true == hb_any (st));
-  assert (false == hb_any (st, 14u));
-  assert (true == hb_any (st, 14u, [] (unsigned _) { return _ - 1u; }));
-  assert (true == hb_any (st, [] (unsigned _) { return _ == 15u; }));
-  assert (true == hb_any (st, 15u));
-  assert (false == hb_none (st));
-  assert (false == hb_none (st, 15u));
-  assert (true == hb_none (st, 17u));
+  hb_always_assert (true == hb_all (st));
+  hb_always_assert (false == hb_all (st, 42u));
+  hb_always_assert (true == hb_any (st));
+  hb_always_assert (false == hb_any (st, 14u));
+  hb_always_assert (true == hb_any (st, 14u, [] (unsigned _) { return _ - 1u; }));
+  hb_always_assert (true == hb_any (st, [] (unsigned _) { return _ == 15u; }));
+  hb_always_assert (true == hb_any (st, 15u));
+  hb_always_assert (false == hb_none (st));
+  hb_always_assert (false == hb_none (st, 15u));
+  hb_always_assert (true == hb_none (st, 17u));
 
   hb_array_t<hb_vector_t<int>> pa;
   pa->as_array ();
@@ -247,14 +333,37 @@ main (int argc, char **argv)
 	       }, hb_map_create ())
   ;
   /* The result should be something like 0->10, 1->11, ..., 9->19 */
-  assert (hb_map_get (result, 9) == 19);
+  hb_always_assert (hb_map_get (result, 9) == 19);
+  hb_map_destroy (result);
+
+  /* Like above, but passing hb_set_t instead of hb_set_t * */
+  temp1 = 10;
+  temp2 = 0;
+  result =
+  + hb_iter (src)
+  | hb_map ([&] (int i) -> hb_set_t
+	    {
+	      hb_set_t set;
+	      for (unsigned int i = 0; i < temp1; ++i)
+		hb_set_add (&set, i);
+	      temp1++;
+	      return set;
+	    })
+  | hb_reduce ([&] (hb_map_t *acc, hb_set_t value) -> hb_map_t *
+	       {
+		 hb_map_set (acc, temp2++, hb_set_get_population (&value));
+		 return acc;
+	       }, hb_map_create ())
+  ;
+  /* The result should be something like 0->10, 1->11, ..., 9->19 */
+  hb_always_assert (hb_map_get (result, 9) == 19);
+  hb_map_destroy (result);
 
   unsigned int temp3 = 0;
   + hb_iter(src)
   | hb_map([&] (int i) { return ++temp3; })
   | hb_reduce([&] (float acc, int value) { return acc + value; }, 0)
   ;
-  hb_map_destroy (result);
 
   + hb_iter (src)
   | hb_drain
@@ -267,20 +376,23 @@ main (int argc, char **argv)
   hb_iota ();
   hb_iota (3);
   hb_iota (3, 2);
-  assert ((&vl) + 1 == *++hb_iota (&vl, hb_inc));
+  hb_always_assert ((&vl) + 1 == *++hb_iota (&vl, hb_inc));
   hb_range ();
   hb_repeat (7u);
   hb_repeat (nullptr);
   hb_repeat (vl) | hb_chop (3);
-  assert (hb_len (hb_range (10) | hb_take (3)) == 3);
-  assert (hb_range (9).len () == 9);
-  assert (hb_range (2, 9).len () == 7);
-  assert (hb_range (2, 9, 3).len () == 3);
-  assert (hb_range (2, 8, 3).len () == 2);
-  assert (hb_range (2, 7, 3).len () == 2);
-  assert (hb_range (-2, -9, -3).len () == 3);
-  assert (hb_range (-2, -8, -3).len () == 2);
-  assert (hb_range (-2, -7, -3).len () == 2);
+  hb_always_assert (hb_len (hb_range (10) | hb_take (3)) == 3);
+  hb_always_assert (hb_range (9).len () == 9);
+  hb_always_assert (hb_range (2, 9).len () == 7);
+  hb_always_assert (hb_range (2, 9, 3).len () == 3);
+  hb_always_assert (hb_range (2, 8, 3).len () == 2);
+  hb_always_assert (hb_range (2, 7, 3).len () == 2);
+  hb_always_assert (hb_range (-2, -9, -3).len () == 3);
+  hb_always_assert (hb_range (-2, -8, -3).len () == 2);
+  hb_always_assert (hb_range (-2, -7, -3).len () == 2);
+
+  test_concat ();
+  test_backward_filter ();
 
   return 0;
 }

@@ -45,29 +45,29 @@ static const union HB_STRING_ARRAY_TYPE_NAME {
  * but C++ does not allow that.
  * https://stackoverflow.com/q/28433862
  */
-#define _S(s) char HB_PASTE (str, __LINE__)[sizeof (s)];
+#define HB_STR(s) char HB_PASTE (str, __LINE__)[sizeof (s)];
 #include HB_STRING_ARRAY_LIST
-#undef _S
+#undef HB_STR
   } st;
   char str[HB_VAR_ARRAY];
 }
 HB_STRING_ARRAY_POOL_NAME =
 {
   {
-#define _S(s) s,
+#define HB_STR(s) s,
 #include HB_STRING_ARRAY_LIST
-#undef _S
+#undef HB_STR
   }
 };
 static const unsigned int HB_STRING_ARRAY_OFFS_NAME[] =
 {
-#define _S(s) offsetof (union HB_STRING_ARRAY_TYPE_NAME, st.HB_PASTE(str, __LINE__)),
+#define HB_STR(s) offsetof (union HB_STRING_ARRAY_TYPE_NAME, st.HB_PASTE(str, __LINE__)),
 #include HB_STRING_ARRAY_LIST
-#undef _S
+#undef HB_STR
   sizeof (HB_STRING_ARRAY_TYPE_NAME)
 };
 
-static const unsigned int HB_STRING_ARRAY_LENG_NAME = ARRAY_LENGTH_CONST (HB_STRING_ARRAY_OFFS_NAME) - 1;
+static const unsigned int HB_STRING_ARRAY_LENG_NAME = ARRAY_LENGTH (HB_STRING_ARRAY_OFFS_NAME) - 1;
 
 static inline hb_bytes_t
 HB_STRING_ARRAY_NAME (unsigned int i)

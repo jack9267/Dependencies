@@ -28,6 +28,7 @@
 #define HB_OT_MAXP_TABLE_HH
 
 #include "hb-open-type.hh"
+#include "hb-ot-dual.hh"
 
 namespace OT {
 
@@ -38,6 +39,7 @@ namespace OT {
  */
 
 #define HB_OT_TAG_maxp HB_TAG('m','a','x','p')
+#define HB_OT_TAG_MAXP HB_TAG('M','A','X','P')
 
 struct maxpV1Tail
 {
@@ -69,10 +71,9 @@ struct maxpV1Tail
 };
 
 
-struct maxp
+template <typename Types>
+struct maxp_MAXP
 {
-  static constexpr hb_tag_t tableTag = HB_OT_TAG_maxp;
-
   unsigned int get_num_glyphs () const { return numGlyphs; }
 
   void set_num_glyphs (unsigned int count)
@@ -85,7 +86,7 @@ struct maxp
     TRACE_SANITIZE (this);
     if (unlikely (!c->check_struct (this)))
       return_trace (false);
-
+    hb_barrier ();
     if (version.major == 1)
     {
       const maxpV1Tail &v1 = StructAfter<maxpV1Tail> (*this);
@@ -97,21 +98,36 @@ struct maxp
   bool subset (hb_subset_context_t *c) const
   {
     TRACE_SUBSET (this);
-    maxp *maxp_prime = c->serializer->embed (this);
+    maxp_MAXP *maxp_prime = c->serializer->embed (this);
     if (unlikely (!maxp_prime)) return_trace (false);
 
-    maxp_prime->numGlyphs = c->plan->num_output_glyphs ();
+    maxp_prime->numGlyphs = hb_min (c->plan->num_output_glyphs (),
+				    (1u << (8 * Types::size)) - 1);
     if (maxp_prime->version.major == 1)
     {
+      hb_barrier ();
       const maxpV1Tail *src_v1 = &StructAfter<maxpV1Tail> (*this);
       maxpV1Tail *dest_v1 = c->serializer->embed<maxpV1Tail> (src_v1);
       if (unlikely (!dest_v1)) return_trace (false);
 
-      if (c->plan->drop_hints)
+      if (c->plan->flags & HB_SUBSET_FLAGS_NO_HINTING)
 	drop_hint_fields (dest_v1);
+
+      if (c->plan->normalized_coords)
+        instancing_update_fields (c->plan->head_maxp_info, dest_v1);
     }
 
     return_trace (true);
+  }
+
+  void instancing_update_fields (head_maxp_info_t& maxp_info, maxpV1Tail* dest_v1) const
+  {
+    dest_v1->maxPoints = maxp_info.maxPoints;
+    dest_v1->maxContours = maxp_info.maxContours;
+    dest_v1->maxCompositePoints = maxp_info.maxCompositePoints;
+    dest_v1->maxCompositeContours = maxp_info.maxCompositeContours;
+    dest_v1->maxComponentElements = maxp_info.maxComponentElements;
+    dest_v1->maxComponentDepth = maxp_info.maxComponentDepth;
   }
 
   static void drop_hint_fields (maxpV1Tail* dest_v1)
@@ -128,11 +144,66 @@ struct maxp
   protected:
   FixedVersion<>version;/* Version of the maxp table (0.5 or 1.0),
 			 * 0x00005000u or 0x00010000u. */
-  HBUINT16	numGlyphs;
+  typename Types::HBUINT
+		numGlyphs;
 			/* The number of glyphs in the font. */
 /*maxpV1Tail	v1Tail[HB_VAR_ARRAY]; */
   public:
-  DEFINE_SIZE_STATIC (6);
+  DEFINE_SIZE_STATIC (4 + Types::HBUINT::static_size);
+};
+
+struct maxp : maxp_MAXP<Layout::SmallTypes>
+{
+  static constexpr hb_tag_t tableTag = HB_OT_TAG_maxp;
+};
+
+struct MAXP : maxp_MAXP<Layout::MediumTypes>
+{
+  static constexpr hb_tag_t tableTag = HB_OT_TAG_MAXP;
+};
+
+struct maxp_accelerator_t
+{
+  maxp_accelerator_t ()
+  {
+    blob = hb_blob_get_empty ();
+    numGlyphs = 0;
+  }
+
+  maxp_accelerator_t (hb_face_t *face) : maxp_accelerator_t ()
+  {
+#ifndef HB_NO_BEYOND_64K
+    if (init_table<MAXP> (face))
+      return;
+#endif
+
+    init_table<maxp> (face);
+  }
+
+  ~maxp_accelerator_t () { hb_blob_destroy (blob); }
+
+  unsigned int get_num_glyphs () const { return numGlyphs; }
+  hb_blob_t *get_blob () const { return blob; }
+
+  private:
+  template <typename Table>
+  bool init_table (hb_face_t *face)
+  {
+    hb_sanitize_context_t c;
+    c.set_num_glyphs (0);
+    hb_blob_ptr_t<Table> table = c.reference_table<Table> (face);
+    bool ret = table.get_length ();
+    if (ret)
+    {
+      blob = hb_blob_reference (table.get_blob ());
+      numGlyphs = table->get_num_glyphs ();
+    }
+    table.destroy ();
+    return ret;
+  }
+
+  hb_blob_t *blob;
+  unsigned int numGlyphs;
 };
 
 

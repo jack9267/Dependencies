@@ -28,6 +28,16 @@
 
 #include "hb-gdi.h"
 
+
+/**
+ * SECTION:hb-gdi
+ * @title: hb-gdi
+ * @short_description: GDI integration
+ * @include: hb-gdi.h
+ *
+ * Functions for using HarfBuzz with GDI fonts.
+ **/
+
 static hb_blob_t *
 _hb_gdi_reference_table (hb_face_t *face HB_UNUSED, hb_tag_t tag, void *user_data)
 {
@@ -35,30 +45,32 @@ _hb_gdi_reference_table (hb_face_t *face HB_UNUSED, hb_tag_t tag, void *user_dat
   DWORD length = 0;
 
   HDC hdc = GetDC (nullptr);
-  if (unlikely (!SelectObject (hdc, (HFONT) user_data))) goto fail;
+  if (unlikely (!SelectObject (hdc, (HFONT) user_data)))
+    return hb_blob_get_empty ();
+  HB_SCOPE_GUARD (ReleaseDC (nullptr, hdc));
 
   length = GetFontData (hdc, hb_uint32_swap (tag), 0, buffer, length);
-  if (unlikely (length == GDI_ERROR)) goto fail_with_releasedc;
+  if (unlikely (length == GDI_ERROR))
+    return hb_blob_get_empty ();
 
-  buffer = (char *) malloc (length);
-  if (unlikely (!buffer)) goto fail_with_releasedc;
+  buffer = (char *) hb_malloc (length);
+  if (unlikely (!buffer))
+    return hb_blob_get_empty ();
+  auto buffer_guard = hb_make_scope_guard ([&]() { hb_free (buffer); });
+
   length = GetFontData (hdc, hb_uint32_swap (tag), 0, buffer, length);
-  if (unlikely (length == GDI_ERROR)) goto fail_with_releasedc_and_free;
-  ReleaseDC (nullptr, hdc);
+  if (unlikely (length == GDI_ERROR))
+    return hb_blob_get_empty ();
 
-  return hb_blob_create ((const char *) buffer, length, HB_MEMORY_MODE_WRITABLE, buffer, free);
-
-fail_with_releasedc_and_free:
-  free (buffer);
-fail_with_releasedc:
-  ReleaseDC (nullptr, hdc);
-fail:
-  return hb_blob_get_empty ();
+  buffer_guard.release ();
+  return hb_blob_create ((const char *) buffer, length, HB_MEMORY_MODE_WRITABLE, buffer, hb_free);
 }
 
 /**
  * hb_gdi_face_create:
  * @hfont: a HFONT object.
+ *
+ * Constructs a new face object from the specified GDI HFONT.
  *
  * Return value: #hb_face_t object corresponding to the given input
  *

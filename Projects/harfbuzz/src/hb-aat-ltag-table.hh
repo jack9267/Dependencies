@@ -46,11 +46,13 @@ struct FTStringRange
   bool sanitize (hb_sanitize_context_t *c, const void *base) const
   {
     TRACE_SANITIZE (this);
-    return_trace (c->check_struct (this) && (base+tag).sanitize (c, length));
+    return_trace (c->check_struct (this) &&
+		  hb_barrier () &&
+		  (base+tag).sanitize (c, length));
   }
 
   protected:
-  NNOffsetTo<UnsizedArrayOf<HBUINT8>>
+  NNOffset16To<UnsizedArrayOf<HBUINT8>>
 		tag;		/* Offset from the start of the table to
 				 * the beginning of the string */
   HBUINT16	length;		/* String length (in bytes) */
@@ -69,10 +71,37 @@ struct ltag
 				    range.length);
   }
 
+  /* Equivalent to hb_language_matches (get_language (i), specific), but
+   * without interning the font's tag: hb_language_from_string() appends
+   * every new string to a process-wide, linearly-searched, never-freed list,
+   * so a hostile font with many tags and many feature records referencing
+   * them could make that quadratic. */
+  bool matches_language (unsigned int i, hb_language_t specific) const
+  {
+    const char *s = hb_language_to_string (specific);
+    if (!s) return false;
+
+    const FTStringRange &range = tagRanges[i];
+    const HBUINT8 *tag = (this+range.tag).arrayZ;
+    /* Canonicalize the same way hb_language_from_string() does: at most 63
+     * bytes, lowercase, '_' to '-', stop at the first other non-alphanumeric. */
+    unsigned len = hb_min ((unsigned) range.length, 63u);
+    unsigned l = 0;
+    for (; l < len; l++)
+    {
+      unsigned char c = TOLOWER (tag[l]);
+      if (c == '_') c = '-';
+      if (!ISALNUM (c) && c != '-') break;
+      if (c != (unsigned char) s[l]) return false;
+    }
+    return l && (s[l] == '\0' || s[l] == '-');
+  }
+
   bool sanitize (hb_sanitize_context_t *c) const
   {
     TRACE_SANITIZE (this);
     return_trace (likely (c->check_struct (this) &&
+			  hb_barrier () &&
 			  version >= 1 &&
 			  tagRanges.sanitize (c, this)));
   }
@@ -80,7 +109,7 @@ struct ltag
   protected:
   HBUINT32	version;	/* Table version; currently 1 */
   HBUINT32	flags;		/* Table flags; currently none defined */
-  LArrayOf<FTStringRange>
+  Array32Of<FTStringRange>
 		tagRanges;	/* Range for each tag's string */
   public:
   DEFINE_SIZE_ARRAY (12, tagRanges);

@@ -62,7 +62,7 @@ struct SettingName
   bool sanitize (hb_sanitize_context_t *c) const
   {
     TRACE_SANITIZE (this);
-    return_trace (likely (c->check_struct (this)));
+    return_trace (c->check_struct (this));
   }
 
   protected:
@@ -114,7 +114,7 @@ struct FeatureName
     if (pdefault_index)
       *pdefault_index = default_index;
 
-    if (selectors_count)
+    if (selectors_count && selectors)
     {
       + settings_table.sub_array (start_offset, selectors_count)
       | hb_map ([=] (const SettingName& setting) { return setting.get_info (default_selector); })
@@ -138,13 +138,14 @@ struct FeatureName
   {
     TRACE_SANITIZE (this);
     return_trace (likely (c->check_struct (this) &&
+			  hb_barrier () &&
 			  (base+settingTableZ).sanitize (c, nSettings)));
   }
 
   protected:
   HBUINT16	feature;	/* Feature type. */
   HBUINT16	nSettings;	/* The number of records in the setting name array. */
-  LNNOffsetTo<UnsizedArrayOf<SettingName>>
+  NNOffset32To<UnsizedArrayOf<SettingName>>
 		settingTableZ;	/* Offset in bytes from the beginning of this table to
 				 * this feature's setting name array. The actual type of
 				 * record this offset refers to will depend on the
@@ -167,7 +168,7 @@ struct feat
 				  unsigned int                 *count,
 				  hb_aat_layout_feature_type_t *features) const
   {
-    if (count)
+    if (count && features)
     {
       + namesZ.as_array (featureNameCount).sub_array (start_offset, count)
       | hb_map (&FeatureName::get_feature_type)
@@ -200,6 +201,7 @@ struct feat
   {
     TRACE_SANITIZE (this);
     return_trace (likely (c->check_struct (this) &&
+			  hb_barrier () &&
 			  version.major == 1 &&
 			  namesZ.sanitize (c, featureNameCount, this)));
   }
