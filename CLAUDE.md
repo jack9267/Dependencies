@@ -59,8 +59,15 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
 
 ## LibreSSL (`Projects/libressl`)
 
-- **4.4.0, stock** (2026-11-02, from 2.7.5). `src` is the release tarball unchanged. 2.7.5 carried one patch,
-  an XP fallback for `pthread_once` in `include/compat/pthread.h`; it is gone (see YY-Thunks below).
+- **4.4.1, stock** (2026-11-13; 4.4.0 on 2026-11-02, from 2.7.5). `src` is the release tarball unchanged. 2.7.5
+  carried one patch, an XP fallback for `pthread_once` in `include/compat/pthread.h`; it is gone (see YY-Thunks below).
+- **Checking a release**: ftp.openbsd.org's `SHA256` is signed (`SHA256.asc`, and each tarball's `.asc`) by Brent
+  Cook's key, `libressl.asc` beside them. 4.4.1 fixed an out-of-bounds read in TLS 1.2 renegotiation and peers
+  sending more than 32 signature algorithms - three `ssl/*.c` files, `cert.pem`, no source-list change. Built x86
+  and x64, Debug and Release, with curl and mongoose7; both DLLs' imports and exports were 4.4.0's. Tested with a
+  client and server over a BIO pair and a certificate made in memory: TLS 1.3, and TLS 1.2 renegotiated by the
+  client, the certificate verified. A test including `<windows.h>` before `<openssl/x509v3.h>` needs
+  `WIN32_LEAN_AND_MEAN`: `<wincrypt.h>`'s `X509_*` macros break it.
 - **The source lists in `premake5.lua` are LibreSSL's own CMake lists**: `CRYPTO_SRC` from
   `src/crypto/CMakeLists.txt`, `SSL_SRC` and `BS_SRC` from `src/ssl/CMakeLists.txt`, and the compat files that
   CMake's checks choose for our defines. After an update, take them again from there rather than globbing:
