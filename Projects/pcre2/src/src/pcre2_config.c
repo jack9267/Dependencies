@@ -7,7 +7,7 @@ and semantics are as close as possible to those of the Perl 5 language.
 
                        Written by Philip Hazel
      Original API code Copyright (c) 1997-2012 University of Cambridge
-          New API code Copyright (c) 2016-2017 University of Cambridge
+          New API code Copyright (c) 2016-2020 University of Cambridge
 
 -----------------------------------------------------------------------------
 Redistribution and use in source and binary forms, with or without
@@ -38,16 +38,10 @@ POSSIBILITY OF SUCH DAMAGE.
 -----------------------------------------------------------------------------
 */
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
-/* Save the configured link size, which is in bytes. In 16-bit and 32-bit modes
-its value gets changed by pcre2_internal.h to be in code units. */
-
-static int configured_link_size = LINK_SIZE;
 
 #include "pcre2_internal.h"
+
+
 
 /* These macros are the standard way of turning unquoted text into C strings.
 They allow macros like PCRE2_MAJOR to be defined without quotes, which is
@@ -78,7 +72,7 @@ pcre2_config(uint32_t what, void *where)
 {
 if (where == NULL)  /* Requests a length */
   {
-  switch(what)
+  switch (what)
     {
     default:
     return PCRE2_ERROR_BADOPTION;
@@ -86,6 +80,7 @@ if (where == NULL)  /* Requests a length */
     case PCRE2_CONFIG_BSR:
     case PCRE2_CONFIG_COMPILED_WIDTHS:
     case PCRE2_CONFIG_DEPTHLIMIT:
+    case PCRE2_CONFIG_EFFECTIVE_LINKSIZE:
     case PCRE2_CONFIG_HEAPLIMIT:
     case PCRE2_CONFIG_JIT:
     case PCRE2_CONFIG_LINKSIZE:
@@ -94,6 +89,7 @@ if (where == NULL)  /* Requests a length */
     case PCRE2_CONFIG_NEWLINE:
     case PCRE2_CONFIG_PARENSLIMIT:
     case PCRE2_CONFIG_STACKRECURSE:    /* Obsolete */
+    case PCRE2_CONFIG_TABLES_LENGTH:
     case PCRE2_CONFIG_UNICODE:
     return sizeof(uint32_t);
 
@@ -122,19 +118,23 @@ switch (what)
   case PCRE2_CONFIG_COMPILED_WIDTHS:
   *((uint32_t *)where) = 0
 #ifdef SUPPORT_PCRE2_8
-  + 1
+  + (1 << 0)
 #endif
 #ifdef SUPPORT_PCRE2_16
-  + 2
+  + (1 << 1)
 #endif
 #ifdef SUPPORT_PCRE2_32
-  + 4
+  + (1 << 2)
 #endif
   ;
   break;
 
   case PCRE2_CONFIG_DEPTHLIMIT:
   *((uint32_t *)where) = MATCH_LIMIT_DEPTH;
+  break;
+
+  case PCRE2_CONFIG_EFFECTIVE_LINKSIZE:
+  *((uint32_t *)where) = LINK_SIZE * sizeof(PCRE2_UCHAR);
   break;
 
   case PCRE2_CONFIG_HEAPLIMIT:
@@ -161,7 +161,7 @@ switch (what)
 #endif
 
   case PCRE2_CONFIG_LINKSIZE:
-  *((uint32_t *)where) = (uint32_t)configured_link_size;
+  *((uint32_t *)where) = (uint32_t)CONFIGURED_LINK_SIZE;
   break;
 
   case PCRE2_CONFIG_MATCHLIMIT:
@@ -191,6 +191,10 @@ switch (what)
   *((uint32_t *)where) = 0;
   break;
 
+  case PCRE2_CONFIG_TABLES_LENGTH:
+  *((uint32_t *)where) = TABLES_LENGTH;
+  break;
+
   case PCRE2_CONFIG_UNICODE_VERSION:
     {
 #if defined SUPPORT_UNICODE
@@ -200,8 +204,7 @@ switch (what)
 #endif
     return (int)(1 + ((where == NULL)?
       strlen(v) : PRIV(strcpy_c8)((PCRE2_UCHAR *)where, v)));
-   }
-  break;
+    }
 
   case PCRE2_CONFIG_UNICODE:
 #if defined SUPPORT_UNICODE
@@ -218,8 +221,8 @@ switch (what)
   XSTRING when PCRE2_PRERELEASE is not empty, an unwanted space is inserted.
   There are problems using an "obvious" approach like this:
 
-     XSTRING(PCRE2_MAJOR) "." XSTRING(PCRE_MINOR)
-     XSTRING(PCRE2_PRERELEASE) " " XSTRING(PCRE_DATE)
+     XSTRING(PCRE2_MAJOR) "." XSTRING(PCRE2_MINOR)
+     XSTRING(PCRE2_PRERELEASE) " " XSTRING(PCRE2_DATE)
 
   because, when PCRE2_PRERELEASE is empty, this leads to an attempted expansion
   of STRING(). The C standard states: "If (before argument substitution) any
@@ -238,6 +241,7 @@ switch (what)
     return (int)(1 + ((where == NULL)?
       strlen(v) : PRIV(strcpy_c8)((PCRE2_UCHAR *)where, v)));
     }
+
   }
 
 return 0;

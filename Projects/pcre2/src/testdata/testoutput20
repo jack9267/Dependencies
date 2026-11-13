@@ -32,13 +32,13 @@
 #load testsaved2
 
 #pop info
-Capturing subpattern count = 2
+Capture group count = 2
 Max back reference = 2
-Named capturing subpatterns:
+Named capture groups:
   n   1
   n   2
 Options: dupnames
-Starting code units: b f 
+Starting code units: b f
 Subject length lower bound = 6
     foofoo
  0: foofoo
@@ -66,8 +66,8 @@ No match, mark = A
  4: A
 
 #pop info
-Capturing subpattern count = 4
-Named capturing subpatterns:
+Capture group count = 4
+Named capture groups:
   ADDR          2
   ADDRESS_PAT   4
   NAME          1

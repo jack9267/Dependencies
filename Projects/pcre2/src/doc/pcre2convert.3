@@ -1,4 +1,4 @@
-.TH PCRE2CONVERT 3 "12 July 2017" "PCRE2 10.30"
+.TH PCRE2CONVERT 3 "14 November 2023" "PCRE2 10.49"
 .SH NAME
 PCRE2 - Perl-compatible regular expressions (revised API)
 .SH "EXPERIMENTAL PATTERN CONVERSION FUNCTIONS"
@@ -83,7 +83,8 @@ If \fBbuffer\fP points to a NULL pointer, an output buffer is obtained using
 the allocator in the context or \fBmalloc()\fP if no context is supplied. A
 pointer to this buffer is placed in the variable to which \fBbuffer\fP points.
 When no longer needed the output buffer must be freed by calling
-\fBpcre2_converted_pattern_free()\fP.
+\fBpcre2_converted_pattern_free()\fP. If this function is called with a NULL
+argument, it returns immediately without doing anything.
 .P
 If \fBbuffer\fP points to a non-NULL pointer, \fBblength\fP must be set to the
 actual length of the buffer provided (in code units).
@@ -115,8 +116,8 @@ permitted to match separator characters, but the double-star (**) feature
 (which does match separators) is supported.
 .P
 PCRE2_CONVERT_GLOB_NO_WILD_SEPARATOR matches globs with wildcards allowed to
-match separator characters. PCRE2_GLOB_NO_STARSTAR matches globs with the
-double-star feature disabled. These options may be given together.
+match separator characters. PCRE2_CONVERT_GLOB_NO_STARSTAR matches globs with
+the double-star feature disabled. These options may be given together.
 .
 .
 .SH "CONVERTING POSIX PATTERNS"
@@ -149,7 +150,7 @@ neither do POSIX extended patterns).
 .sp
 .nf
 Philip Hazel
-University Computing Service
+Retired from University Computing Service
 Cambridge, England.
 .fi
 .
@@ -158,6 +159,6 @@ Cambridge, England.
 .rs
 .sp
 .nf
-Last updated: 12 July 2017
-Copyright (c) 1997-2017 University of Cambridge.
+Last updated: 14 November 2023
+Copyright (c) 1997-2018 University of Cambridge.
 .fi

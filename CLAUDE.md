@@ -214,6 +214,32 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   false where the driver reports that version**: GLEW clears it when any of the version's functions is missing - this
   laptop's Intel driver says 4.6 in a compatibility context and gets 3.0 but not 4.5 or 4.6, the same with 2.1.0.
 
+## PCRE2 (`Projects/pcre2`)
+
+- **10.49, stock** (2026-11-13, from 10.31 of 2018; tarball checked against the SHA-256 GitHub gives for the release
+  asset, and its signature from Nicholas Wilson's key `BACF71F1...FB63B406`), Windows only. `src` is the whole release.
+  Nothing in Galactic, ModLauncher, GTAC, GTAC-Server, GalacticSamples or GalacticTools links it.
+- **`pcre2-8_static` and `pcre2-8.dll`: the 8-bit library with Unicode and no JIT.** 10.31 was built without Unicode;
+  it was turned on with 10.49 (the user's call, 2026-11-13) - the release's default, and what makes `PCRE2_UTF`,
+  `PCRE2_UCP`, `(*UTF)`, `\p{..}`, `\P{..}` and `\X` work. The API is the same either way, and a pattern using none of
+  those matches as before (the release's non-UTF tests pass with the same expected output). The cost is the Unicode
+  tables: the x64 Release DLL was 267 KB without and 479 KB with, built plainly with `cl /O2` (385 KB as built here).
+  A caller taking patterns from elsewhere can keep them out of UTF mode with `PCRE2_NEVER_UTF`.
+- The sources are `CMakeLists.txt`'s `PCRE2_SOURCES`, read from it by premake. Beside `src`, ours: `config.h`, made by
+  the release's CMake (`-DPCRE2_SUPPORT_UNICODE=ON -DPCRE2_SUPPORT_JIT=OFF -DPCRE2_BUILD_TESTS=OFF
+  -DPCRE2_BUILD_PCRE2GREP=OFF -DPCRE2_SUPPORT_LIBZ=OFF -DPCRE2_SUPPORT_LIBBZ2=OFF -DPCRE2_SUPPORT_LIBREADLINE=OFF
+  -DPCRE2_SUPPORT_LIBEDIT=OFF`, the same file for Win32 and x64); `include/pcre2.h`, a copy of
+  `src/src/pcre2.h.generic`; `pcre2_chartables.c`, a copy of `src/src/pcre2_chartables.c.dist` (what CMake copies).
+  Take all three again on an update.
+- The DLL exports `libpcre2-8.sym.in`'s 79 functions, and imports `KERNEL32` and `msvcrt` alone. Tested, x86 and x64,
+  Debug and Release, statically and through the DLL (UTF-8 subjects, properties, caseless outside ASCII, `\X`, an
+  invalid UTF-8 subject refused); and the release's own `pcre2test.c` (with `pcre2posix.c`) linked against
+  `pcre2-8_static` passes `RunTest.bat` in all four - 23 tests, only the JIT, 16/32-bit and EBCDIC ones skipped.
+  **`pcre2test` needs a big stack**: the release's CMake links it with `/STACK:2500000`, which is enough in Release;
+  Debug needs more (8 MB passed) - test 8 raises `parens_nest_limit` to 1000 and 2000 and nests 793 groups, and
+  compiling that overflows 2.5 MB in Debug (`c00000fd` under cdb). Without even that, test 2's "large nest" overflows
+  in x64 Debug. The library's own default limit (250) is what keeps compiling within an ordinary stack.
+
 ## libogg (`Projects/ogg`)
 
 - **1.3.6, stock** (2026-11-13, from 1.3.4; tarball checked against xiph's `SHA256SUMS`). `src` is the whole release;

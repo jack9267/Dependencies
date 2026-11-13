@@ -554,22 +554,27 @@ dep("jpeg", {
 	files = JPEG_SOURCES,
 })
 
+-- pcre2: the 8-bit library, with Unicode and no JIT (config.h, made by the release's CMake - Dependencies' CLAUDE.md
+-- says how). The sources are CMakeLists.txt's PCRE2_SOURCES, read from it, with its pcre2_chartables.c (which CMake
+-- copies from src/pcre2_chartables.c.dist) ours beside config.h, as is include/pcre2.h (src/pcre2.h.generic).
+local PCRE2_SOURCES = (function()
+	local text = io.readfile(path.join(_SCRIPT_DIR, "Projects/pcre2/src/CMakeLists.txt")) or ""
+	local block = text:match("set%(%s*PCRE2_SOURCES%s*\n(.-)\n%s*%)")
+	if not block then error("pcre2: no PCRE2_SOURCES in CMakeLists.txt") end
+	local t = {}
+	for line in block:gmatch("[^\n]+") do
+		local f = line:match("^%s*src/([%w_]+%.c)%s*$")
+		if f then t[#t + 1] = "Projects/pcre2/src/src/" .. f end
+	end
+	t[#t + 1] = "Projects/pcre2/pcre2_chartables.c"
+	return t
+end)()
 dep("pcre2-8", {
 	systems = WINDOWS,
-	defines     = { "PCRE2_CODE_UNIT_WIDTH=8", "HAVE_CONFIG_H", "PCRE2_STATIC" },
-	includedirs = { "Projects/pcre2/src/src", "Projects/pcre2", "Projects/pcre2/include" },
+	defines     = { "PCRE2_CODE_UNIT_WIDTH=8", "HAVE_CONFIG_H", "PCRE2_STATIC", "_CRT_SECURE_NO_WARNINGS" },
+	includedirs = { "Projects/pcre2", "Projects/pcre2/include", "Projects/pcre2/src/src" },
 	shared      = { { defines = { "pcre2_8_EXPORTS" }, dropdefines = { "PCRE2_STATIC" } } },
-	files = (function()
-		local t = srcs("Projects/pcre2/src/src", {
-			"pcre2_auto_possess", "pcre2_compile", "pcre2_config", "pcre2_context", "pcre2_convert",
-			"pcre2_dfa_match", "pcre2_error", "pcre2_extuni", "pcre2_find_bracket", "pcre2_jit_compile",
-			"pcre2_maketables", "pcre2_match", "pcre2_match_data", "pcre2_newline", "pcre2_ord2utf",
-			"pcre2_pattern_info", "pcre2_serialize", "pcre2_string_utils", "pcre2_study",
-			"pcre2_substitute", "pcre2_substring", "pcre2_tables", "pcre2_ucd", "pcre2_valid_utf",
-			"pcre2_xclass" })
-		t[#t + 1] = "Projects/pcre2/pcre2_chartables.c"
-		return t
-	end)(),
+	files       = PCRE2_SOURCES,
 })
 
 -- MinHook exports through its checked-in .def; the DLL also compiles its version .rc.
