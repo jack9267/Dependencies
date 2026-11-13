@@ -359,8 +359,11 @@ dep("RakNet", {
 -- is Windows-only, so no per-library platform guard is needed - the Linux build is the Makefile.
 
 
--- ogg exports through its checked-in .def (no __declspec in the headers), and the DLL is named
--- libogg (CMake's prefix_lib), keeping ogg.lib as the import library.
+-- ogg exports through a .def (no __declspec in the headers), and the DLL is named libogg (CMake's
+-- prefix_lib), keeping ogg.lib as the import library. The .def is Projects/ogg/ogg.def, not the release's
+-- src/win32/ogg.def: that one says "LIBRARY ogg", so ogg.lib named ogg.dll and every DLL linking it (FLAC,
+-- vorbis, vorbisfile, theora) imported a file that doesn't exist. Ours has a bare LIBRARY - the linker then
+-- names the DLL it builds - and the same exports; compare them with the release's on an update.
 -- ogg's os_types.h names the <stdint.h> types on Apple without including it, hence the forced include -
 -- in vorbis too, which includes it.
 local OGG_FORCEINCLUDES = not WINDOWS_TARGET and { "stdint.h" } or nil
@@ -371,7 +374,7 @@ dep("ogg", {
 	shared = { { extra = function()
 		targetname "libogg"
 		implibname "ogg"
-		linkoptions { '/DEF:"$(SolutionDir)..\\Projects\\ogg\\src\\win32\\ogg.def"' }
+		linkoptions { '/DEF:"$(SolutionDir)..\\Projects\\ogg\\ogg.def"' }
 	end } },
 })
 

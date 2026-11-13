@@ -208,11 +208,15 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   update, and **`config_types.h`, written by hand** (`<stdint.h>` types; the release has only `config_types.h.in`,
   which configure fills in). `os_types.h` uses it only on the generic Unix path; Windows and Apple have sections of
   their own. Keep it unless `config_types.h.in` changes (it didn't from 1.3.4 to 1.3.6).
-- `ogg_static`, and `libogg.dll` exporting through `src/win32/ogg.def` with `ogg.lib` as its import library. That
-  `.def` says `LIBRARY ogg`, so the link warns `LNK4070` - and **the import library names `ogg.dll`**, so every DLL
-  linked against `ogg.lib` (`FLAC.dll`, `vorbis.dll`, `theora.dll`) imports an `ogg.dll` that doesn't exist and would
-  not load. Not fixed (2026-11-13): nothing loads those DLLs - FLAC's and vorbis' users link the static libraries. The
-  `Projects/ogg/ogg.def` beside `src` is an older copy nothing uses.
+- `ogg_static`, and `libogg.dll` with `ogg.lib` as its import library, exporting through **`Projects/ogg/ogg.def`,
+  not the release's `src/win32/ogg.def`** (2026-11-13). The release's says `LIBRARY ogg`, so `ogg.lib` named
+  `ogg.dll` (and the link warned `LNK4070`): every DLL linked against it - `FLAC.dll`, `vorbis.dll`, `vorbisfile.dll`,
+  `theora.dll`, Debug and x64 too - imported a file that doesn't exist and could not load. Nothing had loaded them
+  (their users link the static libraries). Ours is an older copy of upstream's with a bare `LIBRARY` - the linker
+  then names the DLL it builds - and the same 66 exports: **compare its exports with the release's on an update**.
+  Seen: all 16 of those DLLs import `libogg[_d][_x64].dll` and `LoadLibrary` succeeds on each. (A `LoadLibrary`
+  test from the Microsoft Store `pwsh` fails with 126 regardless: a packaged app doesn't search the current folder
+  or `PATH` for a DLL's own dependencies. Use Windows PowerShell.)
 - Built x86 and x64, Debug and Release, with vorbis, vorbisfile, theora and FLAC rebuilt on it; the DLL's imports
   and 66 exports are 1.3.4's. A test linking `ogg_static`, `vorbis_static` and `vorbisfile_static` passed in all four:
   1-32-bit fields through `oggpack`, 300 packets of 0 to 200,000 bytes through 211 pages and back through
