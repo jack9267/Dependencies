@@ -194,6 +194,22 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   `FT_Stream_Open: could not open` for each resource-fork name it tries when a font fails to open
   (`FT_DEBUG_LEVEL_ERROR`) - noise, not the error.
 
+## libogg (`Projects/ogg`)
+
+- **1.3.6, stock** (2026-11-13, from 1.3.4; tarball checked against xiph's `SHA256SUMS`). `src` is the whole release;
+  `include/ogg` - searched before `src/include` - holds copies of its `ogg.h` and `os_types.h`, copied again on an
+  update, and **`config_types.h`, written by hand** (`<stdint.h>` types; the release has only `config_types.h.in`,
+  which configure fills in). `os_types.h` uses it only on the generic Unix path; Windows and Apple have sections of
+  their own. Keep it unless `config_types.h.in` changes (it didn't from 1.3.4 to 1.3.6).
+- `ogg_static`, and `libogg.dll` exporting through `src/win32/ogg.def` with `ogg.lib` as its import library. That
+  `.def` says `LIBRARY ogg`, so the link warns `LNK4070` (the name is ignored): upstream's, harmless. The
+  `Projects/ogg/ogg.def` beside `src` is an older copy nothing uses.
+- Built x86 and x64, Debug and Release, with vorbis, vorbisfile, theora and FLAC rebuilt on it; the DLL's imports
+  and 66 exports are 1.3.4's. A test linking `ogg_static`, `vorbis_static` and `vorbisfile_static` passed in all four:
+  1-32-bit fields through `oggpack`, 300 packets of 0 to 200,000 bytes through 211 pages and back through
+  `ogg_sync` in uneven chunks, a damaged page caught by its CRC, and a 5.5-minute Ogg Vorbis file decoded to exactly
+  `ov_pcm_total` samples and seeked.
+
 ## jpeg (`Projects/jpeg`)
 
 - **libjpeg-turbo 3.2.1, stock** (2026-11-05, replacing IJG libjpeg 6b from 1998), still `jpeg_static`. `src` is the
