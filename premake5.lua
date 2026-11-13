@@ -438,7 +438,7 @@ dep("freetype", {
 			"base/ftcid", "base/ftfstype", "base/ftgasp", "base/ftglyph", "base/ftgxval",
 			"base/ftinit", "base/ftmm", "base/ftotval", "base/ftpatent", "base/ftpfr",
 			"base/ftstroke", "base/ftsynth", "base/fttype1", "base/ftwinfnt", "bdf/bdf",
-			"bzip2/ftbzip2", "cache/ftcache", "cff/cff", "cid/type1cid", "gzip/ftgzip",
+			"bzip2/ftbzip2", "cache/ftcache", "cff/cff", "cid/type1cid", "gzip/ftgzip", "hvf/hvf",
 			"lzw/ftlzw", "pcf/pcf", "pfr/pfr", "psaux/psaux", "pshinter/pshinter",
 			"psnames/psnames", "raster/raster", "sdf/sdf", "sfnt/sfnt", "smooth/smooth",
 			"svg/svg", "truetype/truetype", "type1/type1", "type42/type42", "winfonts/winfnt" })

@@ -174,6 +174,26 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   `contrib/testpngs/crashers` with an error, no crash - x86 and x64, Debug and Release. freetype and cairo were
   rebuilt on it. The DLL imports `KERNEL32`, `msvcrt` (1.6.59 adds `ferror` and `remove`) and `zlib.dll` only.
 
+## FreeType (`Projects/freetype`)
+
+- **2.15.0** (2026-11-13, from 2.14.1): the release tarball's `builds`, `include` and `src`, stock but for **two lines
+  of `include/freetype/config/ftoption.h`**, put back after every update: `FT_CONFIG_OPTION_SYSTEM_ZLIB` (our zlib, not
+  the copy in `src/gzip`) and `FT_CONFIG_OPTION_USE_PNG` (colour bitmap glyphs - CBDT/sbix emoji - through our
+  libpng). `FT_CONFIG_OPTION_USE_BZIP2` is off, so `bzip2/ftbzip2.c` compiles to nothing. Savannah gives no hashes:
+  the `.sig` checks against Werner Lemberg's key `E30674707856409FF1948010BE6C3AAC63AD8E3F` (keyserver.ubuntu.com),
+  the key 2.14.1 was signed with too.
+- **Built from a named list** in premake5.lua, one file per module. **A new module must be added there**: 2.15.0 added
+  `hvf` (Apple's HVF fonts) and lists it in `include/freetype/config/ftmodule.h`, so without `hvf/hvf.c` the link
+  fails on `hvf_driver_class`. Compare `ftmodule.h` and CMakeLists.txt's `BASE_SRCS` with the last release's on an
+  update. `FT_CONFIG_OPTION_HVF` (linking Apple's library) stays off; the module is then an empty driver, as in
+  freetype's CMake build without it.
+- Built x86 and x64, Debug and Release, with harfbuzz, cairo and RmlUi rebuilt on it, no warnings; the DLL imports
+  the same 97 as 2.14.1's (`KERNEL32`, `msvcrt`, `libpng16`, `zlib`). A test linking `freetype_static` passed in all
+  four: Arial rendered, Segoe UI Emoji (COLR) and a Noto Color Emoji subset (CBDT, PNG through libpng) rendered in
+  BGRA, Bahnschrift's variation axes set, both faces of `cambria.ttc` opened. A Debug build prints
+  `FT_Stream_Open: could not open` for each resource-fork name it tries when a font fails to open
+  (`FT_DEBUG_LEVEL_ERROR`) - noise, not the error.
+
 ## jpeg (`Projects/jpeg`)
 
 - **libjpeg-turbo 3.2.1, stock** (2026-11-05, replacing IJG libjpeg 6b from 1998), still `jpeg_static`. `src` is the

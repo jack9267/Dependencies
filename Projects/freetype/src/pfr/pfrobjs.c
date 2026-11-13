@@ -4,7 +4,7 @@
  *
  *   FreeType PFR object methods (body).
  *
- * Copyright (C) 2002-2025 by
+ * Copyright (C) 2002-2026 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -529,6 +529,8 @@
 
         if ( extra > 0 )
         {
+          /* `item->pair_count` is not a power of two;  */
+          /* check value and adjust `base` if necessary */
           p = base + extra * size;
 
           if ( twobytes )
@@ -541,14 +543,15 @@
 
           if ( cpair < pair )
           {
-            if ( twobyte_adj )
-              p += 2;
+            if ( twobytes )
+              p -= 4;
             else
-              p++;
+              p -= 2;
             base = p;
           }
         }
 
+        /* do a power-of-two binary search */
         while ( probe > size )
         {
           probe >>= 1;
