@@ -144,6 +144,21 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   in all four: version, the crc32/adler32 check values, compress/uncompress at levels 1/5/9, gzip in memory, and a
   `.gz` file through `gzopen`.
 
+## sqlite (`Projects/sqlite`)
+
+- **3.54.1, stock** (2026-11-13, from 3.51.0): the six files of sqlite.org's `sqlite-autoconf-<n>.tar.gz` that are
+  built or installed - `sqlite3.c`, `shell.c` (the CLI, not built), `sqlite3.rc` and `sqlite3rc.h` in `src`,
+  `sqlite3.h` and `sqlite3ext.h` in `include` - checked against the download page's SHA3-256 (`hashlib.sha3_256`).
+  The tarball's year folder isn't on the page's links: it is `https://sqlite.org/<year>/`. `sqlite3.rc` had been
+  3.31.1's since 2020 (only its copyright URL differed); it is now the release's too.
+- `sqlite3_static`, and `sqlite3.dll` with the version resource. No compile options of ours: sqlite's defaults
+  (threadsafe 1). Galactic uses it (`Settings.cpp`, `InternetCache`).
+- **XP**: compare the DLL's imports with the last build's after an update. 3.54.1's x86 DLL takes `GetDriveTypeW`,
+  `GetFileSizeEx`, `GetOverlappedResult` and `SetFilePointerEx` where 3.51.0 took none (all Windows 2000), and no
+  longer the ANSI and `LockFile` ones; `KERNEL32` and `msvcrt` only. Built x86 and x64, Debug and Release, no
+  warnings; a test linking `sqlite3_static` passed in all four (version, JSON, a WAL database: 10,000 rows in a
+  transaction, an indexed query, a rollback, read-only reopen, `integrity_check`).
+
 ## jpeg (`Projects/jpeg`)
 
 - **libjpeg-turbo 3.2.1, stock** (2026-11-05, replacing IJG libjpeg 6b from 1998), still `jpeg_static`. `src` is the
