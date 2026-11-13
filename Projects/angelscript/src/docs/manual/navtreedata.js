@@ -29,18 +29,18 @@ var NAVTREE =
     [ "Developer manual", "main_topics.html", "main_topics" ],
     [ "The script language", "doc_script.html", "doc_script" ],
     [ "Deprecated List", "deprecated.html", null ],
-    [ "Todo List", "todo.html", null ],
-    [ "The API reference", "modules.html", "modules" ]
+    [ "The API reference", "topics.html", "topics" ]
   ] ]
 ];
 
 var NAVTREEINDEX =
 [
 "classas_i_binary_stream.html",
-"classas_i_script_module.html#a530ac35b11b18e78629f907af3aabfcd",
-"doc_compile_lib.html#doc_compile_size",
-"doc_understanding_as.html"
+"classas_i_script_generic.html#afdb602c3c2e285c5f34bc477ebbd1534",
+"doc_as_vs_cpp_types.html#doc_as_vc_cpp_types_6",
+"doc_script_stdlib_coroutine.html#doc_script_stdlib_coroutine_1"
 ];
 
-var SYNCONMSG = 'click to disable panel synchronisation';
-var SYNCOFFMSG = 'click to enable panel synchronisation';
+var SYNCONMSG = 'click to disable panel synchronization';
+var SYNCOFFMSG = 'click to enable panel synchronization';
+var LISTOFALLMEMBERS = 'List of all members';

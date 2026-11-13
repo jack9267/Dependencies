@@ -1,6 +1,8 @@
 var doc_adv_jit_topic =
 [
     [ "How to build a JIT compiler", "doc_adv_jit.html", [
+      [ "The JIT interface version 1", "doc_adv_jit.html#doc_adv_jit_v1", null ],
+      [ "The JIT interface version 2", "doc_adv_jit.html#doc_adv_jit_v2", null ],
       [ "The structure of the JIT function", "doc_adv_jit.html#doc_adv_jit_3", null ],
       [ "Traversing the byte code", "doc_adv_jit.html#doc_adv_jit_2", null ]
     ] ],

@@ -1,7 +1,9 @@
 var doc_script_class =
 [
     [ "Script class overview", "doc_script_class_desc.html", null ],
-    [ "Class constructors", "doc_script_class_construct.html", null ],
+    [ "Class constructors", "doc_script_class_construct.html", [
+      [ "Auto-generated constructors", "doc_script_class_construct.html#doc_script_class_construct_auto", null ]
+    ] ],
     [ "Initialization of class members", "doc_script_class_memberinit.html", null ],
     [ "Class destructor", "doc_script_class_destruct.html", null ],
     [ "Class methods", "doc_script_class_methods.html", [
@@ -15,11 +17,14 @@ var doc_script_class =
       [ "Prefixed unary operators", "doc_script_class_ops.html#doc_script_class_unary_ops", null ],
       [ "Postfixed unary operators", "doc_script_class_ops.html#doc_script_class_unary2_ops", null ],
       [ "Comparison operators", "doc_script_class_ops.html#doc_script_class_cmp_ops", null ],
-      [ "Assignment operators", "doc_script_class_ops.html#doc_script_class_assign_ops", null ],
+      [ "Assignment operators", "doc_script_class_ops.html#doc_script_class_assign_ops", [
+        [ "Auto-generated assignment operator", "doc_script_class_ops.html#doc_script_class_assign_ops_auto", null ]
+      ] ],
       [ "Binary operators", "doc_script_class_ops.html#doc_script_class_binary_ops", null ],
       [ "Index operators", "doc_script_class_ops.html#doc_script_class_index_op", null ],
       [ "Functor operator", "doc_script_class_ops.html#doc_script_class_call", null ],
-      [ "Type conversion operators", "doc_script_class_ops.html#doc_script_class_conv", null ]
+      [ "Type conversion operators", "doc_script_class_ops.html#doc_script_class_conv", null ],
+      [ "Foreach loop operators", "doc_script_class_ops.html#doc_script_class_foreach_ops", null ]
     ] ],
     [ "Property accessors", "doc_script_class_prop.html", [
       [ "Indexed property accessors", "doc_script_class_prop.html#doc_script_class_prop_index", null ]

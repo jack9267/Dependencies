@@ -28,13 +28,16 @@ var doc_advanced_api =
     [ "The variable parameter type", "doc_adv_var_type.html", [
       [ "Variable conversion operators", "doc_adv_var_type.html#doc_adv_var_type_1", null ]
     ] ],
+    [ "Variadic arguments", "doc_adv_variadic.html", null ],
     [ "Template types", "doc_adv_template.html", [
       [ "Registering the template type", "doc_adv_template.html#doc_adv_template_1", [
         [ "On subtype replacement for template instances", "doc_adv_template.html#doc_adv_template_1_1", null ]
       ] ],
+      [ "Child funcdefs of templates", "doc_adv_template.html#doc_adv_template_1_child", null ],
       [ "Validating template instantiations at compile time", "doc_adv_template.html#doc_adv_template_4", null ],
       [ "Template specializations", "doc_adv_template.html#doc_adv_template_2", null ]
     ] ],
+    [ "Template functions", "doc_adv_template_func.html", null ],
     [ "Weak references", "doc_adv_weakref.html", null ],
     [ "C++ exceptions and longjmp", "doc_cpp_exceptions.html", [
       [ "Exceptions", "doc_cpp_exceptions.html#doc_cpp_exceptions_1", null ],

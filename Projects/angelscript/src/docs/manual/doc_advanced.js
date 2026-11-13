@@ -62,7 +62,9 @@ var doc_advanced =
       [ "Serialization of modules", "doc_serialization.html#doc_serialization_modules", null ],
       [ "Serialization of global variables", "doc_serialization.html#doc_serialization_vars", null ],
       [ "Serialization of objects", "doc_serialization.html#doc_serialization_objects", null ],
-      [ "Serialization of contexts", "doc_serialization.html#doc_serialization_contexts", null ]
+      [ "Serialization of contexts", "doc_serialization.html#doc_serialization_contexts", [
+        [ "Limitations", "doc_serialization.html#Limitations", null ]
+      ] ]
     ] ],
     [ "Inheriting from application registered class", "doc_adv_inheritappclass.html", null ],
     [ "JIT compilation", "doc_adv_jit_topic.html", "doc_adv_jit_topic" ]

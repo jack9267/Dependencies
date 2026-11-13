@@ -9,6 +9,8 @@ var doc_script_global =
     [ "Enums", "doc_global_enums.html", null ],
     [ "Funcdefs", "doc_global_funcdef.html", null ],
     [ "Typedefs", "doc_global_typedef.html", null ],
-    [ "Namespaces", "doc_global_namespace.html", null ],
+    [ "Namespaces", "doc_global_namespace.html", [
+      [ "Using namespace", "doc_global_namespace.html#doc_global_using_ns", null ]
+    ] ],
     [ "Imports", "doc_global_import.html", null ]
 ];

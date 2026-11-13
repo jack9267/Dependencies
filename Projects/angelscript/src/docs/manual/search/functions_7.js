@@ -11,5 +11,6 @@ var searchData=
   ['isprotected_8',['IsProtected',['../classas_i_script_function.html#a2e17b763527ba3a9b0d05c4cd35b5742',1,'asIScriptFunction']]],
   ['isreadonly_9',['IsReadOnly',['../classas_i_script_function.html#a99bbe26ae0ec3f0cc09070bf89aff2f9',1,'asIScriptFunction']]],
   ['isshared_10',['IsShared',['../classas_i_script_function.html#a805ae8064598ad12f44bb583118b6cc5',1,'asIScriptFunction']]],
-  ['isvarinscope_11',['IsVarInScope',['../classas_i_script_context.html#a45fcf7d8d711d5ec5cb9927e7839387a',1,'asIScriptContext']]]
+  ['isvariadic_11',['IsVariadic',['../classas_i_script_function.html#a5bdae4290f3856811d3feba110be087f',1,'asIScriptFunction']]],
+  ['isvarinscope_12',['IsVarInScope',['../classas_i_script_context.html#a45fcf7d8d711d5ec5cb9927e7839387a',1,'asIScriptContext']]]
 ];

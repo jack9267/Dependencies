@@ -5,11 +5,12 @@ var doc_script =
       [ "Variable declarations", "doc_script_statements.html#variable", null ],
       [ "Expression statement", "doc_script_statements.html#expression", null ],
       [ "Conditions: if / if-else / switch-case", "doc_script_statements.html#if", null ],
-      [ "Loops: while / do-while / for", "doc_script_statements.html#while", null ],
+      [ "Loops: while / do-while / for / foreach", "doc_script_statements.html#while", null ],
       [ "Loop control: break / continue", "doc_script_statements.html#break", null ],
       [ "Return statement", "doc_script_statements.html#return", null ],
       [ "Statement blocks", "doc_script_statements.html#block", null ],
-      [ "Try-catch blocks", "doc_script_statements.html#try", null ]
+      [ "Try-catch blocks", "doc_script_statements.html#try", null ],
+      [ "Using namespace", "doc_script_statements.html#using_ns", null ]
     ] ],
     [ "Expressions", "doc_expressions.html", [
       [ "Assignments", "doc_expressions.html#assignment", null ],

@@ -1,8 +1,5 @@
 var doc_script_stdlib =
 [
-    [ "Exception handling", "doc_script_stdlib_exception.html", [
-      [ "Functions", "doc_script_stdlib_exception.html#try_func", null ]
-    ] ],
     [ "string", "doc_script_stdlib_string.html", [
       [ "Supporting string object and functions", "doc_script_stdlib_string.html#doc_datatypes_strings_addon", [
         [ "Operators", "doc_script_stdlib_string.html#doc_datatypes_strings_addon_ops", null ],
@@ -45,9 +42,6 @@ var doc_script_stdlib =
         [ "Operators", "doc_script_stdlib_datetime.html#doc_addon_datetime_2_ops", null ]
       ] ]
     ] ],
-    [ "Co-routines", "doc_script_stdlib_coroutine.html", [
-      [ "Functions", "doc_script_stdlib_coroutine.html#doc_script_stdlib_coroutine_1", null ]
-    ] ],
     [ "file", "doc_script_stdlib_file.html", [
       [ "Supporting file object", "doc_script_stdlib_file.html#doc_script_stdlib_file_1", [
         [ "Methods", "doc_script_stdlib_file.html#doc_script_stdlib_file_1_1", null ],
@@ -58,6 +52,17 @@ var doc_script_stdlib =
       [ "Supporting filesystem object", "doc_script_stdlib_filesystem.html#doc_script_stdlib_filesystem_1", [
         [ "Methods", "doc_script_stdlib_filesystem.html#doc_script_stdlib_filesystem_1_1", null ]
       ] ]
+    ] ],
+    [ "socket", "doc_script_stdlib_socket.html", [
+      [ "Supporting socket object", "doc_script_stdlib_socket.html#doc_datatypes_socket_addon", [
+        [ "Methods", "doc_script_stdlib_socket.html#doc_datatypes_socket_addon_mthd", null ]
+      ] ]
+    ] ],
+    [ "Exception handling", "doc_script_stdlib_exception.html", [
+      [ "Functions", "doc_script_stdlib_exception.html#try_func", null ]
+    ] ],
+    [ "Co-routines", "doc_script_stdlib_coroutine.html", [
+      [ "Functions", "doc_script_stdlib_coroutine.html#doc_script_stdlib_coroutine_1", null ]
     ] ],
     [ "System functions", "doc_script_stdlib_system.html", [
       [ "Functions", "doc_script_stdlib_system.html#doc_script_stdlib_system_1", null ]

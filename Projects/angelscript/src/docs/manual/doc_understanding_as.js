@@ -16,7 +16,9 @@ var doc_understanding_as =
         [ "2017 - external keyword and anonymous initialization lists", "doc_versions.html#doc_versions_2017", null ],
         [ "2018 - Try-catch statements and explicit constructors", "doc_versions.html#doc_versions_2018", null ],
         [ "2019 - Explicit property keyword", "doc_versions.html#doc_versions_2019", null ],
-        [ "2022 - Serialization of the context stack", "doc_versions.html#doc_versions_2022", null ]
+        [ "2022 - Serialization of the context stack", "doc_versions.html#doc_versions_2022", null ],
+        [ "2024 - Improved JIT compiler interface and auto generated copy constructors", "doc_versions.html#doc_versions_2024", null ],
+        [ "2025 - Foreach, variadic, and template functions", "doc_versions.html#doc_versions_2025", null ]
       ] ]
     ] ],
     [ "Script modules", "doc_module.html", [
@@ -41,5 +43,7 @@ var doc_understanding_as =
       [ "Reference counting algorithm", "doc_memory.html#doc_memory_2", null ],
       [ "Garbage collector algorithm", "doc_memory.html#doc_memory_3", null ],
       [ "Memory heap", "doc_memory.html#doc_memory_4", null ]
-    ] ]
+    ] ],
+    [ "Structure of the typeid", "doc_typeid.html", null ],
+    [ "Calling convention", "doc_callconv.html", null ]
 ];

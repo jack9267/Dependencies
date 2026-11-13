@@ -17,7 +17,8 @@ var doc_addon_script =
     [ "ref object", "doc_addon_handle.html", [
       [ "Public C++ interface", "doc_addon_handle.html#doc_addon_handle_1", null ],
       [ "Public script interface", "doc_addon_handle.html#doc_addon_handle_3", null ],
-      [ "Example usage from C++", "doc_addon_handle.html#doc_addon_handle_4", null ]
+      [ "Example usage from C++", "doc_addon_handle.html#doc_addon_handle_4", null ],
+      [ "Example on how to return a newly registered function from C++", "doc_addon_handle.html#doc_addon_handle_5", null ]
     ] ],
     [ "weakref object", "doc_addon_weakref.html", [
       [ "Public C++ interface", "doc_addon_weakref.html#doc_addon_weakref_1", null ],
@@ -50,6 +51,10 @@ var doc_addon_script =
     [ "datetime object", "doc_addon_datetime.html", [
       [ "Public C++ interface", "doc_addon_datetime.html#doc_addon_datetime_1", null ],
       [ "Public script interface", "doc_addon_datetime.html#doc_addon_datetime_2", null ]
+    ] ],
+    [ "socket object", "doc_addon_socket.html", [
+      [ "Public C++ interface", "doc_addon_socket.html#doc_addon_socket_1", null ],
+      [ "Public script interface", "doc_addon_socket.html#doc_addon_socket_2", null ]
     ] ],
     [ "Exception routines", "doc_addon_helpers_try.html", [
       [ "Public C++ interface", "doc_addon_helpers_try.html#doc_addon_helpers_try_1", null ],

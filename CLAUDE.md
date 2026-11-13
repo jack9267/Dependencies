@@ -235,8 +235,8 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
 
 ## AngelScript (`Projects/angelscript`)
 
-- **2.38.0, stock** (2026-11-02), for a planned Galactic scripting backend. `src` is the SDK folder of the release
-  zip unchanged. `angelscript_static` and `angelscript.dll` (`ANGELSCRIPT_EXPORT`; a consumer of the DLL defines
+- **2.39.0, stock** (2026-11-13, from 2.38.0 of 2026-11-02), for Galactic's AngelScript backend. `src` is the SDK
+  folder of the release zip unchanged (angelcode.com gives no checksum, and the GitHub mirror stopped at 2.38.0). `angelscript_static` and `angelscript.dll` (`ANGELSCRIPT_EXPORT`; a consumer of the DLL defines
   `ANGELSCRIPT_DLL_LIBRARY_IMPORT`) from `angelscript/source`; `angelscript_addons_static` from the add-ons a host
   registers (string, array, dictionary, any, handle, weakref, math, grid, datetime, serializer, helper, context
   manager, builder). Left out: `scriptfile` (scripts touching files directly), `scriptsocket` (Windows sockets)
@@ -249,7 +249,18 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   the per-platform assembly (`as_callfunc_*.asm`/`.S`), so the same sources build for every target. The add-ons
   carry their own generic wrappers for it.
 - XP: the Vista-only `InitializeCriticalSectionEx` is used only for Windows Store builds; the DLL imports only
-  `KERNEL32` and `msvcrt`.
+  `KERNEL32` and `msvcrt`. 2.39.0's Fiber Local Storage (`FlsAlloc`, not on XP) is only under `AS_WINDOWS_USEFLS`,
+  which we don't define, so it keeps thread-local storage.
+- **2.39.0 changed overload matching**: a variadic function (`?&in ...`) no longer takes a call that a more specific
+  overload fits, and now accepts zero arguments - Galactic's lenient masks register a variadic overload beside a
+  native's exact one. Also: `1'000'000` number separators, enums with an underlying type, and an extra WORD in
+  `asBC_CALLSYS`/`asBC_ALLOC`/`asBC_CallPtr` (so don't count on bytecode saved by 2.38 loading; nothing saves any yet). The engine's new
+  `as_callfunc_x64_msvc_clang.S` is assembly, not built (only `.cpp`, and `AS_MAX_PORTABILITY` needs none).
+- Built x86 and x64, Debug and Release, no warnings; the DLL's 19 exports are 2.38.0's. A test linking
+  `angelscript_static` and `angelscript_addons_static` passed in all four: `asCALL_CDECL` refused, generic natives,
+  the string/array/dictionary add-ons, a typed enum and number separators, `add(40, 2)` reaching the exact overload
+  and `add()`/`add('one', 2.5, true)` the variadic one, and a line callback `Abort()`ing a `while (true)` inside
+  `try`/`catch`. A Release consumer uses the static runtime (`/MT`), as the libraries do.
 
 ## miniaudio (`Projects/miniaudio`)
 
