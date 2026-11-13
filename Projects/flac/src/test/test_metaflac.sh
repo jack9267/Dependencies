@@ -2,7 +2,7 @@
 
 #  FLAC - Free Lossless Audio Codec
 #  Copyright (C) 2002-2009  Josh Coalson
-#  Copyright (C) 2011-2016  Xiph.Org Foundation
+#  Copyright (C) 2011-2025  Xiph.Org Foundation
 #
 #  This file is part the FLAC project.  FLAC is comprised of several
 #  components distributed under different licenses.  The codec libraries
@@ -20,9 +20,9 @@
 
 . ./common.sh
 
-PATH=`pwd`/../src/flac:$PATH
-PATH=`pwd`/../src/metaflac:$PATH
-PATH=`pwd`/../objs/$BUILD/bin:$PATH
+PATH="$(pwd)/../src/flac:$PATH"
+PATH="$(pwd)/../src/metaflac:$PATH"
+PATH="$(pwd)/../objs/$BUILD/bin:$PATH"
 
 if echo a | (grep -E '(a|b)') >/dev/null 2>&1
 	then EGREP='grep -E'
@@ -30,14 +30,15 @@ if echo a | (grep -E '(a|b)') >/dev/null 2>&1
 fi
 
 testdir="metaflac-test-files"
-flacfile="metaflac.flac"
+flacfile="metaflac1.flac"
+flacfile_secondary="metaflac2.flac"
 
 flac${EXE} --help 1>/dev/null 2>/dev/null || die "ERROR can't find flac executable"
 metaflac${EXE} --help 1>/dev/null 2>/dev/null || die "ERROR can't find metaflac executable"
 
 run_flac ()
 {
-	if [ x"$FLAC__TEST_WITH_VALGRIND" = xyes ] ; then
+	if [ "$FLAC__TEST_WITH_VALGRIND" = yes ] ; then
 		echo "valgrind --leak-check=yes --show-reachable=yes --num-callers=50 flac $*" >>test_metaflac.valgrind.log
 		valgrind --leak-check=yes --show-reachable=yes --num-callers=50 --log-fd=4 flac${EXE} ${TOTALLY_SILENT} --no-error-on-compression-fail $* 4>>test_metaflac.valgrind.log
 	else
@@ -47,7 +48,7 @@ run_flac ()
 
 run_metaflac ()
 {
-	if [ x"$FLAC__TEST_WITH_VALGRIND" = xyes ] ; then
+	if [ "$FLAC__TEST_WITH_VALGRIND" = yes ] ; then
 		echo "valgrind --leak-check=yes --show-reachable=yes --num-callers=50 metaflac $*" >>test_metaflac.valgrind.log
 		valgrind --leak-check=yes --show-reachable=yes --num-callers=50 --log-fd=4 metaflac${EXE} $* 4>>test_metaflac.valgrind.log
 	else
@@ -60,7 +61,7 @@ run_metaflac_silent ()
 	if [ -z "$SILENT" ] ; then
 		run_metaflac $*
 	else
-		if [ x"$FLAC__TEST_WITH_VALGRIND" = xyes ] ; then
+		if [ "$FLAC__TEST_WITH_VALGRIND" = yes ] ; then
 			echo "valgrind --leak-check=yes --show-reachable=yes --num-callers=50 metaflac $*" >>test_metaflac.valgrind.log
 			valgrind --leak-check=yes --show-reachable=yes --num-callers=50 --log-fd=4 metaflac${EXE} $* 2>/dev/null 4>>test_metaflac.valgrind.log
 		else
@@ -68,6 +69,17 @@ run_metaflac_silent ()
 		fi
 	fi
 }
+
+run_metaflac_to_metaflac_silent ()
+{
+	if [ "$FLAC__TEST_WITH_VALGRIND" = yes ] ; then
+		echo "valgrind --leak-check=yes --show-reachable=yes --num-callers=50 metaflac $*" >>test_metaflac.valgrind.log
+		valgrind --leak-check=yes --show-reachable=yes --num-callers=50 --log-fd=4 metaflac${EXE} $* 2>/dev/null 4>>test_metaflac.valgrind.log
+	else
+		metaflac${EXE} $1 | metaflac${EXE} $2 2>/dev/null
+	fi
+}
+
 
 check_flac ()
 {
@@ -95,7 +107,8 @@ filter ()
 	# grep pattern 2: remove minimum/maximum frame and block size from STREAMINFO
 	# grep pattern 3: remove hexdump data from PICTURE metadata blocks
 	# sed pattern 1: remove stream offset values from SEEKTABLE points
-	$EGREP -v '^  vendor string: |^  m..imum .....size: |^    0000[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]: ' | sed -e 's/, stream_offset.*//'
+	$EGREP -v '^  vendor string: |^  m..imum .....size: |^    0000[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]: ' \
+		| sed -e 's/, stream_offset.*//'
 }
 metaflac_test ()
 {
@@ -104,9 +117,35 @@ metaflac_test ()
 	args="$3"
 	expect="$case-expect.meta"
 	echo $ECHO_N "test $1: $desc... " $ECHO_C
-	run_metaflac $args $flacfile | filter > $testdir/out.meta || die "ERROR running metaflac"
+	run_metaflac $args $flacfile | filter > $testdir/out1.meta || die "ERROR running metaflac"
+	# Ignore lengths which can be affected by the version string.
+	sed "s/length:.*/length: XXX/" $testdir/out1.meta > $testdir/out.meta
 	diff -w $expect $testdir/out.meta > /dev/null 2>&1 || die "ERROR: metadata does not match expected $expect"
 	# To blindly accept (and check later): cp -f $testdir/out.meta $expect
+	echo OK
+}
+
+metaflac_test_nofilter ()
+{
+	case="$testdatadir/$1"
+	desc="$2"
+	args="$3"
+	expect="$case-expect.meta"
+	echo $ECHO_N "test $1: $desc... " $ECHO_C
+	run_metaflac $args $flacfile > $testdir/out.meta || die "ERROR running metaflac"
+	diff -w $expect $testdir/out.meta || die "ERROR: metadata does not match expected $expect"
+	echo OK
+}
+
+metaflac_test_binary ()
+{
+	case="$testdatadir/$1"
+	desc="$2"
+	args="$3"
+	expect="$case-expect.meta"
+	echo $ECHO_N "test $1: $desc... " $ECHO_C
+	run_metaflac $args $flacfile > $testdir/out.meta || die "ERROR running metaflac"
+	cmp $expect $testdir/out.meta || die "ERROR: metadata does not match expected $expect"
 	echo OK
 }
 
@@ -128,9 +167,18 @@ check_flac
 metaflac_test case02 "--add-padding" "--list"
 
 # some flavors of /bin/sh (e.g. Darwin's) won't even handle quoted spaces, so we underscore:
+run_metaflac -o $flacfile_secondary --set-tag="ARTIST=The_artist_formerly_known_as_the_artist..." $flacfile
+check_flac
+metaflac_test case02 "whether -o does not change input file" "--list"
+
 run_metaflac --set-tag="ARTIST=The_artist_formerly_known_as_the_artist..." $flacfile
 check_flac
 metaflac_test case03 "--set-tag=ARTIST" "--list"
+
+rm $flacfile
+mv $flacfile_secondary $flacfile
+check_flac
+metaflac_test case03 "-o --set-tag=ARTIST" "--list"
 
 run_metaflac --set-tag="ARTIST=Chuck_Woolery" $flacfile
 check_flac
@@ -144,7 +192,11 @@ run_metaflac --set-tag="TITLE=He_who_smelt_it_dealt_it" $flacfile
 check_flac
 metaflac_test case06 "--set-tag=TITLE" "--list"
 
-metaflac_test case07 "--show-vendor-tag --show-tag=ARTIST" "--show-vendor-tag --show-tag=ARTIST"
+if [ ! $git_commit_version_hash ] ; then
+	metaflac_test case07 "--show-vendor-tag --show-tag=ARTIST" "--show-vendor-tag --show-tag=ARTIST"
+else
+	echo "test case07 is skipped because version is taken from git"
+fi
 
 run_metaflac --remove-first-tag=ARTIST $flacfile
 check_flac
@@ -173,9 +225,18 @@ run_metaflac --add-padding=0 $flacfile
 check_flac
 metaflac_test case18 "--add-padding=0" "--list"
 
+run_metaflac -o $flacfile_secondary --sort-padding $flacfile
+check_flac
+metaflac_test case18 "whether -o does not change input file" "--list"
+
 run_metaflac --sort-padding $flacfile
 check_flac
 metaflac_test case19 "--sort-padding" "--list"
+
+rm $flacfile
+mv $flacfile_secondary $flacfile
+check_flac
+metaflac_test case19 "-o --sort-padding" "--list"
 
 run_metaflac --add-padding=0 $flacfile
 check_flac
@@ -185,21 +246,57 @@ run_metaflac --remove-all-tags $flacfile
 check_flac
 metaflac_test case21 "--remove-all-tags" "--list"
 
+run_metaflac -o $flacfile_secondary --remove --block-number=1,99 --dont-use-padding $flacfile
+check_flac
+metaflac_test case21 "whether -o does not change input file" "--list"
+
 run_metaflac --remove --block-number=1,99 --dont-use-padding $flacfile
 check_flac
 metaflac_test case22 "--remove --block-number=1,99 --dont-use-padding" "--list"
+
+rm $flacfile
+mv $flacfile_secondary $flacfile
+check_flac
+metaflac_test case22 "-o --remove --block-number=1,99 --dont-use-padding" "--list"
+
+run_metaflac -o $flacfile_secondary --remove --block-number=99 --dont-use-padding $flacfile
+check_flac
+metaflac_test case22 "whether -o does not change input file" "--list"
 
 run_metaflac --remove --block-number=99 --dont-use-padding $flacfile
 check_flac
 metaflac_test case23 "--remove --block-number=99 --dont-use-padding" "--list"
 
+rm $flacfile
+mv $flacfile_secondary $flacfile
+check_flac
+metaflac_test case23 "-o --remove --block-number=99 --dont-use-padding" "--list"
+
+run_metaflac -o $flacfile_secondary --remove --block-type=PADDING $flacfile
+check_flac
+metaflac_test case23 "whether -o does not change input file" "--list"
+
 run_metaflac --remove --block-type=PADDING $flacfile
 check_flac
 metaflac_test case24 "--remove --block-type=PADDING" "--list"
 
+rm $flacfile
+mv $flacfile_secondary $flacfile
+check_flac
+metaflac_test case24 "-o --remove --block-type=PADDING" "--list"
+
+run_metaflac -o $flacfile_secondary --remove --block-type=PADDING --dont-use-padding $flacfile
+check_flac
+metaflac_test case24 "whether -o does not change input file" "--list"
+
 run_metaflac --remove --block-type=PADDING --dont-use-padding $flacfile
 check_flac
 metaflac_test case25 "--remove --block-type=PADDING --dont-use-padding" "--list"
+
+rm $flacfile
+mv $flacfile_secondary $flacfile
+check_flac
+metaflac_test case25 "-o --remove --block-type=PADDING --dont-use-padding" "--list"
 
 run_metaflac --add-padding=0 $flacfile $flacfile
 check_flac
@@ -310,7 +407,7 @@ for f in \
 	run_metaflac --import-picture-from="|image/gif|$f||${top_srcdir}/test/pictures/$f" $flacfile
 	check_flac
 	metaflac_test "case$ncase" "--import-picture-from" "--list"
-	ncase=`expr $ncase + 1`
+	ncase=$((ncase + 1))
 done
 for f in \
 	0.jpg \
@@ -319,7 +416,7 @@ for f in \
 	run_metaflac --import-picture-from="4|image/jpeg|$f||${top_srcdir}/test/pictures/$f" $flacfile
 	check_flac
 	metaflac_test "case$ncase" "--import-picture-from" "--list"
-	ncase=`expr $ncase + 1`
+	ncase=$((ncase + 1))
 done
 for f in \
 	0.png \
@@ -335,7 +432,7 @@ for f in \
 	run_metaflac --import-picture-from="5|image/png|$f||${top_srcdir}/test/pictures/$f" $flacfile
 	check_flac
 	metaflac_test "case$ncase" "--import-picture-from" "--list"
-	ncase=`expr $ncase + 1`
+	ncase=$((ncase + 1))
 done
 [ $ncase = 60 ] || die "expected case# to be 60"
 
@@ -362,11 +459,88 @@ metaflac_test case61 "--import-picture-from" "--list"
 run_metaflac --import-picture-from="2|image/png|icon|64x64x24|${top_srcdir}/test/pictures/1.png" $flacfile
 check_flac
 metaflac_test case62 "--import-picture-from" "--list"
+run_metaflac --remove-all-tags-except=artist=title $flacfile
+check_flac
+metaflac_test case63 "--remove-all-tags-except=artist=title" "--list"
+metaflac_test case64 "--export-tags-to=-" "--export-tags-to=-"
+metaflac_test case64 "--show-all-tags" "--show-all-tags"
+
+run_flac ${top_srcdir}/test/foreign-metadata-test-files/AIFF-ID3.aiff --keep-foreign-metadata -f -o $flacfile
+metaflac_test_binary case65 "--data-format=binary" "--list --data-format=binary-headerless --block-type=APPLICATION:aiff"
 
 # UNKNOWN blocks
+flacfile=metaflac2.flac
 echo $ECHO_N "Testing FLAC file with unknown metadata... " $ECHO_C
 cp -p ${top_srcdir}/test/metaflac.flac.in $flacfile
 # remove the VORBIS_COMMENT block so vendor string changes don't interfere with the comparison:
 run_metaflac --remove --block-type=VORBIS_COMMENT --dont-use-padding $flacfile
 cmp $flacfile ${top_srcdir}/test/metaflac.flac.ok || die "ERROR, $flacfile and metaflac.flac.ok differ"
 echo OK
+
+flacfile=metaflac3.flac
+cp -p ${top_srcdir}/test/metaflac.flac.in $flacfile
+
+flacfile2=metaflac4.flac
+cp $flacfile $flacfile2
+run_metaflac --remove-all --dont-use-padding $flacfile
+
+echo $ECHO_N "Appending a streaminfo metadata block... " $ECHO_C
+if run_metaflac_to_metaflac_silent "--list --data-format=binary $flacfile2" "--append $flacfile" ; then
+        die "ERROR: it should have failed but didn't"
+else
+        echo "OK, it failed as it should"
+fi
+
+echo $ECHO_N "Appending a seektable metadata block... " $ECHO_C
+if run_metaflac_to_metaflac_silent "--list --data-format=binary --except-block-type=STREAMINFO $flacfile2" "--append $flacfile" ; then
+        die "ERROR: it should have failed but didn't"
+else
+        echo "OK, it failed as it should"
+fi
+
+run_metaflac --add-seekpoint=0 $flacfile
+
+echo $ECHO_N "Appending a vorbis comment metadata block... " $ECHO_C
+if run_metaflac_to_metaflac_silent "--list --data-format=binary --block-type=VORBIS_COMMENT $flacfile2" "--append $flacfile" ; then
+        echo "OK"
+else
+        die "ERROR, couldn't add vorbis comment metadata block"
+fi
+
+echo $ECHO_N "Appending another vorbis comment metadata block... " $ECHO_C
+if run_metaflac_to_metaflac_silent "--list --data-format=binary --block-type=VORBIS_COMMENT $flacfile2" "--append $flacfile" ; then
+        die "ERROR: it should have failed but didn't"
+else
+        echo "OK, it failed as it should"
+fi
+
+if run_metaflac_to_metaflac_silent "--list --data-format=binary --except-block-type=STREAMINFO,SEEKTABLE,VORBIS_COMMENT $flacfile2" "--append $flacfile" ; then
+		:
+else
+        die "ERROR, couldn't append metadata block"
+fi
+
+metaflac_test_nofilter case66 "--append" "--list"
+
+if run_metaflac_to_metaflac_silent "--list --data-format=binary --except-block-type=STREAMINFO,SEEKTABLE,VORBIS_COMMENT $flacfile2" "-o $flacfile_secondary --append --block-number=0 $flacfile" ; then
+		:
+else
+        die "ERROR, couldn't insert metadata block"
+fi
+check_flac
+metaflac_test_nofilter case66 "whether -o does not change input file" "--list"
+
+if run_metaflac_to_metaflac_silent "--list --data-format=binary --except-block-type=STREAMINFO,SEEKTABLE,VORBIS_COMMENT $flacfile2" "--append --block-number=0 $flacfile" ; then
+		:
+else
+        die "ERROR, couldn't insert metadata block"
+fi
+
+metaflac_test_nofilter case67 "--append --block-number=0" "--list"
+
+rm $flacfile
+mv $flacfile_secondary $flacfile
+check_flac
+metaflac_test_nofilter case67 "-o --append --block-number=0" "--list"
+
+rm -f metaflac-test-files/out.meta  metaflac-test-files/out1.meta

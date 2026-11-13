@@ -1,6 +1,6 @@
 /* metaflac - Command-line FLAC metadata editor
  * Copyright (C) 2001-2009  Josh Coalson
- * Copyright (C) 2011-2016  Xiph.Org Foundation
+ * Copyright (C) 2011-2025  Xiph.Org Foundation
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -54,6 +54,7 @@ typedef enum {
 	OP__SHOW_VC_VENDOR,
 	OP__SHOW_VC_FIELD,
 	OP__REMOVE_VC_ALL,
+	OP__REMOVE_VC_ALL_EXCEPT,
 	OP__REMOVE_VC_FIELD,
 	OP__REMOVE_VC_FIRSTFIELD,
 	OP__SET_VC_FIELD,
@@ -130,10 +131,11 @@ typedef struct {
 
 typedef struct {
 	FLAC__bool is_binary;
+	FLAC__bool is_headerless;
 } Argument_DataFormat;
 
 typedef struct {
-	char *file_name;
+	const char *file_name;
 } Argument_FromFile;
 
 typedef struct {
@@ -189,6 +191,8 @@ typedef struct {
 	FLAC__bool cued_seekpoints;
 	FLAC__bool show_long_help;
 	FLAC__bool show_version;
+	FLAC__bool data_format_is_binary;
+	FLAC__bool data_format_is_binary_headerless;
 	FLAC__bool application_data_format_is_hexdump;
 	struct {
 		Operation *operations;
@@ -208,6 +212,7 @@ typedef struct {
 	} args;
 	unsigned num_files;
 	char **filenames;
+	const char *output_name;
 } CommandLineOptions;
 
 void init_options(CommandLineOptions *options);

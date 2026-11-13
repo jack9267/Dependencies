@@ -1231,18 +1231,19 @@ dep("rmlui_debugger", {
 	files = { "Projects/RmlUi/Source/Debugger/**.cpp" },
 })
 
--- NASM, for flac's x86 assembly: jbuild's pinned one (jbuild_nasm, Common.lua - fetched once into jbuild\tools),
--- whatever is installed, so every machine assembles with the same NASM.
-local function nasm_path()
-	return path.translate(jbuild_nasm(), "\\")
-end
-
--- flac: C + x86 intrinsics (FLAC__HAS_X86INTRIN), and on x86 the ia32 .nasm assembly too, as the CMake
--- build had it - this flac's cpu.c calls FLAC__cpu_info_asm_ia32 on x86 whether or not it has NASM.
+-- flac: as its own CMake builds it with MSVC - C with x86 intrinsics (FLAC__HAS_X86INTRIN), the SSE ones
+-- always and AVX2/FMA (FLAC__USE_AVX) chosen at run time by cpu.c, which asks the OS too (OSXSAVE, xgetbv), so
+-- XP and older CPUs take the SSE or C paths. Those four files alone are compiled with /arch:AVX2; /fp:fast for the
+-- library, as CMake has it. No assembly since 1.4 (the ia32 .nasm went). No multithreaded encoding: that needs
+-- pthreads (HAVE_PTHREAD). The deduplication/*.c are #included by bitreader.c and lpc.c, so the glob stays
+-- one level. The version comes from the release's CMakeLists.txt.
+local FLAC_VERSION = (io.readfile(path.join(_SCRIPT_DIR, "Projects/flac/src/CMakeLists.txt")) or "")
+	:match("project%(FLAC VERSION ([%d%.]+)%)")
+if not FLAC_VERSION then error("flac: no version in CMakeLists.txt") end
 dep("FLAC", {
 	systems = WINDOWS,
-	defines = { "FLAC__NO_DLL", "PACKAGE_VERSION=\"1.3.2\"", "FLAC__HAS_OGG", "FLAC__ALIGN_MALLOC_DATA",
-		"HAVE_LROUND", "FLAC__SSE_OS", "FLAC__HAS_X86INTRIN" },
+	defines = { "FLAC__NO_DLL", 'PACKAGE_VERSION="' .. FLAC_VERSION .. '"', "FLAC__HAS_OGG=1", "FLAC__ALIGN_MALLOC_DATA",
+		"HAVE_LROUND=1", "FLAC__HAS_X86INTRIN=1", "FLAC__USE_AVX" },
 	debugdefines = { "FLAC__OVERFLOW_DETECT" },
 	includedirs = { "Projects/flac/src/include", "Projects/flac/src/src/libFLAC/include",
 		"Projects/ogg/include", "Projects/ogg/src/include" },
@@ -1251,17 +1252,11 @@ dep("FLAC", {
 	files = { "Projects/flac/src/src/libFLAC/*.c",
 		"Projects/flac/src/src/share/win_utf8_io/win_utf8_io.c" },
 	extra = function()
-		filter "architecture:x86"
-			defines { "FLAC__CPU_IA32", "FLAC__HAS_NASM" }
-			files { "Projects/flac/src/src/libFLAC/ia32/cpu_asm.nasm",
-				"Projects/flac/src/src/libFLAC/ia32/fixed_asm.nasm",
-				"Projects/flac/src/src/libFLAC/ia32/lpc_asm.nasm" }
-		filter { "architecture:x86", "files:**.nasm" }
-			buildmessage "%{file.name}"
-			buildcommands { '"' .. nasm_path() .. '" -i"%{file.directory}/" -f win32 -d OBJ_FORMAT_win32 -o "%{cfg.objdir}/%{file.basename}.obj" "%{file.relpath}"' }
-			buildoutputs { "%{cfg.objdir}/%{file.basename}.obj" }
+		floatingpoint "Fast"
 		filter "architecture:x86_64"
-			defines { "FLAC__CPU_X86_64", "ENABLE_64_BIT_WORDS" }
+			defines { "ENABLE_64_BIT_WORDS=1" }
+		filter "files:**/fixed_intrin_avx2.c or **/lpc_intrin_avx2.c or **/stream_encoder_intrin_avx2.c or **/lpc_intrin_fma.c"
+			buildoptions { "/arch:AVX2" }
 		filter {}
 	end,
 })

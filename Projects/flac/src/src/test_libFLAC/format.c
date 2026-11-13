@@ -1,6 +1,6 @@
 /* test_libFLAC - Unit tester for libFLAC
  * Copyright (C) 2004-2009  Josh Coalson
- * Copyright (C) 2011-2016  Xiph.Org Foundation
+ * Copyright (C) 2011-2025  Xiph.Org Foundation
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -29,11 +29,11 @@
 static const char *true_false_string_[2] = { "false", "true" };
 
 static struct {
-	unsigned rate;
+	uint32_t rate;
 	FLAC__bool valid;
 	FLAC__bool subset;
 } SAMPLE_RATES[] = {
-	{ 0      , false, false },
+	{ 0      , true , true  },
 	{ 1      , true , true  },
 	{ 9      , true , true  },
 	{ 10     , true , true  },
@@ -65,11 +65,14 @@ static struct {
 	{ 500010 , true , true  },
 	{ 655349 , true , false },
 	{ 655350 , true , true  },
-	{ 655351 , false, false },
-	{ 655360 , false, false },
-	{ 700000 , false, false },
-	{ 700010 , false, false },
-	{ 1000000, false, false },
+	{ 655351 , true , false },
+	{ 655360 , true , false },
+	{ 700000 , true , false },
+	{ 700010 , true , false },
+	{ 705600 , true , false },
+	{ 768000 , true , false },
+	{ 1000000, true , false },
+	{ 1048575, true , false },
 	{ 1100000, false, false }
 };
 
@@ -89,7 +92,7 @@ static struct {
 };
 
 static struct {
-	unsigned length;
+	uint32_t length;
 	const FLAC__byte *string;
 	FLAC__bool valid;
 } VCENTRY_VALUES[] = {
@@ -153,7 +156,7 @@ static struct {
 };
 
 static struct {
-	unsigned length;
+	uint32_t length;
 	const FLAC__byte *string;
 	FLAC__bool valid;
 } VCENTRIES[] = {
@@ -194,7 +197,7 @@ static struct {
 
 FLAC__bool test_format(void)
 {
-	unsigned i;
+	uint32_t i;
 
 	printf("\n+++ libFLAC unit test: format\n\n");
 
@@ -236,7 +239,7 @@ FLAC__bool test_format(void)
 
 	for(i = 0; i < sizeof(VCENTRY_VALUES_NT)/sizeof(VCENTRY_VALUES_NT[0]); i++) {
 		printf("testing FLAC__format_vorbiscomment_entry_value_is_legal(\"%s\", -1)... ", VCENTRY_VALUES_NT[i].string);
-		if(FLAC__format_vorbiscomment_entry_value_is_legal(VCENTRY_VALUES_NT[i].string, (unsigned)(-1)) != VCENTRY_VALUES_NT[i].valid) {
+		if(FLAC__format_vorbiscomment_entry_value_is_legal(VCENTRY_VALUES_NT[i].string, (uint32_t)(-1)) != VCENTRY_VALUES_NT[i].valid) {
 			printf("FAILED, expected %s, got %s\n", true_false_string_[VCENTRY_VALUES_NT[i].valid], true_false_string_[!VCENTRY_VALUES_NT[i].valid]);
 			return false;
 		}

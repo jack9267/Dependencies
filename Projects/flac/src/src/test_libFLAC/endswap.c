@@ -1,5 +1,5 @@
 /* test_libFLAC - Unit tester for libFLAC
- * Copyright (C) 2014-2016  Xiph.Org Foundation
+ * Copyright (C) 2014-2025  Xiph.Org Foundation
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -38,12 +38,12 @@ FLAC__bool test_endswap(void)
 	uint32_t u32 = 0xabcdef01;
 
 	union {
-		unsigned char bytes[4];
+		uint8_t bytes[4];
 		uint16_t u16;
 		uint32_t u32;
 	} data;
 
-	printf("\n+++ libFLAC unit test: endswap (%s endian host)\n\n", CPU_IS_LITTLE_ENDIAN ? "little" : "big");
+	printf("\n+++ libFLAC unit test: endswap (%s endian host)\n\n", CPU_IS_BIG_ENDIAN ? "big" : "little");
 
 	printf("testing ENDSWAP_16 on int16_t ... ");
 	if (((int16_t) ENDSWAP_16(i16)) == i16) {
@@ -69,22 +69,22 @@ FLAC__bool test_endswap(void)
 
 	printf("testing ENDSWAP_32 on int32_t ... ");
 	if (((int32_t) ENDSWAP_32 (i32)) == i32) {
-		printf("\nFAILED, ENDSWAP_32(0x%08x) -> 0x%08x == 0x%08x\n", i32, (unsigned) ENDSWAP_32 (i32), i32);
+		printf("\nFAILED, ENDSWAP_32(0x%08x) -> 0x%08x == 0x%08x\n", i32, (uint32_t) ENDSWAP_32 (i32), i32);
 		return false;
 	}
 	if (((int32_t) ENDSWAP_32 (ENDSWAP_32 (i32))) != i32) {
-		printf("\nFAILED, ENDSWAP_32(ENDSWAP_32(0x%08x)) -> 0x%08x != 0x%08x\n", i32, (unsigned) ENDSWAP_32(ENDSWAP_32 (i32)), i32);
+		printf("\nFAILED, ENDSWAP_32(ENDSWAP_32(0x%08x)) -> 0x%08x != 0x%08x\n", i32, (uint32_t) ENDSWAP_32(ENDSWAP_32 (i32)), i32);
 		return false;
 	}
 	puts("OK");
 
 	printf("testing ENDSWAP_32 on uint32_t ... ");
 	if (((uint32_t) ENDSWAP_32(u32)) == u32) {
-		printf("\nFAILED, ENDSWAP_32(0x%08x) -> 0x%08x == 0x%08x\n", u32, (unsigned) ENDSWAP_32(u32), u32);
+		printf("\nFAILED, ENDSWAP_32(0x%08x) -> 0x%08x == 0x%08x\n", u32, (uint32_t) ENDSWAP_32(u32), u32);
 		return false;
 	}
 	if (((uint32_t) ENDSWAP_32 (ENDSWAP_32(u32))) != u32) {
-		printf("\nFAILED, ENDSWAP_32(ENDSWAP_32(0x%08x)) -> 0x%08x != 0%08x\n", u32, (unsigned) ENDSWAP_32(ENDSWAP_32(u32)), u32);
+		printf("\nFAILED, ENDSWAP_32(ENDSWAP_32(0x%08x)) -> 0x%08x != 0%08x\n", u32, (uint32_t) ENDSWAP_32(ENDSWAP_32(u32)), u32);
 		return false;
 	}
 	puts("OK");

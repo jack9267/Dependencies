@@ -1,6 +1,6 @@
 /* libFLAC++ - Free Lossless Audio Codec library
  * Copyright (C) 2002-2009  Josh Coalson
- * Copyright (C) 2011-2016  Xiph.Org Foundation
+ * Copyright (C) 2011-2025  Xiph.Org Foundation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -71,49 +71,55 @@ namespace FLAC {
 		bool Stream::set_ogg_serial_number(long value)
 		{
 			FLAC__ASSERT(is_valid());
-			return (bool)::FLAC__stream_decoder_set_ogg_serial_number(decoder_, value);
+			return static_cast<bool>(::FLAC__stream_decoder_set_ogg_serial_number(decoder_, value));
+		}
+
+		bool Stream::set_decode_chained_stream(bool value)
+		{
+			FLAC__ASSERT(is_valid());
+			return static_cast<bool>(::FLAC__stream_decoder_set_decode_chained_stream(decoder_, value));
 		}
 
 		bool Stream::set_md5_checking(bool value)
 		{
 			FLAC__ASSERT(is_valid());
-			return (bool)::FLAC__stream_decoder_set_md5_checking(decoder_, value);
+			return static_cast<bool>(::FLAC__stream_decoder_set_md5_checking(decoder_, value));
 		}
 
 		bool Stream::set_metadata_respond(::FLAC__MetadataType type)
 		{
 			FLAC__ASSERT(is_valid());
-			return (bool)::FLAC__stream_decoder_set_metadata_respond(decoder_, type);
+			return static_cast<bool>(::FLAC__stream_decoder_set_metadata_respond(decoder_, type));
 		}
 
 		bool Stream::set_metadata_respond_application(const FLAC__byte id[4])
 		{
 			FLAC__ASSERT(is_valid());
-			return (bool)::FLAC__stream_decoder_set_metadata_respond_application(decoder_, id);
+			return static_cast<bool>(::FLAC__stream_decoder_set_metadata_respond_application(decoder_, id));
 		}
 
 		bool Stream::set_metadata_respond_all()
 		{
 			FLAC__ASSERT(is_valid());
-			return (bool)::FLAC__stream_decoder_set_metadata_respond_all(decoder_);
+			return static_cast<bool>(::FLAC__stream_decoder_set_metadata_respond_all(decoder_));
 		}
 
 		bool Stream::set_metadata_ignore(::FLAC__MetadataType type)
 		{
 			FLAC__ASSERT(is_valid());
-			return (bool)::FLAC__stream_decoder_set_metadata_ignore(decoder_, type);
+			return static_cast<bool>(::FLAC__stream_decoder_set_metadata_ignore(decoder_, type));
 		}
 
 		bool Stream::set_metadata_ignore_application(const FLAC__byte id[4])
 		{
 			FLAC__ASSERT(is_valid());
-			return (bool)::FLAC__stream_decoder_set_metadata_ignore_application(decoder_, id);
+			return static_cast<bool>(::FLAC__stream_decoder_set_metadata_ignore_application(decoder_, id));
 		}
 
 		bool Stream::set_metadata_ignore_all()
 		{
 			FLAC__ASSERT(is_valid());
-			return (bool)::FLAC__stream_decoder_set_metadata_ignore_all(decoder_);
+			return static_cast<bool>(::FLAC__stream_decoder_set_metadata_ignore_all(decoder_));
 		}
 
 		Stream::State Stream::get_state() const
@@ -122,10 +128,16 @@ namespace FLAC {
 			return State(::FLAC__stream_decoder_get_state(decoder_));
 		}
 
+		bool Stream::get_decode_chained_stream() const
+		{
+			FLAC__ASSERT(is_valid());
+			return static_cast<bool>(::FLAC__stream_decoder_get_decode_chained_stream(decoder_));
+		}
+
 		bool Stream::get_md5_checking() const
 		{
 			FLAC__ASSERT(is_valid());
-			return (bool)::FLAC__stream_decoder_get_md5_checking(decoder_);
+			return static_cast<bool>(::FLAC__stream_decoder_get_md5_checking(decoder_));
 		}
 
 		FLAC__uint64 Stream::get_total_samples() const
@@ -134,7 +146,13 @@ namespace FLAC {
 			return ::FLAC__stream_decoder_get_total_samples(decoder_);
 		}
 
-		unsigned Stream::get_channels() const
+		FLAC__uint64 Stream::find_total_samples()
+		{
+			FLAC__ASSERT(is_valid());
+			return ::FLAC__stream_decoder_find_total_samples(decoder_);
+		}
+
+		uint32_t Stream::get_channels() const
 		{
 			FLAC__ASSERT(is_valid());
 			return ::FLAC__stream_decoder_get_channels(decoder_);
@@ -146,19 +164,19 @@ namespace FLAC {
 			return ::FLAC__stream_decoder_get_channel_assignment(decoder_);
 		}
 
-		unsigned Stream::get_bits_per_sample() const
+		uint32_t Stream::get_bits_per_sample() const
 		{
 			FLAC__ASSERT(is_valid());
 			return ::FLAC__stream_decoder_get_bits_per_sample(decoder_);
 		}
 
-		unsigned Stream::get_sample_rate() const
+		uint32_t Stream::get_sample_rate() const
 		{
 			FLAC__ASSERT(is_valid());
 			return ::FLAC__stream_decoder_get_sample_rate(decoder_);
 		}
 
-		unsigned Stream::get_blocksize() const
+		uint32_t Stream::get_blocksize() const
 		{
 			FLAC__ASSERT(is_valid());
 			return ::FLAC__stream_decoder_get_blocksize(decoder_);
@@ -168,6 +186,12 @@ namespace FLAC {
 		{
 			FLAC__ASSERT(is_valid());
 			return ::FLAC__stream_decoder_get_decode_position(decoder_, position);
+		}
+
+		int32_t Stream::get_link_lengths(FLAC__uint64 **link_lengths)
+		{
+			FLAC__ASSERT(is_valid());
+			return ::FLAC__stream_decoder_get_link_lengths(decoder_, link_lengths);
 		}
 
 		::FLAC__StreamDecoderInitStatus Stream::init()
@@ -185,49 +209,67 @@ namespace FLAC {
 		bool Stream::finish()
 		{
 			FLAC__ASSERT(is_valid());
-			return (bool)::FLAC__stream_decoder_finish(decoder_);
+			return static_cast<bool>(::FLAC__stream_decoder_finish(decoder_));
+		}
+
+		bool Stream::finish_link()
+		{
+			FLAC__ASSERT(is_valid());
+			return static_cast<bool>(::FLAC__stream_decoder_finish_link(decoder_));
 		}
 
 		bool Stream::flush()
 		{
 			FLAC__ASSERT(is_valid());
-			return (bool)::FLAC__stream_decoder_flush(decoder_);
+			return static_cast<bool>(::FLAC__stream_decoder_flush(decoder_));
 		}
 
 		bool Stream::reset()
 		{
 			FLAC__ASSERT(is_valid());
-			return (bool)::FLAC__stream_decoder_reset(decoder_);
+			return static_cast<bool>(::FLAC__stream_decoder_reset(decoder_));
 		}
 
 		bool Stream::process_single()
 		{
 			FLAC__ASSERT(is_valid());
-			return (bool)::FLAC__stream_decoder_process_single(decoder_);
+			return static_cast<bool>(::FLAC__stream_decoder_process_single(decoder_));
 		}
 
 		bool Stream::process_until_end_of_metadata()
 		{
 			FLAC__ASSERT(is_valid());
-			return (bool)::FLAC__stream_decoder_process_until_end_of_metadata(decoder_);
+			return static_cast<bool>(::FLAC__stream_decoder_process_until_end_of_metadata(decoder_));
+		}
+
+		bool Stream::process_until_end_of_link()
+		{
+			FLAC__ASSERT(is_valid());
+			return static_cast<bool>(::FLAC__stream_decoder_process_until_end_of_link(decoder_));
 		}
 
 		bool Stream::process_until_end_of_stream()
 		{
 			FLAC__ASSERT(is_valid());
-			return (bool)::FLAC__stream_decoder_process_until_end_of_stream(decoder_);
+			return static_cast<bool>(::FLAC__stream_decoder_process_until_end_of_stream(decoder_));
 		}
 
 		bool Stream::skip_single_frame()
 		{
 			FLAC__ASSERT(is_valid());
-			return (bool)::FLAC__stream_decoder_skip_single_frame(decoder_);
+			return static_cast<bool>(::FLAC__stream_decoder_skip_single_frame(decoder_));
+		}
+
+		bool Stream::skip_single_link()
+		{
+			FLAC__ASSERT(is_valid());
+			return static_cast<bool>(::FLAC__stream_decoder_skip_single_link(decoder_));
 		}
 
 		bool Stream::seek_absolute(FLAC__uint64 sample)
 		{
 			FLAC__ASSERT(is_valid());
-			return (bool)::FLAC__stream_decoder_seek_absolute(decoder_, sample);
+			return static_cast<bool>(::FLAC__stream_decoder_seek_absolute(decoder_, sample));
 		}
 
 		::FLAC__StreamDecoderSeekStatus Stream::seek_callback(FLAC__uint64 absolute_byte_offset)
@@ -390,5 +432,5 @@ namespace FLAC {
 			return ::FLAC__STREAM_DECODER_READ_STATUS_ABORT; // double protection
 		}
 
-	}
-}
+	} // namespace Decoder
+} // namespace FLAC

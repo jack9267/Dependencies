@@ -1,6 +1,6 @@
 /* flac - Command-line FLAC encoder/decoder
  * Copyright (C) 2002-2009  Josh Coalson
- * Copyright (C) 2011-2016  Xiph.Org Foundation
+ * Copyright (C) 2011-2025  Xiph.Org Foundation
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -42,7 +42,7 @@ typedef struct {
 	char *field; /* the whole field as passed on the command line, i.e. "NAME=VALUE" */
 	char *field_name;
 	/* according to the vorbis spec, field values can contain \0 so simple C strings are not enough here */
-	unsigned field_value_length;
+	uint32_t field_value_length;
 	char *field_value;
 	FLAC__bool field_value_from_file; /* true if field_value holds a filename for the value, false for plain value */
 } Argument_VcField;
@@ -63,7 +63,7 @@ static char *local_strdup(const char *source)
 	return ret;
 }
 
-static FLAC__bool parse_vorbis_comment_field(const char *field_ref, char **field, char **name, char **value, unsigned *length, const char **violation)
+static FLAC__bool parse_vorbis_comment_field(const char *field_ref, char **field, char **name, char **value, uint32_t *length, const char **violation)
 {
 	static const char * const violations[] = {
 		"field name contains invalid character",
@@ -162,6 +162,7 @@ static FLAC__bool set_vc_field(FLAC__StreamMetadata *block, const Argument_VcFie
 		}
 		free(converted);
 		if(!FLAC__metadata_object_vorbiscomment_append_comment(block, entry, /*copy=*/false)) {
+			free(entry.entry);
 			*violation = "memory allocation failure";
 			return false;
 		}

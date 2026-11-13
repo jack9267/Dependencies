@@ -1,6 +1,6 @@
 /* test_libFLAC - Unit tester for libFLAC
  * Copyright (C) 2002-2009  Josh Coalson
- * Copyright (C) 2011-2016  Xiph.Org Foundation
+ * Copyright (C) 2011-2025  Xiph.Org Foundation
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -34,7 +34,7 @@
 #endif
 #define min(a,b) ((a)<(b)?(a):(b))
 
-const long file_utils__ogg_serial_number = 12345;
+long file_utils__ogg_serial_number = 12345;
 
 #ifdef FLAC__VALGRIND_TESTING
 static size_t local__fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
@@ -52,7 +52,7 @@ typedef struct {
 	FILE *file;
 } encoder_client_struct;
 
-static FLAC__StreamEncoderWriteStatus encoder_write_callback_(const FLAC__StreamEncoder *encoder, const FLAC__byte buffer[], size_t bytes, unsigned samples, unsigned current_frame, void *client_data)
+static FLAC__StreamEncoderWriteStatus encoder_write_callback_(const FLAC__StreamEncoder *encoder, const FLAC__byte buffer[], size_t bytes, uint32_t samples, uint32_t current_frame, void *client_data)
 {
 	encoder_client_struct *ecd = (encoder_client_struct*)client_data;
 
@@ -69,13 +69,13 @@ static void encoder_metadata_callback_(const FLAC__StreamEncoder *encoder, const
 	(void)encoder, (void)metadata, (void)client_data;
 }
 
-FLAC__bool file_utils__generate_flacfile(FLAC__bool is_ogg, const char *output_filename, FLAC__off_t *output_filesize, unsigned length, const FLAC__StreamMetadata *streaminfo, FLAC__StreamMetadata **metadata, unsigned num_metadata)
+FLAC__bool file_utils__generate_flacfile(FLAC__bool is_ogg, const char *output_filename, FLAC__off_t *output_filesize, uint32_t length, const FLAC__StreamMetadata *streaminfo, FLAC__StreamMetadata **metadata, uint32_t num_metadata)
 {
 	FLAC__int32 samples[1024];
 	FLAC__StreamEncoder *encoder;
 	FLAC__StreamEncoderInitStatus init_status;
 	encoder_client_struct encoder_client_data;
-	unsigned i, n;
+	uint32_t i, n;
 
 	FLAC__ASSERT(0 != output_filename);
 	FLAC__ASSERT(0 != streaminfo);
@@ -151,5 +151,24 @@ FLAC__bool file_utils__generate_flacfile(FLAC__bool is_ogg, const char *output_f
 			*output_filesize = filestats.st_size;
 	}
 
+	return true;
+}
+
+FLAC__bool file_utils__append_file(const char *output_filename,  const char *input_filename)
+{
+	FILE *output, *input;
+	int c;
+	if(0 == (output = flac_fopen(output_filename, "ab")))
+		return false;
+	if(0 == (input = flac_fopen(input_filename, "rb")))
+		return false;
+
+	fseek(output, 0, SEEK_END);
+
+	while ((c = fgetc(input)) != EOF) {
+		fputc(c, output);
+	}
+	fclose(input);
+	fclose(output);
 	return true;
 }

@@ -1,6 +1,6 @@
 /* flac - Command-line FLAC encoder/decoder
  * Copyright (C) 2002-2009  Josh Coalson
- * Copyright (C) 2011-2016  Xiph.Org Foundation
+ * Copyright (C) 2011-2025  Xiph.Org Foundation
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -29,6 +29,10 @@
 #include <stdio.h> /* for FILE */
 
 typedef enum { FORMAT_RAW, FORMAT_WAVE, FORMAT_WAVE64, FORMAT_RF64, FORMAT_AIFF, FORMAT_AIFF_C, FORMAT_FLAC, FORMAT_OGGFLAC } FileFormat;
+static const char * const FileFormatString[] = { " raw", " WAVE", " Wave64", "n RF64", "n AIFF", "n AIFF-C", " FLAC", "n Ogg FLAC" };
+
+typedef enum { SUBFORMAT_UNSPECIFIED = 0, SUBFORMAT_WAVE_PCM, SUBFORMAT_WAVE_EXTENSIBLE, SUBFORMAT_AIFF_C_NONE, SUBFORMAT_AIFF_C_SOWT } FileSubFormat;
+
 
 typedef struct {
 	FLAC__bool is_relative; /* i.e. specification string started with + or - */
@@ -56,13 +60,16 @@ void flac__utils_printf(FILE *stream, int level, const char *format, ...);
 
 int get_console_width(void);
 size_t strlen_console(const char *text);
-void stats_new_file(void);
+void stats_new_line(void);
 void stats_clear(void);
 void stats_print_name(int level, const char *name);
+void stats_print_name_and_stream_number(int level, const char *name, int stream_number);
 void stats_print_info(int level, const char *format, ...);
+void flac__utils_printf_clear_stats(FILE *stream, int level, const char *format, ...);
 
+FLAC__bool flac__utils_check_empty_skip_until_specification(utils__SkipUntilSpecification *spec);
 FLAC__bool flac__utils_parse_skip_until_specification(const char *s, utils__SkipUntilSpecification *spec);
-void flac__utils_canonicalize_skip_until_specification(utils__SkipUntilSpecification *spec, unsigned sample_rate);
+FLAC__bool flac__utils_canonicalize_skip_until_specification(utils__SkipUntilSpecification *spec, uint32_t sample_rate);
 
 FLAC__bool flac__utils_parse_cue_specification(const char *s, utils__CueSpecification *spec);
 void flac__utils_canonicalize_cue_specification(const utils__CueSpecification *cue_spec, const FLAC__StreamMetadata_CueSheet *cuesheet, FLAC__uint64 total_samples, utils__SkipUntilSpecification *skip_spec, utils__SkipUntilSpecification *until_spec);

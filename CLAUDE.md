@@ -209,13 +209,37 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   which configure fills in). `os_types.h` uses it only on the generic Unix path; Windows and Apple have sections of
   their own. Keep it unless `config_types.h.in` changes (it didn't from 1.3.4 to 1.3.6).
 - `ogg_static`, and `libogg.dll` exporting through `src/win32/ogg.def` with `ogg.lib` as its import library. That
-  `.def` says `LIBRARY ogg`, so the link warns `LNK4070` (the name is ignored): upstream's, harmless. The
+  `.def` says `LIBRARY ogg`, so the link warns `LNK4070` - and **the import library names `ogg.dll`**, so every DLL
+  linked against `ogg.lib` (`FLAC.dll`, `vorbis.dll`, `theora.dll`) imports an `ogg.dll` that doesn't exist and would
+  not load. Not fixed (2026-11-13): nothing loads those DLLs - FLAC's and vorbis' users link the static libraries. The
   `Projects/ogg/ogg.def` beside `src` is an older copy nothing uses.
 - Built x86 and x64, Debug and Release, with vorbis, vorbisfile, theora and FLAC rebuilt on it; the DLL's imports
   and 66 exports are 1.3.4's. A test linking `ogg_static`, `vorbis_static` and `vorbisfile_static` passed in all four:
   1-32-bit fields through `oggpack`, 300 packets of 0 to 200,000 bytes through 211 pages and back through
   `ogg_sync` in uneven chunks, a damaged page caught by its CRC, and a 5.5-minute Ogg Vorbis file decoded to exactly
   `ov_pcm_total` samples and seeked.
+
+## FLAC (`Projects/flac`)
+
+- **1.5.0, stock** (2026-11-13, from 1.3.2 of 2016; tarball checked against xiph's `SHA256SUMS`), Windows only. `src`
+  is the release; the 1.3.2 copy also held 66 `PaxHeaders.29360` folders, tar metadata unpacked as files, gone now.
+  Its users are the CHD disc image readers (GalacticSamples' `HarryPotter/Shared/DiscImage.cpp`, GalacticTools' `g7z`
+  and `gmount`): the stream decoder only (`FLAC__stream_decoder_init_stream` and `process_single`), linking
+  `FLAC_static` and `ogg_static`. Galactic's own FLAC playback is dr_flac, in miniaudio.
+- **Built as its CMake builds it for MSVC** (premake5.lua): intrinsics (`FLAC__HAS_X86INTRIN=1`), with SSE always
+  and AVX2/FMA chosen at run time (`FLAC__USE_AVX`; `cpu.c` checks OSXSAVE before `xgetbv`, so XP takes the SSE or C
+  paths), `/arch:AVX2` on the four `*_avx2.c`/`lpc_intrin_fma.c` files only, `/fp:fast`, `ENABLE_64_BIT_WORDS=1`
+  on x64. **1.4 removed the ia32 NASM assembly**, so the NASM build step (and Dependencies' `nasm_path()`) is gone.
+  Several config macros are `#cmakedefine01` - tested by value, so define them `=1`. No multithreaded encoding
+  (needs pthreads). `deduplication/*.c` are `#include`d by `bitreader.c` and `lpc.c`: the glob stays one level.
+  The version is read from the release's CMakeLists.txt (`project(FLAC VERSION ...)`).
+- **API**: 1.5.0 is API version 14 (`FLAC_API_VERSION_CURRENT`), and only adds (chained Ogg streams, encoder threads,
+  a minimum bitrate): the DLL exports all 290 of 1.3.2's, 306 now. FLAC++ warns C4005 (`M_LN2`, defined by
+  `share/compat.h` and again by `corecrt_math_defines.h` under the workspace's `_USE_MATH_DEFINES`): the same value.
+- Tested, x86 and x64, Debug and Release, linking `FLAC_static` and `ogg_static`: a stereo signal encoded and
+  decoded back bit for bit through `init_stream`, native and Ogg FLAC (an Ogg encoder that can seek needs a read
+  callback too - without one `finish` crashes); Firefox's test files (24-bit, 16-bit mono and stereo) decoded to
+  their STREAMINFO length with MD5 checking; a truncated crash-test file and an invalid one refused, no crash.
 
 ## jpeg (`Projects/jpeg`)
 

@@ -1,6 +1,6 @@
 /* test_libFLAC - Unit tester for libFLAC
  * Copyright (C) 2002-2009  Josh Coalson
- * Copyright (C) 2011-2016  Xiph.Org Foundation
+ * Copyright (C) 2011-2025  Xiph.Org Foundation
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -49,7 +49,7 @@ static const char * const LayerString[] = {
 
 static FLAC__StreamMetadata streaminfo_, padding_, seektable_, application1_, application2_, vorbiscomment_, cuesheet_, picture_, unknown_;
 static FLAC__StreamMetadata *metadata_sequence_[] = { &vorbiscomment_, &padding_, &seektable_, &application1_, &application2_, &cuesheet_, &picture_, &unknown_ };
-static const unsigned num_metadata_ = sizeof(metadata_sequence_) / sizeof(metadata_sequence_[0]);
+static const uint32_t num_metadata_ = sizeof(metadata_sequence_) / sizeof(metadata_sequence_[0]);
 
 static const char *flacfilename(FLAC__bool is_ogg)
 {
@@ -71,10 +71,10 @@ static FLAC__bool die_s_(const char *msg, const FLAC__StreamEncoder *encoder)
 	else
 		printf("FAILED");
 
-	printf(", state = %u (%s)\n", (unsigned)state, FLAC__StreamEncoderStateString[state]);
+	printf(", state = %u (%s)\n", (uint32_t)state, FLAC__StreamEncoderStateString[state]);
 	if(state == FLAC__STREAM_ENCODER_VERIFY_DECODER_ERROR) {
 		FLAC__StreamDecoderState dstate = FLAC__stream_encoder_get_verify_decoder_state(encoder);
-		printf("      verify decoder state = %u (%s)\n", (unsigned)dstate, FLAC__StreamDecoderStateString[dstate]);
+		printf("      verify decoder state = %u (%s)\n", (uint32_t)dstate, FLAC__StreamDecoderStateString[dstate]);
 	}
 
 	return false;
@@ -107,7 +107,7 @@ static FLAC__StreamEncoderReadStatus stream_encoder_read_callback_(const FLAC__S
 		return FLAC__STREAM_ENCODER_READ_STATUS_ABORT;
 }
 
-static FLAC__StreamEncoderWriteStatus stream_encoder_write_callback_(const FLAC__StreamEncoder *encoder, const FLAC__byte buffer[], size_t bytes, unsigned samples, unsigned current_frame, void *client_data)
+static FLAC__StreamEncoderWriteStatus stream_encoder_write_callback_(const FLAC__StreamEncoder *encoder, const FLAC__byte buffer[], size_t bytes, uint32_t samples, uint32_t current_frame, void *client_data)
 {
 	FILE *f = (FILE*)client_data;
 	(void)encoder, (void)samples, (void)current_frame;
@@ -145,7 +145,7 @@ static void stream_encoder_metadata_callback_(const FLAC__StreamEncoder *encoder
 	(void)encoder, (void)metadata, (void)client_data;
 }
 
-static void stream_encoder_progress_callback_(const FLAC__StreamEncoder *encoder, FLAC__uint64 bytes_written, FLAC__uint64 samples_written, unsigned frames_written, unsigned total_frames_estimate, void *client_data)
+static void stream_encoder_progress_callback_(const FLAC__StreamEncoder *encoder, FLAC__uint64 bytes_written, FLAC__uint64 samples_written, uint32_t frames_written, uint32_t total_frames_estimate, void *client_data)
 {
 	(void)encoder, (void)bytes_written, (void)samples_written, (void)frames_written, (void)total_frames_estimate, (void)client_data;
 }
@@ -159,7 +159,7 @@ static FLAC__bool test_stream_encoder(Layer layer, FLAC__bool is_ogg)
 	FILE *file = 0;
 	FLAC__int32 samples[1024];
 	FLAC__int32 *samples_array[1];
-	unsigned i;
+	uint32_t i;
 
 	samples_array[0] = samples;
 
@@ -206,7 +206,7 @@ static FLAC__bool test_stream_encoder(Layer layer, FLAC__bool is_ogg)
 	printf("OK\n");
 
 	printf("testing FLAC__stream_encoder_set_compression_level()... ");
-	if(!FLAC__stream_encoder_set_compression_level(encoder, (unsigned)(-1)))
+	if(!FLAC__stream_encoder_set_compression_level(encoder, (uint32_t)(-1)))
 		return die_s_("returned false", encoder);
 	printf("OK\n");
 
@@ -275,6 +275,11 @@ static FLAC__bool test_stream_encoder(Layer layer, FLAC__bool is_ogg)
 		return die_s_("returned false", encoder);
 	printf("OK\n");
 
+	printf("testing FLAC__stream_encoder_set_limit_min_bitrate()... ");
+	if(!FLAC__stream_encoder_set_limit_min_bitrate(encoder, true))
+		return die_s_("returned false", encoder);
+	printf("OK\n");
+
 	if(layer < LAYER_FILENAME) {
 		printf("opening file for FLAC output... ");
 		file = flac_fopen(flacfilename(is_ogg), "w+b");
@@ -320,17 +325,17 @@ static FLAC__bool test_stream_encoder(Layer layer, FLAC__bool is_ogg)
 
 	printf("testing FLAC__stream_encoder_get_state()... ");
 	state = FLAC__stream_encoder_get_state(encoder);
-	printf("returned state = %u (%s)... OK\n", (unsigned)state, FLAC__StreamEncoderStateString[state]);
+	printf("returned state = %u (%s)... OK\n", (uint32_t)state, FLAC__StreamEncoderStateString[state]);
 
 	printf("testing FLAC__stream_encoder_get_verify_decoder_state()... ");
 	dstate = FLAC__stream_encoder_get_verify_decoder_state(encoder);
-	printf("returned state = %u (%s)... OK\n", (unsigned)dstate, FLAC__StreamDecoderStateString[dstate]);
+	printf("returned state = %u (%s)... OK\n", (uint32_t)dstate, FLAC__StreamDecoderStateString[dstate]);
 
 	{
 		FLAC__uint64 absolute_sample;
-		unsigned frame_number;
-		unsigned channel;
-		unsigned sample;
+		uint32_t frame_number;
+		uint32_t channel;
+		uint32_t sample;
 		FLAC__int32 expected;
 		FLAC__int32 got;
 
@@ -397,7 +402,7 @@ static FLAC__bool test_stream_encoder(Layer layer, FLAC__bool is_ogg)
 
 	printf("testing FLAC__stream_encoder_get_max_lpc_order()... ");
 	if(FLAC__stream_encoder_get_max_lpc_order(encoder) != 0) {
-		printf("FAILED, expected %u, got %u\n", 0, FLAC__stream_encoder_get_max_lpc_order(encoder));
+		printf("FAILED, expected %d, got %u\n", 0, FLAC__stream_encoder_get_max_lpc_order(encoder));
 		return false;
 	}
 	printf("OK\n");
@@ -430,21 +435,21 @@ static FLAC__bool test_stream_encoder(Layer layer, FLAC__bool is_ogg)
 
 	printf("testing FLAC__stream_encoder_get_min_residual_partition_order()... ");
 	if(FLAC__stream_encoder_get_min_residual_partition_order(encoder) != 0) {
-		printf("FAILED, expected %u, got %u\n", 0, FLAC__stream_encoder_get_min_residual_partition_order(encoder));
+		printf("FAILED, expected %d, got %u\n", 0, FLAC__stream_encoder_get_min_residual_partition_order(encoder));
 		return false;
 	}
 	printf("OK\n");
 
 	printf("testing FLAC__stream_encoder_get_max_residual_partition_order()... ");
 	if(FLAC__stream_encoder_get_max_residual_partition_order(encoder) != 0) {
-		printf("FAILED, expected %u, got %u\n", 0, FLAC__stream_encoder_get_max_residual_partition_order(encoder));
+		printf("FAILED, expected %d, got %u\n", 0, FLAC__stream_encoder_get_max_residual_partition_order(encoder));
 		return false;
 	}
 	printf("OK\n");
 
 	printf("testing FLAC__stream_encoder_get_rice_parameter_search_dist()... ");
 	if(FLAC__stream_encoder_get_rice_parameter_search_dist(encoder) != 0) {
-		printf("FAILED, expected %u, got %u\n", 0, FLAC__stream_encoder_get_rice_parameter_search_dist(encoder));
+		printf("FAILED, expected %d, got %u\n", 0, FLAC__stream_encoder_get_rice_parameter_search_dist(encoder));
 		return false;
 	}
 	printf("OK\n");
@@ -455,6 +460,12 @@ static FLAC__bool test_stream_encoder(Layer layer, FLAC__bool is_ogg)
 		return false;
 	}
 	printf("OK\n");
+	
+	printf("testing FLAC__stream_encoder_get_limit_min_bitrate()... ");
+	if(FLAC__stream_encoder_get_limit_min_bitrate(encoder) != true) {
+		printf("FAILED, expected true, got false\n");
+		return false;
+	}
 
 	/* init the dummy sample buffer */
 	for(i = 0; i < sizeof(samples) / sizeof(FLAC__int32); i++)

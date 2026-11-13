@@ -45,6 +45,8 @@
 #  include <config.h>
 #endif
 
+#include "share/compat.h"
+
 #if !defined __STDC__ || !__STDC__
 /* This is a separate conditional since some stdc systems
    reject `defined (const)'.  */
@@ -86,7 +88,7 @@
 
 #ifdef VMS
 # include <unixlib.h>
-# if HAVE_STRING_H - 0
+# ifdef HAVE_STRING_H
 #  include <string.h>
 # endif
 #endif
@@ -312,8 +314,7 @@ static void exchange (char **);
 #endif
 
 static void
-exchange (argv)
-     char **argv;
+exchange (char **argv)
 {
   int bottom = first_nonopt;
   int middle = last_nonopt;
@@ -397,10 +398,7 @@ exchange (argv)
 static const char *share___getopt_initialize (int, char *const *, const char *);
 #endif
 static const char *
-share___getopt_initialize (argc, argv, optstring)
-     int argc;
-     char *const *argv;
-     const char *optstring;
+share___getopt_initialize (int argc, char *const *argv, const char *optstring )
 {
   /* Start processing options with ARGV-element 1 (since ARGV-element 0
      is the program name); the sequence of previously skipped
@@ -521,13 +519,13 @@ share___getopt_initialize (argc, argv, optstring)
    long-named options.  */
 
 int
-share___getopt_internal (argc, argv, optstring, longopts, longind, long_only)
-     int argc;
-     char *const *argv;
-     const char *optstring;
-     const struct share__option *longopts;
-     int *longind;
-     int long_only;
+share___getopt_internal (
+     int argc,
+     char *const *argv,
+     const char *optstring,
+     const struct share__option *longopts,
+     int *longind,
+     int long_only )
 {
   share__optarg = NULL;
 
@@ -663,8 +661,7 @@ share___getopt_internal (argc, argv, optstring, longopts, longind, long_only)
       for (p = longopts, option_index = 0; p->name; p++, option_index++)
 	if (!strncmp (p->name, nextchar, nameend - nextchar))
 	  {
-	    if ((unsigned int) (nameend - nextchar)
-		== (unsigned int) strlen (p->name))
+	    if ((size_t) (nameend - nextchar) == strlen (p->name))
 	      {
 		/* Exact match found.  */
 		pfound = p;
@@ -686,7 +683,7 @@ share___getopt_internal (argc, argv, optstring, longopts, longind, long_only)
       if (ambig && !exact)
 	{
 	  if (share__opterr)
-	    fprintf (stderr, _("%s: option `%s' is ambiguous\n"),
+	    flac_fprintf (stderr, _("%s: option `%s' is ambiguous\n"),
 		     argv[0], argv[share__optind]);
 	  nextchar += strlen (nextchar);
 	  share__optind++;
@@ -710,12 +707,12 @@ share___getopt_internal (argc, argv, optstring, longopts, longind, long_only)
 		    {
 		      if (argv[share__optind - 1][1] == '-')
 			/* --option */
-			fprintf (stderr,
+			flac_fprintf (stderr,
 				 _("%s: option `--%s' doesn't allow an argument\n"),
 				 argv[0], pfound->name);
 		      else
 			/* +option or -option */
-			fprintf (stderr,
+			flac_fprintf (stderr,
 				 _("%s: option `%c%s' doesn't allow an argument\n"),
 				 argv[0], argv[share__optind - 1][0], pfound->name);
 		    }
@@ -733,7 +730,7 @@ share___getopt_internal (argc, argv, optstring, longopts, longind, long_only)
 	      else
 		{
 		  if (share__opterr)
-		    fprintf (stderr,
+		    flac_fprintf (stderr,
 			   _("%s: option `%s' requires an argument\n"),
 			   argv[0], argv[share__optind - 1]);
 		  nextchar += strlen (nextchar);
@@ -763,11 +760,11 @@ share___getopt_internal (argc, argv, optstring, longopts, longind, long_only)
 	    {
 	      if (argv[share__optind][1] == '-')
 		/* --option */
-		fprintf (stderr, _("%s: unrecognized option `--%s'\n"),
+		flac_fprintf (stderr, _("%s: unrecognized option `--%s'\n"),
 			 argv[0], nextchar);
 	      else
 		/* +option or -option */
-		fprintf (stderr, _("%s: unrecognized option `%c%s'\n"),
+		flac_fprintf (stderr, _("%s: unrecognized option `%c%s'\n"),
 			 argv[0], argv[share__optind][0], nextchar);
 	    }
 	  nextchar = (char *) "";
@@ -793,10 +790,10 @@ share___getopt_internal (argc, argv, optstring, longopts, longind, long_only)
 	  {
 	    if (posixly_correct)
 	      /* 1003.2 specifies the format of this message.  */
-	      fprintf (stderr, _("%s: illegal option -- %c\n"),
+	      flac_fprintf (stderr, _("%s: illegal option -- %c\n"),
 		       argv[0], c);
 	    else
-	      fprintf (stderr, _("%s: invalid option -- %c\n"),
+	      flac_fprintf (stderr, _("%s: invalid option -- %c\n"),
 		       argv[0], c);
 	  }
 	share__optopt = c;
@@ -826,7 +823,7 @@ share___getopt_internal (argc, argv, optstring, longopts, longind, long_only)
 	    if (share__opterr)
 	      {
 		/* 1003.2 specifies the format of this message.  */
-		fprintf (stderr, _("%s: option requires an argument -- %c\n"),
+		flac_fprintf (stderr, _("%s: option requires an argument -- %c\n"),
 			 argv[0], c);
 	      }
 	    share__optopt = c;
@@ -852,7 +849,7 @@ share___getopt_internal (argc, argv, optstring, longopts, longind, long_only)
 	for (p = longopts, option_index = 0; p->name; p++, option_index++)
 	  if (!strncmp (p->name, nextchar, nameend - nextchar))
 	    {
-	      if ((unsigned int) (nameend - nextchar) == strlen (p->name))
+	      if ((size_t) (nameend - nextchar) == strlen (p->name))
 		{
 		  /* Exact match found.  */
 		  pfound = p;
@@ -873,7 +870,7 @@ share___getopt_internal (argc, argv, optstring, longopts, longind, long_only)
 	if (ambig && !exact)
 	  {
 	    if (share__opterr)
-	      fprintf (stderr, _("%s: option `-W %s' is ambiguous\n"),
+	      flac_fprintf (stderr, _("%s: option `-W %s' is ambiguous\n"),
 		       argv[0], argv[share__optind]);
 	    nextchar += strlen (nextchar);
 	    share__optind++;
@@ -891,7 +888,7 @@ share___getopt_internal (argc, argv, optstring, longopts, longind, long_only)
 		else
 		  {
 		    if (share__opterr)
-		      fprintf (stderr, _("\
+		      flac_fprintf (stderr, _("\
 %s: option `-W %s' doesn't allow an argument\n"),
 			       argv[0], pfound->name);
 
@@ -906,7 +903,7 @@ share___getopt_internal (argc, argv, optstring, longopts, longind, long_only)
 		else
 		  {
 		    if (share__opterr)
-		      fprintf (stderr,
+		      flac_fprintf (stderr,
 			       _("%s: option `%s' requires an argument\n"),
 			       argv[0], argv[share__optind - 1]);
 		    nextchar += strlen (nextchar);
@@ -955,7 +952,7 @@ share___getopt_internal (argc, argv, optstring, longopts, longind, long_only)
 		if (share__opterr)
 		  {
 		    /* 1003.2 specifies the format of this message.  */
-		    fprintf (stderr,
+		    flac_fprintf (stderr,
 			   _("%s: option requires an argument -- %c\n"),
 			   argv[0], c);
 		  }
@@ -977,10 +974,7 @@ share___getopt_internal (argc, argv, optstring, longopts, longind, long_only)
 }
 
 int
-share__getopt (argc, argv, optstring)
-     int argc;
-     char *const *argv;
-     const char *optstring;
+share__getopt (int argc, char *const *argv, const char *optstring)
 {
   return share___getopt_internal (argc, argv, optstring,
 			   (const struct share__option *) 0,
@@ -996,9 +990,7 @@ share__getopt (argc, argv, optstring)
    the above definition of `share__getopt'.  */
 
 int
-main (argc, argv)
-     int argc;
-     char **argv;
+main (int argc, char **argv)
 {
   int c;
   int digit_optind = 0;
@@ -1024,37 +1016,37 @@ main (argc, argv)
 	case '8':
 	case '9':
 	  if (digit_optind != 0 && digit_optind != this_option_optind)
-	    printf ("digits occur in two different argv-elements.\n");
+	    flac_printf ("digits occur in two different argv-elements.\n");
 	  digit_optind = this_option_optind;
-	  printf ("option %c\n", c);
+	  flac_printf ("option %c\n", c);
 	  break;
 
 	case 'a':
-	  printf ("option a\n");
+	  flac_printf ("option a\n");
 	  break;
 
 	case 'b':
-	  printf ("option b\n");
+	  flac_printf ("option b\n");
 	  break;
 
 	case 'c':
-	  printf ("option c with value `%s'\n", share__optarg);
+	  flac_printf ("option c with value `%s'\n", share__optarg);
 	  break;
 
 	case '?':
 	  break;
 
 	default:
-	  printf ("?? getopt returned character code 0%o ??\n", c);
+	  flac_printf ("?? getopt returned character code 0%o ??\n", c);
 	}
     }
 
   if (share__optind < argc)
     {
-      printf ("non-option ARGV-elements: ");
+      flac_printf ("non-option ARGV-elements: ");
       while (share__optind < argc)
-	printf ("%s ", argv[share__optind++]);
-      printf ("\n");
+	flac_printf ("%s ", argv[share__optind++]);
+      flac_printf ("\n");
     }
 
   exit (0);

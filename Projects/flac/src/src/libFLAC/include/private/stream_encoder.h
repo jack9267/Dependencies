@@ -1,6 +1,6 @@
 /* libFLAC - Free Lossless Audio Codec library
  * Copyright (C) 2000-2009  Josh Coalson
- * Copyright (C) 2011-2016  Xiph.Org Foundation
+ * Copyright (C) 2011-2025  Xiph.Org Foundation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -42,6 +42,13 @@
  * accumulator in the *precompute_partition_info_sums_* functions.
  */
 #define FLAC__MAX_EXTRA_RESIDUAL_BPS 4
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+#define FLAC__STREAM_ENCODER_MAX_THREADS 16
+#define FLAC__STREAM_ENCODER_MAX_THREADTASKS 34
+#else
+#define FLAC__STREAM_ENCODER_MAX_THREADS 64
+#define FLAC__STREAM_ENCODER_MAX_THREADTASKS 130
+#endif
 
 #if (defined FLAC__CPU_IA32 || defined FLAC__CPU_X86_64) && defined FLAC__HAS_X86INTRIN
 #include "private/cpu.h"
@@ -49,17 +56,17 @@
 
 #ifdef FLAC__SSE2_SUPPORTED
 extern void FLAC__precompute_partition_info_sums_intrin_sse2(const FLAC__int32 residual[], FLAC__uint64 abs_residual_partition_sums[],
-			unsigned residual_samples, unsigned predictor_order, unsigned min_partition_order, unsigned max_partition_order, unsigned bps);
+			uint32_t residual_samples, uint32_t predictor_order, uint32_t min_partition_order, uint32_t max_partition_order, uint32_t bps);
 #endif
 
 #ifdef FLAC__SSSE3_SUPPORTED
 extern void FLAC__precompute_partition_info_sums_intrin_ssse3(const FLAC__int32 residual[], FLAC__uint64 abs_residual_partition_sums[],
-			unsigned residual_samples, unsigned predictor_order, unsigned min_partition_order, unsigned max_partition_order, unsigned bps);
+			uint32_t residual_samples, uint32_t predictor_order, uint32_t min_partition_order, uint32_t max_partition_order, uint32_t bps);
 #endif
 
 #ifdef FLAC__AVX2_SUPPORTED
 extern void FLAC__precompute_partition_info_sums_intrin_avx2(const FLAC__int32 residual[], FLAC__uint64 abs_residual_partition_sums[],
-			unsigned residual_samples, unsigned predictor_order, unsigned min_partition_order, unsigned max_partition_order, unsigned bps);
+			uint32_t residual_samples, uint32_t predictor_order, uint32_t min_partition_order, uint32_t max_partition_order, uint32_t bps);
 #endif
 
 #endif

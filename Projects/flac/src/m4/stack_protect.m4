@@ -1,4 +1,4 @@
-dnl Copyright (C) 2013-2016  Xiph.org Foundation
+dnl Copyright (C) 2013-2025  Xiph.Org Foundation
 dnl
 dnl Redistribution and use in source and binary forms, with or without
 dnl modification, are permitted provided that the following conditions
@@ -27,7 +27,7 @@ dnl LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 dnl NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 dnl SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-dnl Want to know of GCC stack protector works, botfor the C and for the C++
+dnl We want to know if GCC stack protector works, for the C and for the C++
 dnl compiler.
 dnl
 dnl Just checking if the compiler accepts the required CFLAGSs is not enough
@@ -41,33 +41,27 @@ AC_DEFUN([XIPH_GCC_STACK_PROTECTOR],
 [AC_LANG_ASSERT(C)
 	AC_MSG_CHECKING([if $CC supports stack smash protection])
 	xiph_stack_check_old_cflags="$CFLAGS"
-	SSP_FLAGS="-fstack-protector --param ssp-buffer-size=4"
+	SSP_FLAGS="-fstack-protector-strong"
 	CFLAGS=$SSP_FLAGS
-	AC_TRY_LINK([
+	AC_LINK_IFELSE([AC_LANG_PROGRAM([[
 			#include <stdio.h>
-			],
-		[puts("Hello, World!"); return 0;],
-		AC_MSG_RESULT([yes])
-			CFLAGS="$xiph_stack_check_old_cflags $SSP_FLAGS",
-		AC_MSG_RESULT([no])
+			]], [[puts("Hello, World!"); return 0;]])],[AC_MSG_RESULT(yes)
+			CFLAGS="$xiph_stack_check_old_cflags $SSP_FLAGS"],[AC_MSG_RESULT(no)
 			CFLAGS="$xiph_stack_check_old_cflags"
-		)
+		])
 ])# XIPH_GCC_STACK_PROTECTOR
 
 AC_DEFUN([XIPH_GXX_STACK_PROTECTOR],
 [AC_LANG_PUSH([C++])
 	AC_MSG_CHECKING([if $CXX supports stack smash protection])
-	xiph_stack_check_old_cflags="$CFLAGS"
-	SSP_FLAGS="-fstack-protector --param ssp-buffer-size=4"
-	CFLAGS=$SSP_FLAGS
-	AC_TRY_LINK([
+	xiph_stack_check_old_cxxflags="$CXXFLAGS"
+	SSP_FLAGS="-fstack-protector-strong"
+	CXXFLAGS=$SSP_FLAGS
+	AC_LINK_IFELSE([AC_LANG_PROGRAM([[
 			#include <cstdio>
-			],
-		[puts("Hello, World!"); return 0;],
-		AC_MSG_RESULT([yes])
-			CFLAGS="$xiph_stack_check_old_cflags $SSP_FLAGS",
-		AC_MSG_RESULT([no])
-			CFLAGS="$xiph_stack_check_old_cflags"
-		)
+			]], [[puts("Hello, World!"); return 0;]])],[AC_MSG_RESULT(yes)
+			CXXFLAGS="$xiph_stack_check_old_cxxflags $SSP_FLAGS"],[AC_MSG_RESULT(no)
+			CXXFLAGS="$xiph_stack_check_old_cxxflags"
+		])
 	AC_LANG_POP([C++])
 ])# XIPH_GXX_STACK_PROTECTOR

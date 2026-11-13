@@ -1,6 +1,6 @@
 /* flac - Command-line FLAC encoder/decoder
  * Copyright (C) 2000-2009  Josh Coalson
- * Copyright (C) 2011-2016  Xiph.Org Foundation
+ * Copyright (C) 2011-2025  Xiph.Org Foundation
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -46,12 +46,15 @@ typedef struct {
 	FLAC__bool is_ogg;
 	FLAC__bool use_first_serial_number;
 	long serial_number;
+	FLAC__bool decode_chained_stream;
 #endif
 	utils__SkipUntilSpecification skip_specification;
 	utils__SkipUntilSpecification until_specification;
 	FLAC__bool has_cue_specification;
 	utils__CueSpecification cue_specification;
 	FLAC__bool channel_map_none; /* --channel-map=none specified, eventually will expand to take actual channel map */
+	FLAC__bool relaxed_foreign_metadata_handling;
+	FileSubFormat force_subformat;
 
 	FileFormat format;
 	union {

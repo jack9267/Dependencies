@@ -36,8 +36,7 @@
 #  include <config.h>
 #endif
 
-#include "share/getopt.h"
-/*[JEC] was:#include "getopt.h"*/
+#include "share/compat.h"
 
 #if !defined __STDC__ || !__STDC__
 /* This is a separate conditional since some stdc systems
@@ -48,6 +47,9 @@
 #endif
 
 #include <stdio.h>
+
+#include "share/getopt.h"
+/*[JEC] was:#include "getopt.h"*/
 
 /* Comment out all this code if we are using the GNU C Library, and are not
    actually compiling the library itself.  This code is part of the GNU C
@@ -79,13 +81,7 @@
 #define NULL 0
 #endif
 
-int
-share__getopt_long (argc, argv, options, long_options, opt_index)
-     int argc;
-     char *const *argv;
-     const char *options;
-     const struct share__option *long_options;
-     int *opt_index;
+int share__getopt_long(int argc, char *const *argv, const char *options, const struct share__option *long_options, int *opt_index)
 {
   return share___getopt_internal (argc, argv, options, long_options, opt_index, 0);
 }
@@ -95,13 +91,7 @@ share__getopt_long (argc, argv, options, long_options, opt_index)
    but does match a short option, it is parsed as a short option
    instead.  */
 
-int
-share__getopt_long_only (argc, argv, options, long_options, opt_index)
-     int argc;
-     char *const *argv;
-     const char *options;
-     const struct share__option *long_options;
-     int *opt_index;
+int share__getopt_long_only(int argc, char *const *argv, const char *options, const struct share__option *long_options, int *opt_index)
 {
   return share___getopt_internal (argc, argv, options, long_options, opt_index, 1);
 }
@@ -113,10 +103,7 @@ share__getopt_long_only (argc, argv, options, long_options, opt_index)
 
 #include <stdio.h>
 
-int
-main (argc, argv)
-     int argc;
-     char **argv;
+int main(int argc, char **argv)
 {
   int c;
   int digit_optind = 0;
@@ -144,10 +131,10 @@ main (argc, argv)
       switch (c)
 	{
 	case 0:
-	  printf ("option %s", long_options[option_index].name);
+	  flac_printf ("option %s", long_options[option_index].name);
 	  if (share__optarg)
-	    printf (" with arg %s", share__optarg);
-	  printf ("\n");
+	    flac_printf (" with arg %s", share__optarg);
+	  flac_printf ("\n");
 	  break;
 
 	case '0':
@@ -161,41 +148,41 @@ main (argc, argv)
 	case '8':
 	case '9':
 	  if (digit_optind != 0 && digit_optind != this_option_optind)
-	    printf ("digits occur in two different argv-elements.\n");
+	    flac_printf ("digits occur in two different argv-elements.\n");
 	  digit_optind = this_option_optind;
-	  printf ("option %c\n", c);
+	  flac_printf ("option %c\n", c);
 	  break;
 
 	case 'a':
-	  printf ("option a\n");
+	  flac_printf ("option a\n");
 	  break;
 
 	case 'b':
-	  printf ("option b\n");
+	  flac_printf ("option b\n");
 	  break;
 
 	case 'c':
-	  printf ("option c with value `%s'\n", share__optarg);
+	  flac_printf ("option c with value `%s'\n", share__optarg);
 	  break;
 
 	case 'd':
-	  printf ("option d with value `%s'\n", share__optarg);
+	  flac_printf ("option d with value `%s'\n", share__optarg);
 	  break;
 
 	case '?':
 	  break;
 
 	default:
-	  printf ("?? getopt returned character code 0%o ??\n", c);
+	  flac_printf ("?? getopt returned character code 0%o ??\n", c);
 	}
     }
 
   if (share__optind < argc)
     {
-      printf ("non-option ARGV-elements: ");
+      flac_printf ("non-option ARGV-elements: ");
       while (share__optind < argc)
-	printf ("%s ", argv[share__optind++]);
-      printf ("\n");
+	flac_printf ("%s ", argv[share__optind++]);
+      flac_printf ("\n");
     }
 
   exit (0);

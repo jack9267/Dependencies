@@ -1,6 +1,6 @@
 /* example_cpp_decode_file - Simple FLAC file decoder using libFLAC
  * Copyright (C) 2007-2009  Josh Coalson
- * Copyright (C) 2011-2016  Xiph.Org Foundation
+ * Copyright (C) 2011-2025  Xiph.Org Foundation
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -36,9 +36,9 @@
 #include "share/compat.h"
 
 static FLAC__uint64 total_samples = 0;
-static unsigned sample_rate = 0;
-static unsigned channels = 0;
-static unsigned bps = 0;
+static uint32_t sample_rate = 0;
+static uint32_t channels = 0;
+static uint32_t bps = 0;
 
 static bool write_little_endian_uint16(FILE *f, FLAC__uint16 x)
 {
@@ -123,6 +123,10 @@ int main(int argc, char *argv[])
 {
 	const FLAC__uint32 total_size = (FLAC__uint32)(total_samples * channels * (bps/8));
 	size_t i;
+
+	// Update data
+	channels = OurDecoder::get_channels();
+	bps = OurDecoder::get_bits_per_sample();
 
 	if(total_samples == 0) {
 		fprintf(stderr, "ERROR: this example only works for FLAC files that have a total_samples count in STREAMINFO\n");

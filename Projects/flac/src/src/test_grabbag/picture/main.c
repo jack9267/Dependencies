@@ -1,6 +1,6 @@
 /* test_picture - Simple tester for picture routines in grabbag
  * Copyright (C) 2006-2009  Josh Coalson
- * Copyright (C) 2011-2016  Xiph.Org Foundation
+ * Copyright (C) 2011-2025  Xiph.Org Foundation
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -73,9 +73,9 @@ static FLAC__bool test_one_picture(const char *prefix, const PictureFile *pf, co
 	if(fn_only)
 		flac_snprintf(s, sizeof(s), "pictures/%s", pf->path);
 	else if (res == NULL)
-		flac_snprintf(s, sizeof(s), "%u|%s|%s||pictures/%s", (unsigned)pf->type, pf->mime_type, pf->description, pf->path);
+		flac_snprintf(s, sizeof(s), "%u|%s|%s||pictures/%s", (uint32_t)pf->type, pf->mime_type, pf->description, pf->path);
 	else
-		flac_snprintf(s, sizeof(s), "%u|%s|%s|%dx%dx%d/%d|pictures/%s", (unsigned)pf->type, pf->mime_type, pf->description, res->width, res->height, res->depth, res->colors, pf->path);
+		flac_snprintf(s, sizeof(s), "%u|%s|%s|%dx%dx%d/%d|pictures/%s", (uint32_t)pf->type, pf->mime_type, pf->description, res->width, res->height, res->depth, res->colors, pf->path);
 
 	printf("testing grabbag__picture_parse_specification(\"%s\")... ", s);
 

@@ -1,6 +1,6 @@
 /* metaflac - Command-line FLAC metadata editor
  * Copyright (C) 2001-2009  Josh Coalson
- * Copyright (C) 2011-2016  Xiph.Org Foundation
+ * Copyright (C) 2011-2025  Xiph.Org Foundation
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -61,26 +61,33 @@ char *local_strdup(const char *source)
 
 void local_strcat(char **dest, const char *source)
 {
-	size_t ndest, nsource;
+	size_t ndest, nsource, outlen;
 
 	FLAC__ASSERT(0 != dest);
 	FLAC__ASSERT(0 != source);
 
-	ndest = *dest? strlen(*dest) : 0;
+	ndest = *dest ? strlen(*dest) : 0;
 	nsource = strlen(source);
+	outlen = ndest + nsource + 1;
 
 	if(nsource == 0)
 		return;
 
 	*dest = safe_realloc_add_3op_(*dest, ndest, /*+*/nsource, /*+*/1);
-	if(0 == *dest)
+	if(*dest == NULL)
 		die("out of memory growing string");
-	safe_strncpy((*dest)+ndest, source, nsource + 1);
+	/* If ndest == 0, strlen in safe_strncat reads
+	 * uninitialized data. To prevent that, set first character
+	 * to zero */
+	if(ndest == 0)
+		*dest[0] = 0;
+	safe_strncat(*dest, source, outlen);
 }
 
 static inline int local_isprint(int c)
 {
 	if (c < 32) return 0;
+	if (c > 127) return 0;
 	return isprint(c);
 }
 
@@ -91,7 +98,7 @@ void hexdump(const char *filename, const FLAC__byte *buf, unsigned bytes, const 
 
 	for(i = 0; i < bytes; i += 16) {
 		flac_printf("%s%s", filename? filename:"", filename? ":":"");
-		printf("%s%08X: "
+		flac_printf("%s%08X: "
 			"%02X %02X %02X %02X %02X %02X %02X %02X "
 			"%02X %02X %02X %02X %02X %02X %02X %02X "
 			"%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c\n",
@@ -237,11 +244,9 @@ void write_vc_field(const char *filename, const FLAC__StreamMetadata_VorbisComme
 			 * WATCHOUT: comments that contain an embedded null will
 			 * be truncated by utf_decode().
 			 */
-#ifdef _WIN32 /* if we are outputting to console, we need to use proper print functions to show unicode characters */
-			if (f == stdout || f == stderr) {
-				flac_fprintf(f, "%s", entry->entry);
-			} else {
-#endif
+#ifdef _WIN32
+			flac_fprintf(f, "%s", entry->entry);
+#else
 			char *converted;
 
 			if(utf8_decode((const char *)entry->entry, &converted) >= 0) {
@@ -251,16 +256,17 @@ void write_vc_field(const char *filename, const FLAC__StreamMetadata_VorbisComme
 			else {
 				(void) local_fwrite(entry->entry, 1, entry->length, f);
 			}
-#ifdef _WIN32
-			}
 #endif
 		}
 		else {
 			(void) local_fwrite(entry->entry, 1, entry->length, f);
 		}
 	}
-
+#ifdef _WIN32
+	flac_fprintf(f,"\n");
+#else
 	putc('\n', f);
+#endif
 }
 
 void write_vc_fields(const char *filename, const char *field_name, const FLAC__StreamMetadata_VorbisComment_Entry entry[], unsigned num_entries, FLAC__bool raw, FILE *f)

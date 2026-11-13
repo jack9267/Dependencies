@@ -1,6 +1,6 @@
 #  flac - Command-line FLAC encoder/decoder
 #  Copyright (C) 2000-2009  Josh Coalson
-#  Copyright (C) 2011-2016  Xiph.Org Foundation
+#  Copyright (C) 2011-2025  Xiph.Org Foundation
 #
 #  This program is free software; you can redistribute it and/or
 #  modify it under the terms of the GNU General Public License
@@ -16,20 +16,22 @@
 #  with this program; if not, write to the Free Software Foundation, Inc.,
 #  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+if OS_IS_WINDOWS
+win_utf8_lib = $(top_builddir)/src/share/win_utf8_io/libwin_utf8_io.la
+if HAVE_WINDRES
+flac_DEPENDENCIES = version.o
+windows_resource_link = -Wl,version.o
+endif
+endif
+
 bin_PROGRAMS = flac
 
 AM_CFLAGS = @OGG_CFLAGS@
 AM_CPPFLAGS = -I$(top_builddir) -I$(srcdir)/include -I$(top_srcdir)/include
 EXTRA_DIST = \
-	Makefile.lite \
-	Makefile.lite.iffscan \
-	flac.vcproj \
-	flac.vcxproj \
-	flac.vcxproj.filters \
+	CMakeLists.txt \
 	iffscan.c \
-	iffscan.vcproj \
-	iffscan.vcxproj \
-	iffscan.vcxproj.filters
+	version.rc
 
 flac_SOURCES = \
 	analyze.c \
@@ -48,10 +50,6 @@ flac_SOURCES = \
 	utils.h \
 	vorbiscomment.h
 
-if OS_IS_WINDOWS
-win_utf8_lib = $(top_builddir)/src/share/win_utf8_io/libwin_utf8_io.la
-endif
-
 flac_LDADD = \
 	$(top_builddir)/src/share/utf8/libutf8.la \
 	$(top_builddir)/src/share/grabbag/libgrabbag.la \
@@ -60,7 +58,12 @@ flac_LDADD = \
 	$(top_builddir)/src/share/replaygain_synthesis/libreplaygain_synthesis.la \
 	$(top_builddir)/src/libFLAC/libFLAC.la \
 	$(win_utf8_lib) \
-	@LIBICONV@ \
+	@LTLIBICONV@ \
 	-lm
 
+flac_LDFLAGS = $(AM_LDFLAGS) $(windows_resource_link)
+
 CLEANFILES = flac.exe
+
+.rc.o:
+	$(RC) $(AM_CPPFLAGS) $< $@
