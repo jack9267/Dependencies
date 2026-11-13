@@ -404,6 +404,13 @@ dep("vorbisfile", {
 	files = { "Projects/vorbis/src/lib/vorbisfile.c" },
 })
 
+-- theora: the sources of the release's own win32/VS2010/libtheora project - decoder and encoder in one library (not
+-- lib/encoder_disabled.c, its stubs for a build without the encoder, which that project excludes too) - but plain C
+-- on every target: no OC_X86_ASM, which that project sets on Win32. Its x86_vc MMX code (MSVC inline asm) decodes
+-- wrongly with v143 - every frame of Firefox's A4.ogv hashed differently from the C build, and FFmpeg's decoder agrees
+-- with the C one, bit for bit (1.2.0, 2026-11-13) - so x86_vc/*.c are listed but compile to nothing.
+-- libtheora.def (ours) exports the 56 functions of the release's win32/xmingw32/libtheoradec-all.def and
+-- libtheoraenc-all.def together; check it against them on an update.
 dep("theora", {
 	systems = WINDOWS,
 	includedirs = { "Projects/theora/src/include", "Projects/theora/src/lib",
@@ -414,13 +421,13 @@ dep("theora", {
 	end } },
 	files = (function()
 		local t = srcs("Projects/theora/src/lib", {
-			"cpu", "analyze", "encapiwrapper", "encfrag", "encinfo", "encode", "enquant", "fdct",
+			"analyze", "encapiwrapper", "encfrag", "encinfo", "encode", "enquant", "fdct",
 			"huffenc", "mathops", "mcenc", "rate", "tokenize", "apiwrapper", "bitpack",
 			"decapiwrapper", "decinfo", "decode", "dequant", "fragment", "huffdec", "idct", "info",
 			"internal", "quant", "state" })
-		-- x86_vc MMX paths - internally #if-guarded (OC_X86_ASM), so they compile to nothing on x64.
+		-- x86_vc: the MMX code and CPU detection, #if-guarded on OC_X86_ASM (not defined - see above).
 		for _, f in ipairs(srcs("Projects/theora/src/lib/x86_vc", {
-			"mmxencfrag", "mmxfdct", "x86enc", "mmxfrag", "mmxidct", "mmxstate", "x86state" })) do
+			"x86cpu", "mmxencfrag", "mmxfdct", "x86enc", "mmxfrag", "mmxidct", "mmxstate", "x86state" })) do
 			t[#t + 1] = f
 		end
 		return t

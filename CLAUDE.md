@@ -223,6 +223,23 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   `ogg_sync` in uneven chunks, a damaged page caught by its CRC, and a 5.5-minute Ogg Vorbis file decoded to exactly
   `ov_pcm_total` samples and seeked.
 
+## Theora (`Projects/theora`)
+
+- **1.2.0, stock** (2026-11-13, from 1.1.1 of 2009; tarball checked against xiph's `SHA256SUMS`), Windows only. `src`
+  is the whole release. Nothing here or in Galactic, ModLauncher, GTAC, GalacticSamples or GalacticTools links it.
+- **The sources are the release's `win32/VS2010/libtheora` project's** - decoder and encoder in one library, without
+  `lib/encoder_disabled.c` (stubs for a build with no encoder, excluded there too). 1.2.0 moved `lib/cpu.c` to
+  `lib/x86_vc/x86cpu.c` (and `x86/x86cpu.c` for GCC).
+- **Plain C everywhere: no `OC_X86_ASM`**, though that project sets it on Win32. Its `x86_vc` MMX code (MSVC inline
+  asm) decodes wrongly with v143: Firefox's `A4.ogv` and `bug520908.ogv` (`dom/media/test`) hashed differently from
+  the C build in every frame, and FFmpeg's decoder (`-f rawvideo -pix_fmt yuv420p`, FNV-1a over the frames) agrees
+  with the C build bit for bit. The encoder's output was the same either way. Before 1.2.0 it was never defined
+  here either.
+- `libtheora.def` (ours, beside `src`) exports the 56 functions of the release's `win32/xmingw32/libtheoradec-all.def`
+  and `libtheoraenc-all.def` together - compare on an update. Tested, x86 and x64, Debug and Release, linking
+  `theora_static` and `ogg_static`: 48 frames encoded and decoded back (luma PSNR 46.8 dB), and both videos decoded
+  to FFmpeg's exact frames.
+
 ## FLAC (`Projects/flac`)
 
 - **1.5.0, stock** (2026-11-13, from 1.3.2 of 2016; tarball checked against xiph's `SHA256SUMS`), Windows only. `src`
