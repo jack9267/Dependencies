@@ -187,6 +187,29 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   (and `-laaudio`, which needs API 26). Not yet built for Android.
 - Vorbis is not built in (that needs `extras/stb_vorbis.c` or the libvorbis decoder); MP3, FLAC and WAV are.
 
+## Opus (`Projects/opus`)
+
+- **1.6.1, stock** (2026-11-13), for voice chat (the xlive DLL's `IXHVEngine`). `src` is the release tarball
+  unchanged (SHA-256 checked against xiph's `SHA256SUMS.txt`); `opus_static`, static only, with `opus.h`,
+  `opus_defines.h`, `opus_multistream.h`, `opus_projection.h` and `opus_types.h` in `include\opus\`
+  (`#include <opus/opus.h>`, as its own CMake installs them). Built for every target.
+- **Built as its CMake's defaults are**: floating point, the float API, `ENABLE_HARDENING`, no custom modes, and
+  none of the neural extras in `dnn/` (deep PLC, DRED, OSCE - about 22 MB of the release, kept but not compiled).
+  Stack arrays are `USE_ALLOCA` on MSVC, `VAR_ARRAYS` elsewhere (with `HAVE_LRINT`/`HAVE_LRINTF`). No `config.h`:
+  the sources include it only under `HAVE_CONFIG_H`.
+- **Plain C: no SIMD sources and no run-time CPU detection** (no `OPUS_X86_MAY_HAVE_*`, no `OPUS_HAVE_RTCD`), as
+  jpeg, so it runs on any CPU XP does and one Apple compile serves every architecture. Voice at 16 kHz costs next to
+  nothing anyway. The library calls nothing outside the C runtime (checked with `dumpbin /symbols`).
+- **The source lists are read from the release's own `.mk` files** when premake runs (`opus_sources` in
+  premake5.lua: `OPUS_SOURCES`, `OPUS_SOURCES_FLOAT`, `CELT_SOURCES`, `SILK_SOURCES`, `SILK_SOURCES_FLOAT` - what
+  its CMake compiles by default), and `PACKAGE_VERSION` from `package_version`, so an update needs no list copied
+  by hand; premake stops with an error if one is missing. 137 files for 1.6.1.
+- Seen working (Windows x86 and x64, Debug and Release; the Linux, macOS, iOS, Android and FreeBSD fragments are
+  generated but not built): 16 kHz mono, `OPUS_APPLICATION_VOIP`, 16 kbit/s with `OPUS_SET_VBR(0)` and 20 ms
+  frames gives 40-byte packets every time, each harmonic of a test signal within about 1 dB of the input, and a lost
+  packet concealed (`opus_decode(NULL, ...)`). Waveform SNR is only about 3 dB at that rate: SILK keeps how speech
+  sounds, not its phase, so don't test it that way.
+
 ## litehtml (`Projects/litehtml`)
 
 - **Upstream master 6293d441 (v0.10 + 55, 2026-11-07), with two patches of ours** (2026-11-08). `src` is

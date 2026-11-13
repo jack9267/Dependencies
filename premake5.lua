@@ -279,6 +279,43 @@ dep("miniaudio", {
 	defines     = APPLE_TARGET and { "MA_NO_RUNTIME_LINKING" } or nil,
 	files       = { APPLE_TARGET and "Projects/miniaudio/apple/miniaudio.m" or "Projects/miniaudio/src/miniaudio.c" } })
 
+-- opus: the codec as its own CMake builds it by default - floating point, the float API, hardening, no custom
+-- modes and none of the neural extras (dnn/: deep PLC, DRED, OSCE). Plain C: no SIMD sources and no run-time
+-- CPU detection (no OPUS_X86_MAY_HAVE_*/OPUS_HAVE_RTCD), so it runs on any CPU XP does and one Apple compile
+-- serves every architecture. Stack arrays are alloca on MSVC and C99 arrays elsewhere. No config.h: the
+-- sources include it only under HAVE_CONFIG_H. The lists are read from the release's own .mk files (as its
+-- CMake does, cmake/OpusSources.cmake), so an update brings them with it. Static only.
+local function opus_sources(mk, var)
+	-- "VAR = \", then one file a line, each but the last ending in "\"
+	local text = io.readfile(path.join(_SCRIPT_DIR, "Projects/opus/src", mk)) or ""
+	local t, inside = {}, false
+	for line in (text .. "\n"):gmatch("([^\n]*)\n") do
+		line = line:gsub("\r$", "")
+		if not inside then
+			inside = line:match("^" .. var .. "%s*=") ~= nil
+		else
+			local f = line:match("^%s*(%S+%.c)")
+			if f then t[#t + 1] = "Projects/opus/src/" .. f end
+			if not line:match("\\%s*$") then break end
+		end
+	end
+	if #t == 0 then error("opus: no " .. var .. " in " .. mk) end
+	return t
+end
+-- opus_get_version_string() says "libopus " PACKAGE_VERSION, which CMake reads from the release's package_version
+local OPUS_VERSION = (io.readfile(path.join(_SCRIPT_DIR, "Projects/opus/src/package_version")) or "")
+	:match('PACKAGE_VERSION="([^"]+)"')
+if not OPUS_VERSION then error("opus: no PACKAGE_VERSION in package_version") end
+dep("opus", {
+	includedirs = { "Projects/opus/src/include", "Projects/opus/src", "Projects/opus/src/celt",
+		"Projects/opus/src/silk", "Projects/opus/src/silk/float", "Projects/opus/src/dnn" },
+	defines     = table.join({ "OPUS_BUILD", "ENABLE_HARDENING", 'PACKAGE_VERSION="' .. OPUS_VERSION .. '"' },
+		WINDOWS_TARGET and { "USE_ALLOCA" } or { "VAR_ARRAYS", "HAVE_LRINT", "HAVE_LRINTF" }),
+	files       = table.join(
+		opus_sources("opus_sources.mk", "OPUS_SOURCES"), opus_sources("opus_sources.mk", "OPUS_SOURCES_FLOAT"),
+		opus_sources("celt_sources.mk", "CELT_SOURCES"),
+		opus_sources("silk_sources.mk", "SILK_SOURCES"), opus_sources("silk_sources.mk", "SILK_SOURCES_FLOAT")) })
+
 -- mongoose6: 64 KB per socket read/write and of a served file kept queued, where mongoose's defaults are
 -- 1460 and 1024 - one TCP segment per connection per mg_mgr_poll() held HTTP file serving to about 23 KB/s
 -- against a server loop that sleeps between polls. Used only inside mongoose.c, so consumers need not match.
@@ -667,6 +704,13 @@ headers_project {
 	{ files = "Projects/angelscript/src/add_on/serializer/*.h", to = "angelscript" },
 	{ files = "Projects/angelscript/src/add_on/weakref/*.h", to = "angelscript" },
 	{ file = "Projects/miniaudio/src/miniaudio.h" },
+	-- opus's public headers, where its own CMake installs them (<opus/opus.h>; opus_custom.h is for custom
+	-- modes, which are not built)
+	{ file = "Projects/opus/src/include/opus.h", to = "opus" },
+	{ file = "Projects/opus/src/include/opus_defines.h", to = "opus" },
+	{ file = "Projects/opus/src/include/opus_multistream.h", to = "opus" },
+	{ file = "Projects/opus/src/include/opus_projection.h", to = "opus" },
+	{ file = "Projects/opus/src/include/opus_types.h", to = "opus" },
 	{ dir = "Projects/mongoose6/include" },
 	{ dir = "Projects/mongoose7/include" },
 	{ dir = "Projects/sqlite/include" },
