@@ -159,6 +159,21 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   warnings; a test linking `sqlite3_static` passed in all four (version, JSON, a WAL database: 10,000 rows in a
   transaction, an indexed query, a rollback, read-only reopen, `integrity_check`).
 
+## libpng (`Projects/png`)
+
+- **1.6.59, stock** (2026-11-13, from 1.6.50, for the CVE fixes in 1.6.52-1.6.59). `src` is the release tarball
+  (sourceforge's, SHA-256 from libpng.org) less `.github`; `include` holds `png.h` and `pngconf.h` from it and
+  **`pnglibconf.h` copied from `src/scripts/pnglibconf.h.prebuilt`** - the default configuration, what libpng's own
+  CMake and configure produce. `src` has no `pnglibconf.h`, and premake puts `include` first, so that copy is what
+  the library is compiled with: copy all three on every update. Until 1.6.59 it had been 1.6.18's (2015), so eXIf,
+  cICP, cLLI, mDCV and the simplified stdio writer were never built; they are now (and exported from the DLL).
+- **Built from a named list** (`PNG_SOURCES` in premake5.lua), plus `intel/` SSE2 filters on Windows; check those
+  files still exist after an update. `libpng16.dll` links `zlib.dll`.
+- **Tested with libpng's own `pngtest.c`** (in `src`), compiled against `png_static` and `zlib_static`: it passes
+  on `pngtest.png` and every image of `contrib/pngsuite` (`pngtest -m <files>`), and refuses all 23 of
+  `contrib/testpngs/crashers` with an error, no crash - x86 and x64, Debug and Release. freetype and cairo were
+  rebuilt on it. The DLL imports `KERNEL32`, `msvcrt` (1.6.59 adds `ferror` and `remove`) and `zlib.dll` only.
+
 ## jpeg (`Projects/jpeg`)
 
 - **libjpeg-turbo 3.2.1, stock** (2026-11-05, replacing IJG libjpeg 6b from 1998), still `jpeg_static`. `src` is the
