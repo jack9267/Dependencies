@@ -201,6 +201,19 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   `FT_Stream_Open: could not open` for each resource-fork name it tries when a font fails to open
   (`FT_DEBUG_LEVEL_ERROR`) - noise, not the error.
 
+## GLEW (`Projects/glew`)
+
+- **2.3.1, stock** (2026-11-13, from 2.1.0 of 2017; tarball checked against the SHA-256 GitHub gives for the release
+  asset), Windows only, for Galactic's OpenGL device (`GL/glew.h` with `GLEW_STATIC`; GTAC and GalacticSamples link
+  `glew_static`). Not the whole release: its `build`, `doc`, `include` and `src`, and `LICENSE.txt`, at the top of
+  `Projects/glew` as before (2.1.0's copy was those four, unchanged). `glew_static` is `src/glew.c` alone.
+- **XP**: the library needs only `glGetString`, `glGetIntegerv`, `wglGetProcAddress` and `wglGetCurrentDC` from
+  `opengl32` (the Debug lib's undefined symbols - the Release lib is `/GL`, so it has none to list); everything else
+  goes through `wglGetProcAddress`. Tested, x86 and x64, Debug and Release: a WGL context, `glewInit`, `wglewInit`, then
+  a shader, a VBO and a framebuffer object drawn through what GLEW found and read back. **A `GLEW_VERSION_x_y` can be
+  false where the driver reports that version**: GLEW clears it when any of the version's functions is missing - this
+  laptop's Intel driver says 4.6 in a compatibility context and gets 3.0 but not 4.5 or 4.6, the same with 2.1.0.
+
 ## libogg (`Projects/ogg`)
 
 - **1.3.6, stock** (2026-11-13, from 1.3.4; tarball checked against xiph's `SHA256SUMS`). `src` is the whole release;
