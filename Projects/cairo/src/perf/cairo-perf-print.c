@@ -27,9 +27,7 @@
  *	    Chris Wilson <chris@chris-wilson.co.uk>
  */
 
-#if HAVE_CONFIG_H
 #include "config.h"
-#endif
 
 #include "cairo-perf.h"
 #include "cairo-stats.h"
@@ -45,6 +43,9 @@
 #if USE_TERMINAL_SIZE
 #include <unistd.h>
 #include <sys/ioctl.h>
+#if HAVE_TERMIOS_H
+#include <termios.h>
+#endif
 #endif
 
 static void

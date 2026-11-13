@@ -26,20 +26,13 @@
 #include "cairo-test-private.h"
 #include "cairo-boilerplate-getopt.h"
 
-/* get the "real" version info instead of dummy cairo-version.h */
-#undef CAIRO_VERSION_H
-#undef CAIRO_VERSION_MAJOR
-#undef CAIRO_VERSION_MINOR
-#undef CAIRO_VERSION_MICRO
-#include "../cairo-version.h"
-
 #include <pixman.h> /* for version information */
 
 #define SHOULD_FORK HAVE_FORK && HAVE_WAITPID
-#if SHOULD_FORK
 #if HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+#if SHOULD_FORK
 #if HAVE_SIGNAL_H
 #include <signal.h>
 #endif
@@ -78,6 +71,8 @@ typedef struct _cairo_test_runner {
     int num_xfailed;
     int num_error;
     int num_crashed;
+
+    unsigned int num_ignored_via_env;
 
     cairo_test_list_t *crashes_preamble;
     cairo_test_list_t *errors_preamble;
@@ -164,11 +159,13 @@ static cairo_bool_t
 is_running_under_debugger (void)
 {
 #if HAVE_UNISTD_H && HAVE_LIBGEN_H && __linux__
-    char buf[1024];
+    char buf[1024] = { 0 };
+    char buf2[1024] = { 0 };
 
     sprintf (buf, "/proc/%d/exe", getppid ());
-    if (readlink (buf, buf, sizeof (buf)) != -1 &&
-	strncmp (basename (buf), "gdb", 3) == 0)
+    if (readlink (buf, buf2, sizeof (buf2)) != -1 &&
+	buf2[1023] == 0 &&
+	strncmp (basename (buf2), "gdb", 3) == 0)
     {
 	return TRUE;
     }
@@ -213,6 +210,9 @@ _cairo_test_runner_preamble (cairo_test_runner_t *runner,
     if (! runner->foreground) {
 	pid_t pid;
 
+	/* fork() duplicates output buffers, so clear them */
+	fflush (NULL);
+
 	switch ((pid = fork ())) {
 	case -1: /* error */
 	    return CAIRO_TEST_UNTESTED;
@@ -238,6 +238,9 @@ _cairo_test_runner_draw (cairo_test_runner_t *runner,
 #if SHOULD_FORK
     if (! runner->foreground) {
 	pid_t pid;
+
+	/* fork() duplicates output buffers, so clear them */
+	fflush (NULL);
 
 	switch ((pid = fork ())) {
 	case -1: /* error */
@@ -438,6 +441,11 @@ _runner_print_summary (cairo_test_runner_t *runner)
 	  runner->num_xfailed,
 
 	  runner->num_skipped);
+    if (runner->num_ignored_via_env) {
+	_log (&runner->base,
+	      "%d expected failure due to special request via environment variables!\n",
+	      runner->num_ignored_via_env);
+    }
 }
 
 static void
@@ -596,6 +604,69 @@ _runner_fini (cairo_test_runner_t *runner)
 }
 
 static cairo_bool_t
+expect_fail_due_to_env_var (cairo_test_context_t *ctx,
+                            const cairo_boilerplate_target_t *target)
+{
+    const char *prefix = "CAIRO_TEST_IGNORE_";
+    const char *content = cairo_boilerplate_content_name (target->content);
+    char *env_name;
+    const char *env;
+    cairo_bool_t result = FALSE;
+    char *to_replace;
+
+    /* Construct the name of the env var */
+    env_name = malloc (strlen (prefix) + strlen (target->name) + 1 + strlen (content) + 1);
+    if (env_name == NULL) {
+	fprintf(stderr, "Malloc failed, cannot check $%s%s_%s\n", prefix, target->name, content);
+	cairo_test_log(ctx, "Malloc failed, cannot check $%s%s_%s\n", prefix, target->name, content);
+	return FALSE;
+    }
+    strcpy (env_name, prefix);
+    strcat (env_name, target->name);
+    strcat (env_name, "_");
+    strcat (env_name, content);
+
+    /* Deal with some invalid characters: Replace '-' and '&' with '_' */
+    while ((to_replace = strchr(env_name, '-')) != NULL) {
+	*to_replace = '_';
+    }
+    while ((to_replace = strchr(env_name, '&')) != NULL) {
+	*to_replace = '_';
+    }
+
+    env = getenv (env_name);
+
+    /* Look for the test name in the env var (comma separated) */
+    if (env) {
+	for (size_t start = 0;; start += strlen (ctx->test_name)) {
+	   char *match = strstr (env + start, ctx->test_name);
+	   if (!match)
+	       break;
+
+	   /* Make sure that "foo" does not match in "barfoo,foobaz"
+	    * There must be commas around the test name (or string begin/end)
+	    */
+	   if (env == match || match[-1] == ',') {
+	       char *end = match + strlen (ctx->test_name);
+	       if (*end == '\0' || *end == ',') {
+		   result = TRUE;
+		   break;
+	       }
+	   }
+	}
+    }
+    if (result)
+       cairo_test_log (ctx,
+                       "Expecting '%s' to fail because it appears in $%s\n",
+                       ctx->test_name, env_name);
+
+    free (env_name);
+
+    return result;
+}
+
+
+static cairo_bool_t
 _version_compare (int a, cairo_test_compare_op_t op, int b)
 {
     switch (op) {
@@ -653,42 +724,6 @@ _has_required_cairo_version (const char *str)
     return _version_compare (cairo_version (),
 			     op,
 			     CAIRO_VERSION_ENCODE (major, minor, micro));
-}
-
-static cairo_bool_t
-_has_required_ghostscript_version (const char *str)
-{
-#if ! CAIRO_CAN_TEST_PS_SURFACE
-    return TRUE;
-#endif
-
-    str += 2; /* advance over "gs" */
-
-    return TRUE;
-}
-
-static cairo_bool_t
-_has_required_poppler_version (const char *str)
-{
-#if ! CAIRO_CAN_TEST_PDF_SURFACE
-    return TRUE;
-#endif
-
-    str += 7; /* advance over "poppler" */
-
-    return TRUE;
-}
-
-static cairo_bool_t
-_has_required_rsvg_version (const char *str)
-{
-#if ! CAIRO_CAN_TEST_SVG_SURFACE
-    return TRUE;
-#endif
-
-    str += 4; /* advance over "rsvg" */
-
-    return TRUE;
 }
 
 #define TEST_SIMILAR	0x1
@@ -834,30 +869,6 @@ main (int argc, char **argv)
 		else
 		    goto TEST_SKIPPED;
 	    }
-
-	    str = strstr (requirements, "gs");
-	    if (str != NULL && ! _has_required_ghostscript_version (str)) {
-		if (runner.list_only)
-		    goto TEST_NEXT;
-		else
-		    goto TEST_SKIPPED;
-	    }
-
-	    str = strstr (requirements, "poppler");
-	    if (str != NULL && ! _has_required_poppler_version (str)) {
-		if (runner.list_only)
-		    goto TEST_NEXT;
-		else
-		    goto TEST_SKIPPED;
-	    }
-
-	    str = strstr (requirements, "rsvg");
-	    if (str != NULL && ! _has_required_rsvg_version (str)) {
-		if (runner.list_only)
-		    goto TEST_NEXT;
-		else
-		    goto TEST_SKIPPED;
-	    }
 	}
 
 	if (runner.list_only) {
@@ -871,6 +882,20 @@ main (int argc, char **argv)
 
 	if (ctx.test->preamble != NULL) {
 	    status = _cairo_test_runner_preamble (&runner, &ctx);
+	    if (getenv ("CAIRO_TEST_UGLY_HACK_TO_IGNORE_PS_FAILURES")) {
+		if (strcmp (ctx.test_name, "ps-eps") == 0) {
+		    if (status == CAIRO_TEST_FAILURE) {
+			cairo_test_log (&ctx, "Turning FAIL into XFAIL due to env\n");
+			fprintf (stderr, "Turning FAIL into XFAIL due to env\n");
+			runner.num_ignored_via_env++;
+			status = CAIRO_TEST_XFAILURE;
+		    } else {
+			fprintf (stderr, "Test was expected to fail due to an environment variable, but did not!\n");
+			fprintf (stderr, "Please update the corresponding CAIRO_TEST_IGNORE_* variable.\n");
+			status = CAIRO_TEST_ERROR;
+		    }
+		}
+	    }
 	    switch (status) {
 	    case CAIRO_TEST_SUCCESS:
 		in_preamble = TRUE;
@@ -936,6 +961,35 @@ main (int argc, char **argv)
 		    for (similar = DIRECT; similar <= has_similar; similar++) {
 			status = _cairo_test_runner_draw (&runner, &ctx, target,
 							  similar, dev_offset, dev_scale);
+
+			if (expect_fail_due_to_env_var (&ctx, target)) {
+			    if (status == CAIRO_TEST_FAILURE) {
+				cairo_test_log (&ctx, "Turning FAIL into XFAIL due to env\n");
+				fprintf (stderr, "Turning FAIL into XFAIL due to env\n");
+				runner.num_ignored_via_env++;
+				status = CAIRO_TEST_XFAILURE;
+			    } else {
+				fprintf (stderr, "Test was expected to fail due to an environment variable, but did not!\n");
+				fprintf (stderr, "Please update the corresponding CAIRO_TEST_IGNORE_* variable.\n");
+				status = CAIRO_TEST_ERROR;
+			    }
+			}
+			if (getenv ("CAIRO_TEST_UGLY_HACK_TO_SOMETIMES_IGNORE_SCRIPT_XCB_HUGE_IMAGE_SHM")) {
+			    if (strcmp (target->name, "script") == 0 && strcmp (ctx.test_name, "xcb-huge-image-shm") == 0) {
+				if (status == CAIRO_TEST_FAILURE) {
+				    fprintf (stderr, "This time the xcb-huge-image-shm test on script surface failed.\n");
+				    cairo_test_log (&ctx, "Turning FAIL into XFAIL due to env\n");
+				    fprintf (stderr, "Turning FAIL into XFAIL due to env\n");
+				    runner.num_ignored_via_env++;
+				} else {
+				    fprintf (stderr, "This time the xcb-huge-image-shm test on script surface did not fail.\n");
+				    cairo_test_log (&ctx, "Turning the status into XFAIL due to env\n");
+				    fprintf (stderr, "Turning the status into XFAIL due to env\n");
+				}
+				status = CAIRO_TEST_XFAILURE;
+				fprintf (stderr, "If you are were getting one of the outcomes for some time, please update this code.\n");
+			    }
+			}
 			switch (status) {
 			case CAIRO_TEST_SUCCESS:
 			    target_skipped = FALSE;

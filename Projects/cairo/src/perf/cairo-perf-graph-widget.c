@@ -25,6 +25,8 @@
  * Authors: Chris Wilson <chris@chris-wilson.co.uk>
  */
 
+#define GLIB_DISABLE_DEPRECATION_WARNINGS
+
 #include "cairo-perf.h"
 #include "cairo-perf-graph.h"
 
@@ -489,8 +491,6 @@ static gboolean
 graph_view_button_release (GtkWidget	  *w,
 			   GdkEventButton *ev)
 {
-    GraphView *self = (GraphView *) w;
-
     return FALSE;
 }
 

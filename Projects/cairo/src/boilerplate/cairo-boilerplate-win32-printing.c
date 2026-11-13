@@ -26,15 +26,8 @@
  *	    Adrian Johnson <ajohnson@redneon.com>
  */
 
-/* We require Windows 2000 features such as GetDefaultPrinter() */
-#if !defined(WINVER) || (WINVER < 0x0500)
-# define WINVER 0x0500
-#endif
-#if !defined(_WIN32_WINNT) || (_WIN32_WINNT < 0x0500)
-# define _WIN32_WINNT 0x0500
-#endif
-
 #include "cairo-boilerplate-private.h"
+#include "cairo-malloc-private.h"
 
 #if CAIRO_CAN_TEST_WIN32_PRINTING_SURFACE
 
@@ -42,51 +35,6 @@
 #include <cairo-paginated-surface-private.h>
 
 #include <windows.h>
-
-#if !defined(POSTSCRIPT_IDENTIFY)
-# define POSTSCRIPT_IDENTIFY 0x1015
-#endif
-
-#if !defined(PSIDENT_GDICENTRIC)
-# define PSIDENT_GDICENTRIC 0x0000
-#endif
-
-#if !defined(GET_PS_FEATURESETTING)
-# define GET_PS_FEATURESETTING 0x1019
-#endif
-
-#if !defined(FEATURESETTING_PSLEVEL)
-# define FEATURESETTING_PSLEVEL 0x0002
-#endif
-
-static cairo_status_t
-_cairo_win32_print_gdi_error (const char *context)
-{
-    void *lpMsgBuf;
-    DWORD last_error = GetLastError ();
-
-    if (!FormatMessageW (FORMAT_MESSAGE_ALLOCATE_BUFFER |
-			 FORMAT_MESSAGE_FROM_SYSTEM,
-			 NULL,
-			 last_error,
-			 MAKELANGID (LANG_NEUTRAL, SUBLANG_DEFAULT),
-			 (LPWSTR) &lpMsgBuf,
-			 0, NULL)) {
-	fprintf (stderr, "%s: Unknown GDI error", context);
-    } else {
-	fprintf (stderr, "%s: %S", context, (wchar_t *)lpMsgBuf);
-
-	LocalFree (lpMsgBuf);
-    }
-
-    fflush (stderr);
-
-    /* We should switch off of last_status, but we'd either return
-     * CAIRO_STATUS_NO_MEMORY or CAIRO_STATUS_UNKNOWN_ERROR and there
-     * is no CAIRO_STATUS_UNKNOWN_ERROR.
-     */
-    return CAIRO_STATUS_NO_MEMORY;
-}
 
 static cairo_user_data_key_t win32_closure_key;
 
@@ -131,7 +79,7 @@ create_printer_dc (win32_target_closure_t *ptc)
 
     ptc->dc = NULL;
     GetDefaultPrinter (NULL, &size);
-    printer_name = malloc (size);
+    printer_name = _cairo_malloc (size);
 
     if (printer_name == NULL)
 	return;
@@ -153,7 +101,7 @@ create_printer_dc (win32_target_closure_t *ptc)
 
     /* The printer device units on win32 are 1 unit == 1 dot and the
      * origin is the start of the printable area. We transform the
-     * cordinate space to 1 unit is 1 point as expected by the
+     * coordinate space to 1 unit is 1 point as expected by the
      * tests. As the page size is larger than the test surface, the
      * origin is translated down so that the each test is drawn at the
      * bottom left corner of the page. This is because the bottom left
@@ -181,7 +129,7 @@ create_printer_dc (win32_target_closure_t *ptc)
     xform.eDx = 0;
     xform.eDy = printable_height - ptc->height*y_dpi/72.0;
     if (!SetWorldTransform (ptc->dc, &xform)) {
-	_cairo_win32_print_gdi_error ("cairo-boilerplate-win32-printing:SetWorldTransform");
+        fprintf (stderr, "%s:%s\n", "cairo-boilerplate-win32-printing", "SetWorldTransform");
 	return;
     }
 
@@ -270,22 +218,28 @@ _cairo_boilerplate_win32_printing_surface_write_to_png (cairo_surface_t *surface
     cairo_t *cr;
     cairo_status_t status;
 
-    /* Both surface and ptc->target were originally created at the
-     * same dimensions. We want a 1:1 copy here, so we first clear any
-     * device offset on surface.
-     *
-     * In a more realistic use case of device offsets, the target of
-     * this copying would be of a different size than the source, and
-     * the offset would be desirable during the copy operation. */
-    cairo_surface_set_device_offset (surface, 0, 0);
-
     if (ptc->target) {
+	/* Both surface and ptc->target were originally created at the
+	 * same dimensions. We want a 1:1 copy here, so we first clear any
+	 * device offset and scale on surface.
+	 *
+	 * In a more realistic use case of device offsets, the target of
+	 * this copying would be of a different size than the source, and
+	 * the offset would be desirable during the copy operation. */
+	double x_offset, y_offset;
+	double x_scale, y_scale;
+	cairo_surface_get_device_offset (surface, &x_offset, &y_offset);
+	cairo_surface_get_device_scale (surface, &x_scale, &y_scale);
+	cairo_surface_set_device_offset (surface, 0, 0);
+	cairo_surface_set_device_scale (surface, 1, 1);
 	cairo_t *cr;
 	cr = cairo_create (ptc->target);
 	cairo_set_source_surface (cr, surface, 0, 0);
 	cairo_paint (cr);
 	cairo_show_page (cr);
 	cairo_destroy (cr);
+	cairo_surface_set_device_offset (surface, x_offset, y_offset);
+	cairo_surface_set_device_scale (surface, x_scale, y_scale);
 
 	cairo_surface_finish (surface);
 	surface = ptc->target;

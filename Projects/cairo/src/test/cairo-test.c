@@ -25,11 +25,7 @@
  *         Chris Wilson <chris@chris-wilson.co.uk>
  */
 
-#define _GNU_SOURCE 1	/* for feenableexcept() et al */
-
-#if HAVE_CONFIG_H
 #include "config.h"
-#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -71,9 +67,9 @@
 #ifdef _MSC_VER
 #include <crtdbg.h>
 #include <direct.h>
+#include <io.h>
 #define F_OK 0
 #define HAVE_MKDIR 1
-#define mkdir _mkdir
 #endif
 
 #ifndef FALSE
@@ -189,7 +185,7 @@ _cairo_test_init (cairo_test_context_t *ctx,
 	ctx->own_targets = FALSE;
 
 	ctx->srcdir = parent->srcdir;
-	ctx->refdir = parent->refdir;
+	ctx->refdir = xstrdup (parent->refdir);
     } else {
 	int tmp_num_targets;
 	cairo_bool_t tmp_limited_targets;
@@ -200,10 +196,18 @@ _cairo_test_init (cairo_test_context_t *ctx,
 	ctx->own_targets = TRUE;
 
 	ctx->srcdir = getenv ("srcdir");
-	if (ctx->srcdir == NULL)
-	    ctx->srcdir = ".";
+	if (ctx->srcdir == NULL) {
+            ctx->srcdir = ".";
+#if HAVE_SYS_STAT_H
+            struct stat st;
+            if (stat ("srcdir", &st) == 0 && (st.st_mode & S_IFDIR))
+                ctx->srcdir = "srcdir";
+#endif
+        }
 
-	ctx->refdir = getenv ("CAIRO_REF_DIR");
+	ctx->refdir = xstrdup (getenv ("CAIRO_REF_DIR"));
+        if (ctx->refdir == NULL)
+            xasprintf (&ctx->refdir, "%s/reference", ctx->srcdir);
     }
 
 #ifdef HAVE_UNISTD_H
@@ -245,6 +249,7 @@ cairo_test_fini (cairo_test_context_t *ctx)
 	fclose (ctx->log_file);
     ctx->log_file = NULL;
 
+    free (ctx->refdir);
     free (ctx->ref_name);
     cairo_surface_destroy (ctx->ref_image);
     cairo_surface_destroy (ctx->ref_image_flattened);
@@ -628,7 +633,7 @@ cairo_test_for_target (cairo_test_context_t		 *ctx,
 		       int				  dev_scale,
 		       cairo_bool_t                       similar)
 {
-    cairo_test_status_t status;
+    cairo_status_t finish_status;
     cairo_surface_t *surface = NULL;
     cairo_t *cr;
     const char *empty_str = "";
@@ -644,7 +649,7 @@ cairo_test_for_target (cairo_test_context_t		 *ctx,
     char *base_xfail_png_path;
     char *diff_png_path;
     char *test_filename = NULL, *pass_filename = NULL, *fail_filename = NULL;
-    cairo_test_status_t ret;
+    cairo_test_status_t ret, test_status;
     cairo_content_t expected_content;
     cairo_font_options_t *font_options;
     const char *format;
@@ -930,7 +935,7 @@ REPEAT:
 
     cairo_save (cr);
     alarm (ctx->timeout);
-    status = (ctx->test->draw) (cr, ctx->test->width, ctx->test->height);
+    test_status = (ctx->test->draw) (cr, ctx->test->width, ctx->test->height);
     alarm (0);
     cairo_restore (cr);
 
@@ -946,7 +951,7 @@ REPEAT:
     /* repeat test after malloc failure injection */
     if (ctx->malloc_failure &&
 	MEMFAULT_COUNT_FAULTS () - last_fault_count > 0 &&
-	(status == CAIRO_TEST_NO_MEMORY ||
+	(test_status == CAIRO_TEST_NO_MEMORY ||
 	 cairo_status (cr) == CAIRO_STATUS_NO_MEMORY ||
 	 cairo_surface_status (surface) == CAIRO_STATUS_NO_MEMORY))
     {
@@ -968,9 +973,9 @@ REPEAT:
 #endif
 
     /* Then, check all the different ways it could fail. */
-    if (status) {
+    if (test_status) {
 	cairo_test_log (ctx, "Error: Function under test failed\n");
-	ret = status;
+	ret = test_status;
 	goto UNWIND_CAIRO;
     }
 
@@ -995,7 +1000,7 @@ REPEAT:
 
 	/* also check for infinite loops whilst replaying */
 	alarm (ctx->timeout);
-	status = target->finish_surface (surface);
+	finish_status = target->finish_surface (surface);
 	alarm (0);
 
 #if HAVE_MEMFAULT
@@ -1003,7 +1008,7 @@ REPEAT:
 
 	if (ctx->malloc_failure &&
 	    MEMFAULT_COUNT_FAULTS () - last_fault_count > 0 &&
-	    status == CAIRO_STATUS_NO_MEMORY)
+	    finish_status == CAIRO_STATUS_NO_MEMORY)
 	{
 	    cairo_destroy (cr);
 	    cairo_surface_destroy (surface);
@@ -1021,9 +1026,9 @@ REPEAT:
 	    goto REPEAT;
 	}
 #endif
-	if (status) {
+	if (finish_status) {
 	    cairo_test_log (ctx, "Error: Failed to finish surface: %s\n",
-			    cairo_status_to_string (status));
+			    cairo_status_to_string (finish_status));
 	    ret = CAIRO_TEST_FAILURE;
 	    goto UNWIND_CAIRO;
 	}
@@ -1470,7 +1475,7 @@ UNWIND_STRINGS:
 #include <signal.h>
 #include <setjmp.h>
 /* Used to catch crashes in a test, so that we report it as such and
- * continue testing, although one crasher may already have corrupted memory in
+ * continue testing, although one crash may already have corrupted memory in
  * an nonrecoverable fashion. */
 static jmp_buf jmpbuf;
 
@@ -1512,9 +1517,13 @@ _cairo_test_context_run_for_target (cairo_test_context_t *ctx,
     if (! RUNNING_ON_VALGRIND) {
 	void (* volatile old_segfault_handler)(int);
 	void (* volatile old_segfpe_handler)(int);
+#ifdef SIGPIPE
 	void (* volatile old_sigpipe_handler)(int);
+#endif
 	void (* volatile old_sigabrt_handler)(int);
+#ifdef SIGALRM
 	void (* volatile old_sigalrm_handler)(int);
+#endif
 
 	/* Set up a checkpoint to get back to in case of segfaults. */
 #ifdef SIGSEGV
@@ -1660,6 +1669,16 @@ const cairo_test_context_t *
 cairo_test_get_context (cairo_t *cr)
 {
     return cairo_get_user_data (cr, &_cairo_test_context_key);
+}
+
+cairo_t *
+cairo_test_create (cairo_surface_t *surface,
+		   const cairo_test_context_t *ctx)
+{
+    cairo_t *cr = cairo_create (surface);
+    cairo_set_user_data (cr, &_cairo_test_context_key,
+			 (void*) ctx, NULL);
+    return cr;
 }
 
 cairo_surface_t *
@@ -1809,4 +1828,71 @@ cairo_test_status_from_status (const cairo_test_context_t *ctx,
 	return CAIRO_TEST_NO_MEMORY;
 
     return CAIRO_TEST_FAILURE;
+}
+
+#if CAIRO_HAS_FT_FONT
+
+#include "cairo-ft.h"
+
+static void
+_free_face (void *face)
+{
+    FT_Done_Face ((FT_Face) face);
+}
+
+static FT_Library ft_library = NULL;
+
+#endif
+
+static const cairo_user_data_key_t ft_font_key;
+
+cairo_test_status_t
+cairo_test_ft_select_font_from_file (cairo_t      *cr,
+                                     const char   *filename)
+{
+    const cairo_test_context_t *ctx = cairo_test_get_context (cr);
+#if CAIRO_HAS_FT_FONT
+    FT_Face face;
+    cairo_font_face_t *font_face;
+    char *srcdir_filename = NULL;
+
+    if (access (filename, F_OK) != 0) {
+	if (ctx->srcdir) {
+	    xasprintf (&srcdir_filename, "%s/%s", ctx->srcdir, filename);
+            filename = srcdir_filename;
+	}
+    }
+
+    if (access (filename, F_OK) != 0) {
+        cairo_test_log (ctx, "Could not find font file: %s\n", filename);
+        return CAIRO_TEST_FAILURE;
+    }
+
+    if (!ft_library) {
+        if (FT_Init_FreeType (&ft_library))
+            return CAIRO_TEST_FAILURE;
+    }
+
+    if (FT_New_Face (ft_library, filename, 0, &face)) {
+        cairo_test_log (ctx, "FT_New_Face failed loading font file: %s\n", filename);
+        return CAIRO_TEST_FAILURE;
+    }
+
+    free (srcdir_filename);
+    font_face = cairo_ft_font_face_create_for_ft_face (face, 0);
+    if (cairo_font_face_status (font_face))
+        return CAIRO_TEST_FAILURE;
+
+    cairo_font_face_set_user_data (font_face, &ft_font_key, face, _free_face);
+    cairo_set_font_face (cr, font_face);
+    if (cairo_status (cr))
+        return CAIRO_TEST_FAILURE;
+
+    cairo_font_face_destroy (font_face);
+
+    return CAIRO_TEST_SUCCESS;
+#else
+    cairo_test_log (ctx, "cairo_test_ft_select_font_from_file() requires the FreeType backend\n");
+    return CAIRO_TEST_FAILURE;
+#endif
 }

@@ -34,9 +34,7 @@
  *	Benjamin Otte <otte@redhat.com>
  */
 
-#ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif
 
 #include "cairo-gobject.h"
 
@@ -44,14 +42,14 @@
 GType \
 underscore_name ## _get_type (void) \
 { \
-   static volatile gsize type_volatile = 0; \
-   if (g_once_init_enter (&type_volatile)) { \
+   static gsize type_ret = 0; \
+   if (g_once_init_enter (&type_ret)) { \
       GType type = g_boxed_type_register_static (g_intern_static_string (Name), \
                                                  (GBoxedCopyFunc)copy_func, \
                                                  (GBoxedFreeFunc)free_func); \
-      g_once_init_leave (&type_volatile, type); \
+      g_once_init_leave (&type_ret, type); \
    } \
-   return type_volatile; \
+   return type_ret; \
 }
 
 CAIRO_DEFINE_BOXED ("CairoContext", cairo_gobject_context, 
@@ -71,12 +69,19 @@ CAIRO_DEFINE_BOXED ("CairoFontOptions", cairo_gobject_font_options,
 CAIRO_DEFINE_BOXED ("CairoRegion", cairo_gobject_region, 
                     cairo_region_reference, cairo_region_destroy);
 
+#if GLIB_CHECK_VERSION(2, 68, 0)
 #define COPY_FUNC(name) \
 static gpointer \
-cairo_gobject_cairo_ ## name ## _copy (gpointer src) \
-{ \
-    return g_memdup (src, sizeof (cairo_ ## name ## _t)); \
+cairo_gobject_cairo_ ## name ## _copy (gpointer src) { \
+  return g_memdup2 (src, sizeof (cairo_ ## name ## _t)); \
 }
+#else
+#define COPY_FUNC(name) \
+static gpointer \
+cairo_gobject_cairo_ ## name ## _copy (gpointer src) { \
+  return g_memdup (src, sizeof (cairo_ ## name ## _t)); \
+}
+#endif
 
 COPY_FUNC (matrix)
 CAIRO_DEFINE_BOXED ("CairoMatrix", cairo_gobject_matrix, 
@@ -87,3 +92,9 @@ CAIRO_DEFINE_BOXED ("CairoRectangle", cairo_gobject_rectangle,
 COPY_FUNC (rectangle_int)
 CAIRO_DEFINE_BOXED ("CairoRectangleInt", cairo_gobject_rectangle_int, 
                     cairo_gobject_cairo_rectangle_int_copy, g_free);
+COPY_FUNC (glyph)
+CAIRO_DEFINE_BOXED ("CairoGlyph", cairo_gobject_glyph,
+                    cairo_gobject_cairo_glyph_copy, g_free);
+COPY_FUNC (text_cluster)
+CAIRO_DEFINE_BOXED ("CairoTextCluster", cairo_gobject_text_cluster,
+                    cairo_gobject_cairo_text_cluster_copy, g_free);

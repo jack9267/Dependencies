@@ -27,6 +27,9 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+
+/* Disable deprecation warnings coming from librsvg */
+#define RSVG_DISABLE_DEPRECATION_WARNINGS
 #include <librsvg/rsvg.h>
 
 #define FAIL(msg)							\
@@ -52,12 +55,11 @@ int main (int argc, char *argv[])
 
     error = NULL;
 
-    rsvg_set_default_dpi (72.0);
-
     handle = rsvg_handle_new_from_file (filename, &error);
     if (!handle)
 	FAIL (error->message);
 
+    rsvg_handle_set_dpi (handle, 72.0);
     rsvg_handle_get_dimensions (handle, &dimensions);
 
     surface = cairo_image_surface_create (CAIRO_FORMAT_RGB24,
@@ -80,9 +82,6 @@ int main (int argc, char *argv[])
     cairo_destroy (cr);
     if (status)
 	FAIL (cairo_status_to_string (status));
-
-    if (!rsvg_handle_close (handle, &error))
-	FAIL (error->message);
 
     g_object_unref (handle);
     return 0;

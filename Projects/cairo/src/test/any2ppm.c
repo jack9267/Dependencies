@@ -50,9 +50,7 @@
  * Author: Kristian Høgsberg <krh@redhat.com>
  */
 
-#if HAVE_CONFIG_H
 #include "config.h"
-#endif
 
 #if HAVE_UNISTD_H
 #include <unistd.h>
@@ -62,13 +60,17 @@
 #include <string.h>
 
 #include <cairo.h>
+
+#if CAIRO_HAS_INTERPRETER
 #include <cairo-script-interpreter.h>
+#endif
 
 #if CAIRO_CAN_TEST_PDF_SURFACE
 #include <poppler.h>
 #endif
 
 #if CAIRO_CAN_TEST_SVG_SURFACE
+#define RSVG_DISABLE_DEPRECATION_WARNINGS
 #include <librsvg/rsvg.h>
 #ifndef RSVG_CAIRO_H
 #include <librsvg/rsvg-cairo.h>
@@ -85,12 +87,21 @@
 #include <fcntl.h>
 #endif
 
-#if HAVE_UNISTD_H && HAVE_SIGNAL_H && HAVE_SYS_STAT_H && HAVE_SYS_SOCKET_H && HAVE_SYS_POLL_H && HAVE_SYS_UN_H
+#ifdef _WIN32
+#include <io.h>
+#endif
+
+#if HAVE_UNISTD_H && HAVE_SIGNAL_H && HAVE_SYS_STAT_H && HAVE_SYS_SOCKET_H && (HAVE_POLL_H || HAVE_SYS_POLL_H) && HAVE_SYS_UN_H
 #include <signal.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
-#include <sys/poll.h>
 #include <sys/un.h>
+
+#if defined(HAVE_POLL_H)
+#include <poll.h>
+#elif defined(HAVE_SYS_POLL_H)
+#include <sys/poll.h>
+#endif
 
 #define SOCKET_PATH "./.any2ppm"
 #define TIMEOUT 60000 /* 60 seconds */
@@ -201,6 +212,8 @@ write_ppm (cairo_surface_t *surface, int fd)
     case CAIRO_FORMAT_A1:
     case CAIRO_FORMAT_RGB16_565:
     case CAIRO_FORMAT_RGB30:
+    case CAIRO_FORMAT_RGB96F:
+    case CAIRO_FORMAT_RGBA128F:
     case CAIRO_FORMAT_INVALID:
     default:
 	return "unhandled image format";
@@ -436,6 +449,7 @@ _rsvg_render_page (const char *filename,
     if (handle == NULL)
 	return error->message; /* XXX g_error_free */
 
+    rsvg_handle_set_dpi (handle, 72.0);
     rsvg_handle_get_dimensions (handle, &dimensions);
     surface = cairo_image_surface_create (CAIRO_FORMAT_ARGB32,
 					  dimensions.width,
@@ -871,10 +885,6 @@ main (int argc, char **argv)
 #if GLIB_MAJOR_VERSION <= 2 && GLIB_MINOR_VERSION <= 34
     g_type_init ();
 #endif
-#endif
-
-#if CAIRO_CAN_TEST_SVG_SURFACE
-    rsvg_set_default_dpi (72.0);
 #endif
 
 #if defined(_WIN32) && !defined (__CYGWIN__)

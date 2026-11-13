@@ -266,6 +266,55 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   way (about 70 ms here: every switch snapshots every thread on the system with ToolHelp) - no change. The DLL imports
   `KERNEL32` and `msvcrt`, and exports the `.def`'s 12 functions.
 
+## pixman and cairo (`Projects/pixman`, `Projects/cairo`)
+
+- **pixman 0.46.4 and cairo 1.18.6** (2026-11-13, from 0.38.4 and 1.16.0, both of 2018-2019; tarballs checked against
+  the `.sha512`/`.sha256sum` cairographics.org gives beside them), Windows only, updated together - cairo is pixman's
+  only user here. `src` is each whole release (pixman's but for twelve `.gitlab-ci.d/meson-cross` symlinks `tar` can't
+  make on Windows). pixman is stock; **cairo is stock but for upstream commit `a1718af9`** ("Win32: Fix build with
+  DWrite disabled", 2026-09-22, after 1.18.6): without it `src/win32/cairo-win32-system.c` doesn't compile with
+  DirectWrite off - `CO_MTA_USAGE_COOKIE` undeclared (`WIN32_LEAN_AND_MEAN` keeps the COM headers out), and a call to
+  `cairo_win32_dwrite_finalize` - in upstream's own meson build as much as ours. Drop it at the next release.
+- **Both build with meson now** (cairo 1.18 dropped autotools and its Win32 makefiles), so premake reads the source lists
+  from their `meson.build`s (`meson_files`/`meson_dict_files`): pixman's `pixman_files`; cairo's `cairo_sources` plus
+  `cairo_feature_sources` for the features we have. The generated headers were made by each release's own meson,
+  x86 and x64 (meson, ninja and pkgconf from PyPI in a venv, run inside `vcvarsall`; for cairo, `.pc` files pointing
+  at Dependencies' own `include` and `Lib/<arch>/v143_static/Release` static libraries, `--wrap-mode=nofallback
+  -Db_vscrt=mt`). pixman: `-Ddefault_library=static -Dtls=disabled`, every SIMD option off, no tests, demos, OpenMP,
+  GTK or libpng; it gives `pixman-config.h` (beside `src`, the same for both) and `pixman-version.h`
+  (`include`, with a copy of `src/pixman/pixman.h`). cairo: freetype, png and zlib enabled; dwrite, fontconfig,
+  quartz, tee, xcb, xlib, glib, spectre, symbol-lookup, lzo, tests off; it gives `config.h` (beside `src`; x86 and x64
+  differ only in `SIZEOF_SIZE_T`/`SIZEOF_VOID_P`, merged with `#ifdef _WIN64`) and `cairo-features.h` (`include`,
+  with copies of `src/src`'s public headers). Make all of them again on an update. The defines and flags in premake
+  are meson's compile line.
+- **What changed in what consumers get**: pixman's `include` used to hold copies of its private headers too
+  (`pixman-private.h` and five more) - now only `pixman.h` and `pixman-version.h`. cairo has the same surfaces and font
+  backends as 1.16 (win32 surface and fonts, FreeType, PNG, PS, PDF, SVG, script); the old hand-made
+  `cairo-features.h` also said `CAIRO_HAS_GOBJECT_FUNCTIONS`, which nothing built, and `cairo-gobject.h` is gone.
+  FreeType 2.13+'s colour glyphs are new (`HAVE_FT_COLR_V1`, `HAVE_FT_SVG_DOCUMENT`). Every function 1.16's headers
+  declared is still exported, and 15 are new (colour fonts, hairlines, dithering, PDF metadata). **A program linking
+  `cairo_static` now needs `ole32.lib`** (`CoInitializeEx`), besides gdi32, msimg32 and user32.
+- **pixman is plain C, as before**, and **`PIXMAN_NO_TLS`, as before**: meson's TLS is `__declspec(thread)`, which a
+  `LoadLibrary`'d module can't have on XP, and pixman's `TlsAlloc` path is MinGW-only - so its fast-path cache is one
+  static for every thread. Six threads drawing the same scene at once all matched one thread's, pixel for pixel.
+- **XP**: cairo 1.18 is written for Vista - meson compiles it with `_WIN32_WINNT` Vista (kept), and it uses SRW locks
+  and `InitOnce`, which YY-Thunks gives every DLL and program the XP target builds (`cairo.dll` imports nothing newer
+  than XP). **It also sets itself up from a TLS callback** (`.CRT$XLD`, forcing `_tls_used`), not `DllMain` - mutexes,
+  per-thread data, freeing a thread's data when it ends - and keeps per-thread data in `_Thread_local` (hence
+  `/std:c11`). That works on XP in a DLL `LoadLibrary`'d after start too (an injected hack), where XP's own loader
+  would skip it: jbuild's `yy-thunks-tls` (on by default) gives every DLL YY-Thunks' entry point, which sets up the
+  module's TLS and runs its callbacks itself (the user, 2026-11-13). Nothing calls cairo yet (GTAC's and
+  GalacticSamples' link lines name `cairo_static`/`pixman_static`, but no code includes `cairo.h` - GUITest's
+  `USE_CAIRO` is defined and unused), so the linker leaves it out until something does.
+- Tested, x86 and x64, Debug and Release, static and through `cairo.dll`, ten runs each: shapes, gradients, clipping and
+  dashes on an image surface (exact pixels), a PNG out and back identical, text through the win32 font backend (the toy
+  API and a `LOGFONTW`) and through FreeType (Arial, and Segoe UI Emoji's COLR glyphs in colour), PDF, SVG and
+  PostScript surfaces into memory, a win32 DIB surface, and the threads above. **A test mistake worth knowing**: an
+  `FT_Face` handed to `cairo_ft_font_face_create_for_ft_face` must be freed from the font face's destroy callback
+  (`cairo_font_face_set_user_data`), not after `cairo_font_face_destroy` - cairo's caches keep the face, keyed by the
+  `FT_Face` pointer, and a new face at a freed one's address got its stale entry, no size set, and FreeType 2.15's
+  `ft_glyphslot_preset_bitmap` (width over 16 x ppem) refused it as `Raster_Overflow`, on a third of runs.
+
 ## libogg (`Projects/ogg`)
 
 - **1.3.6, stock** (2026-11-13, from 1.3.4; tarball checked against xiph's `SHA256SUMS`). `src` is the whole release;

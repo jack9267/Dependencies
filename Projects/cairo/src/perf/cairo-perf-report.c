@@ -25,16 +25,15 @@
  * Authors: Carl Worth <cworth@cworth.org>
  */
 
+#include "config.h"
+
 #define _GETDELIM 1/* for getline() on AIX */
 
 #include "cairo-perf.h"
 #include "cairo-missing.h"
 #include "cairo-stats.h"
+#include "cairo-ctype-inline.h"
 
-/* We use _GNU_SOURCE for getline and strndup if available. */
-#ifndef _GNU_SOURCE
-# define _GNU_SOURCE
-#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -47,10 +46,12 @@
 #endif
 
 #ifdef _MSC_VER
+#if _MSC_VER < 1800
 static long long
 strtoll (const char  *nptr,
 	 char	    **endptr,
 	 int	      base);
+#endif
 
 static char *
 basename (char *path);
@@ -100,7 +101,7 @@ do {									\
 #define parse_string(result)						\
 do {									\
     for (end = s; *end; end++)						\
-	if (isspace (*end))						\
+	if (_cairo_isspace (*end))					\
 	    break;							\
     (result) = strndup (s, end - s);					\
     if ((result) == NULL) {						\
@@ -223,6 +224,8 @@ test_report_parse (test_report_t *report,
  * The basename function is fully compliant to its GNU specs.
  */
 #ifdef _MSC_VER
+
+#if _MSC_VER < 1800
 long long
 strtoll (const char  *nptr,
 	 char	    **endptr,
@@ -230,6 +233,7 @@ strtoll (const char  *nptr,
 {
     return _atoi64(nptr);
 }
+#endif
 
 static char *
 basename (char *path)

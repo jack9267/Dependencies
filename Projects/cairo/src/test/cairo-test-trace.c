@@ -52,8 +52,6 @@
  *     scope of this test.
  */
 
-#define _GNU_SOURCE 1	/* getline() */
-
 #include "cairo-test.h"
 #include "buffer-diff.h"
 
@@ -79,12 +77,21 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/mman.h>
-#include <sys/poll.h>
 #include <sys/un.h>
 #include <errno.h>
 #include <assert.h>
+#include <unistd.h>
+
 #if CAIRO_HAS_REAL_PTHREAD
 #include <pthread.h>
+#endif
+
+#if defined(HAVE_POLL_H)
+#include <poll.h>
+#elif defined(HAVE_SYS_POLL_H)
+#include <sys/poll.h>
+#else
+#error No poll.h equivalent found
 #endif
 
 #if HAVE_FCFINI
@@ -545,7 +552,11 @@ spawn_shm (const char *shm_path)
 
     base = mmap (NULL, DATA_SIZE,
 		 PROT_READ | PROT_WRITE,
+#ifdef MAP_NORESERVE
 		 MAP_SHARED | MAP_NORESERVE,
+#else
+		 MAP_SHARED,
+#endif
 		 fd, 0);
     close (fd);
 
@@ -784,7 +795,8 @@ matches_reference (struct slave *slave)
 			int channel;
 
 			for (channel = 0; channel < 4; channel++) {
-			    unsigned va, vb, diff;
+			    int va, vb;
+			    unsigned diff;
 
 			    va = (ua[x] >> (channel*8)) & 0xff;
 			    vb = (ub[x] >> (channel*8)) & 0xff;
@@ -808,7 +820,8 @@ matches_reference (struct slave *slave)
 			int channel;
 
 			for (channel = 0; channel < 3; channel++) {
-			    unsigned va, vb, diff;
+			    int va, vb;
+			    unsigned diff;
 
 			    va = (ua[x] >> (channel*8)) & 0xff;
 			    vb = (ub[x] >> (channel*8)) & 0xff;
@@ -849,6 +862,8 @@ matches_reference (struct slave *slave)
 
 	case CAIRO_FORMAT_RGB30:
 	case CAIRO_FORMAT_RGB16_565:
+        case CAIRO_FORMAT_RGB96F:
+        case CAIRO_FORMAT_RGBA128F:
 	case CAIRO_FORMAT_INVALID:
 	    assert (0);
 	}
@@ -906,7 +921,7 @@ write_result (const char *trace, struct slave *slave)
     static int index;
     char *filename;
 
-    xasprintf (&filename, "%s-%s-pass-%d-%d-%d.png",
+    xasprintf (&filename, "%s-%s-pass-%d-%ld-%ld.png",
 	       trace, slave->target->name, ++index,
 	       slave->start_line, slave->end_line);
     cairo_surface_write_to_png (slave->image, filename);
@@ -1175,7 +1190,7 @@ test_run (void *base,
 	    if (write_results) write_result (trace, &slaves[1]);
 	    if (write_traces && slaves[0].is_recording) {
 		char buf[80];
-		snprintf (buf, sizeof (buf), "%d", slaves[0].image_serial);
+		snprintf (buf, sizeof (buf), "%ld", slaves[0].image_serial);
 		write_trace (trace, buf, &slaves[0]);
 	    }
 
@@ -1203,7 +1218,7 @@ test_run (void *base,
 	    image = 0;
 	}
     }
-done:
+
     ret = TRUE;
 
 out:
@@ -1504,11 +1519,11 @@ read_excludes (test_trace_t *test, const char *filename)
 
 	/* whitespace delimits */
 	s = line;
-	while (*s != '\0' && isspace (*s))
+	while (*s != '\0' && isspace ((unsigned char)*s))
 	    s++;
 
 	t = s;
-	while (*t != '\0' && ! isspace (*t))
+	while (*t != '\0' && ! isspace ((unsigned char)*t))
 	    t++;
 
 	if (s != t) {

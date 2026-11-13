@@ -3,45 +3,6 @@ Cairo Utilities
 
 There are a varieties of utilities we use with cairo.
 
-
-backtrace-symbols
------------------
-
-This is a small shared library designed to be preloaded by the
-linker and its purpose is to make the backtrace_symbols() function
-of glibc produce more useful source reference information.
-
-Build by:
-
-	make backtrace-symbols.so
-
-and use by:
-
-	LD_PRELOAD=$PWD/backtrace-symbols.so app-to-run
-
-This code should be contributed back to glibc at some point.
-
-
-malloc-stats
-------------
-
-This is a small shared library designed to be preloaded by the
-linker and its purpose is to make the malloc_stats() function
-of glibc produce more useful information.
-
-Build by:
-
-	make malloc-stats.so
-
-and use by:
-
-	LD_PRELOAD=$PWD/malloc-stats.so app-to-run
-
-This works best when backtrace-symbols is in use.  That is:
-
-	LD_PRELOAD="$PWD/backtrace-symbols.so $PWD/malloc-stats.so" app-to-run
-
-
 cairo-trace
 -----------
 

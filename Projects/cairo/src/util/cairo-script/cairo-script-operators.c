@@ -46,11 +46,6 @@
 #include <stdlib.h> /* mkstemp */
 #include <string.h>
 
-#ifdef _MSC_VER
-#define _USE_MATH_DEFINES /* for M_LN2, M_PI and M_SQRT2 on win32 */
-#define snprintf _snprintf
-#endif
-
 #include <math.h>
 #include <limits.h> /* INT_MAX */
 #include <assert.h>
@@ -60,7 +55,7 @@
 #endif
 
 #if HAVE_LZO
-#include <lzo/lzo2a.h>
+#include <lzo2a.h>
 #endif
 
 #ifdef HAVE_MMAP
@@ -465,6 +460,7 @@ _csi_ostack_get_matrix (csi_t *ctx, unsigned int i, cairo_matrix_t *out)
 			       csi_number_get_value (&obj->datum.array->stack.objects[5]));
 	    return CSI_STATUS_SUCCESS;
 	}
+	/* else fall through */
     default:
 	return _csi_error (CSI_STATUS_INVALID_SCRIPT);
     }
@@ -1757,46 +1753,47 @@ _mmap_bytes (const struct mmap_vec *vec, int count)
 static void *
 inflate_string (csi_t *ctx, csi_string_t *src)
 {
-    uLongf len;
     uint8_t *bytes;
 
-    len = src->deflate;
-    bytes = _csi_alloc (ctx, len + 1);
+    bytes = _csi_alloc (ctx, src->deflate + 1);
     if (bytes == NULL)
 	return NULL;
 
     switch (src->method) {
-    default:
-    case NONE:
-	free (bytes);
-	return NULL;
-
     case ZLIB:
+    {
 #if HAVE_ZLIB
-	if (uncompress ((Bytef *) bytes, &len,
-			(Bytef *) src->string, src->len) != Z_OK)
-#endif
+        uLongf length = src->deflate;
+	if (uncompress ((Bytef *) bytes, &length,
+			(Bytef *) src->string, src->len) == Z_OK)
 	{
-	    _csi_free (ctx, bytes);
-	    return NULL;
+            bytes[length] = '\0';
+            return bytes;
 	}
-	break;
-
-    case LZO:
-#if HAVE_LZO
-	if (lzo2a_decompress ((Bytef *) src->string, src->len,
-			      (Bytef *) bytes, &len,
-			      NULL))
 #endif
-	{
-	    _csi_free (ctx, bytes);
-	    return NULL;
-	}
 	break;
     }
+    case LZO:
+    {
+#if HAVE_LZO
+        lzo_uint length = src->deflate;
+	if (lzo2a_decompress ((Bytef *) src->string, src->len,
+			      (Bytef *) bytes, &length,
+			      NULL) == LZO_E_OK)
+	{
+            bytes[length] = '\0';
+            return bytes;
+	}
+#endif
+	break;
+    }
+    case NONE:
+    default:
+        break;
+    }
 
-    bytes[len] = '\0';
-    return bytes;
+    _csi_free (ctx, bytes);
+    return NULL;
 }
 
 static csi_status_t
@@ -2967,6 +2964,12 @@ _image_read_raw (csi_t *ctx,
     case CAIRO_FORMAT_ARGB32:
 	instride = rowlen = 4 * width;
 	break;
+    case CAIRO_FORMAT_RGB96F:
+	instride = rowlen = 12 * width;
+	break;
+    case CAIRO_FORMAT_RGBA128F:
+	instride = rowlen = 16 * width;
+	break;
     }
     len = rowlen * height;
 
@@ -2975,7 +2978,6 @@ _image_read_raw (csi_t *ctx,
 	len == src->datum.string->deflate)
     {
 	csi_string_t *s = src->datum.string;
-	unsigned long out = s->deflate;
 
 	switch (s->method) {
 	default:
@@ -2985,21 +2987,27 @@ err_decompress:
 	    return _csi_error (CSI_STATUS_READ_ERROR);
 
 	case ZLIB:
+        {
 #if HAVE_ZLIB
+            uLongf out = s->deflate;
 	    if (uncompress ((Bytef *) data, &out,
 			    (Bytef *) s->string, s->len) != Z_OK)
 #endif
 		goto err_decompress;
 	    break;
+        }
 
 	case LZO:
+        {
 #if HAVE_LZO
+            lzo_uint out = s->deflate;
 	    if (lzo2a_decompress ((Bytef *) s->string, s->len,
 				  (Bytef *) data, &out,
 				  NULL))
 #endif
 		goto err_decompress;
 	    break;
+        }
 	}
     }
     else
@@ -3066,6 +3074,8 @@ err_decompress:
 #endif
 		    }
 		    break;
+		case CAIRO_FORMAT_RGB96F:
+		case CAIRO_FORMAT_RGBA128F:
 		case CAIRO_FORMAT_RGB30:
 		case CAIRO_FORMAT_INVALID:
 		case CAIRO_FORMAT_ARGB32:
@@ -3155,6 +3165,8 @@ err_decompress:
 #endif
 		}
 		break;
+	    case CAIRO_FORMAT_RGBA128F:
+	    case CAIRO_FORMAT_RGB96F:
 	    case CAIRO_FORMAT_RGB30:
 	    case CAIRO_FORMAT_INVALID:
 	    case CAIRO_FORMAT_ARGB32:
@@ -3191,6 +3203,8 @@ err_decompress:
 	    case CAIRO_FORMAT_A8:
 		break;
 
+	    case CAIRO_FORMAT_RGBA128F:
+	    case CAIRO_FORMAT_RGB96F:
 	    case CAIRO_FORMAT_RGB30:
 	    case CAIRO_FORMAT_RGB24:
 	    case CAIRO_FORMAT_INVALID:
@@ -5149,6 +5163,27 @@ _set_line_width (csi_t *ctx)
 }
 
 static csi_status_t
+_set_hairline (csi_t *ctx)
+{
+    csi_status_t status;
+    cairo_t *cr;
+    cairo_bool_t set_hairline = FALSE; /* silence the compiler */
+
+    check (2);
+
+    status = _csi_ostack_get_boolean (ctx, 0, &set_hairline);
+    if (_csi_unlikely (status))
+	return status;
+    status = _csi_ostack_get_context (ctx, 1, &cr);
+	if (_csi_unlikely (status))
+	return status;
+
+    cairo_set_hairline (cr, set_hairline);
+	pop (1);
+	return CSI_STATUS_SUCCESS;
+}
+
+static csi_status_t
 _set_matrix (csi_t *ctx)
 {
     csi_object_t *obj;
@@ -6612,6 +6647,7 @@ _defs[] = {
     { "set-line-cap", _set_line_cap },
     { "set-line-join", _set_line_join },
     { "set-line-width", _set_line_width },
+    { "set-hairline", _set_hairline },
     { "set-matrix", _set_matrix },
     { "set-miter-limit", _set_miter_limit },
     { "set-mime-data", _set_mime_data },
@@ -6764,6 +6800,9 @@ _integer_constants[] = {
     { "RGB16_565",		CAIRO_FORMAT_RGB16_565 },
     { "RGB24",			CAIRO_FORMAT_RGB24 },
     { "ARGB32",			CAIRO_FORMAT_ARGB32 },
+    { "RGB30",			CAIRO_FORMAT_RGB30 },
+    { "RGB96F",			CAIRO_FORMAT_RGB96F },
+    { "RGBA128F",		CAIRO_FORMAT_RGBA128F },
     { "INVALID",		CAIRO_FORMAT_INVALID },
 
     { NULL, 0 }

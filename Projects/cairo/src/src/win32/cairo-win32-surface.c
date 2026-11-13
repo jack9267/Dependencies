@@ -37,17 +37,9 @@
  *	Vladimir Vukicevic <vladimir@pobox.com>
  */
 
-#define WIN32_LEAN_AND_MEAN
-/* We require Windows 2000 features such as ETO_PDY */
-#if !defined(WINVER) || (WINVER < 0x0500)
-# define WINVER 0x0500
-#endif
-#if !defined(_WIN32_WINNT) || (_WIN32_WINNT < 0x0500)
-# define _WIN32_WINNT 0x0500
-#endif
-
 #include "cairoint.h"
 
+#include "cairo-backend-private.h"
 #include "cairo-default-context-private.h"
 #include "cairo-error-private.h"
 #include "cairo-image-surface-private.h"
@@ -60,10 +52,6 @@
 
 #include <wchar.h>
 #include <windows.h>
-
-#if defined(__MINGW32__) && !defined(ETO_PDY)
-# define ETO_PDY 0x2000
-#endif
 
 /**
  * SECTION:cairo-win32
@@ -90,40 +78,6 @@
  *
  * Since: 1.0
  **/
-
-/**
- * _cairo_win32_print_gdi_error:
- * @context: context string to display along with the error
- *
- * Helper function to dump out a human readable form of the
- * current error code.
- *
- * Return value: A cairo status code for the error code
- **/
-cairo_status_t
-_cairo_win32_print_gdi_error (const char *context)
-{
-    void *lpMsgBuf;
-    DWORD last_error = GetLastError ();
-
-    if (!FormatMessageW (FORMAT_MESSAGE_ALLOCATE_BUFFER |
-			 FORMAT_MESSAGE_FROM_SYSTEM,
-			 NULL,
-			 last_error,
-			 MAKELANGID (LANG_NEUTRAL, SUBLANG_DEFAULT),
-			 (LPWSTR) &lpMsgBuf,
-			 0, NULL)) {
-	fprintf (stderr, "%s: Unknown GDI error", context);
-    } else {
-	fprintf (stderr, "%s: %S", context, (wchar_t *)lpMsgBuf);
-
-	LocalFree (lpMsgBuf);
-    }
-
-    fflush (stderr);
-
-    return _cairo_error (CAIRO_STATUS_WIN32_GDI_ERROR);
-}
 
 cairo_bool_t
 _cairo_win32_surface_get_extents (void		          *abstract_surface,
@@ -155,6 +109,9 @@ _cairo_win32_surface_get_extents (void		          *abstract_surface,
 HDC
 cairo_win32_surface_get_dc (cairo_surface_t *surface)
 {
+    if (surface->backend == NULL)
+	return NULL;
+
     if (surface->backend->type == CAIRO_SURFACE_TYPE_WIN32)
 	return to_win32_surface(surface)->dc;
 
@@ -175,7 +132,7 @@ cairo_win32_surface_get_dc (cairo_surface_t *surface)
  *
  * Return value: %TRUE if the surface is an win32 surface
  **/
-static inline cairo_bool_t
+cairo_bool_t
 _cairo_surface_is_win32 (const cairo_surface_t *surface)
 {
     /* _cairo_surface_nil sets a NULL backend so be safe */
@@ -216,6 +173,16 @@ _cairo_win32_surface_emit_glyphs (cairo_win32_surface_t *dst,
 				  cairo_scaled_font_t	 *scaled_font,
 				  cairo_bool_t		  glyph_indexing)
 {
+#if CAIRO_HAS_DWRITE_FONT
+    if (scaled_font->backend->type == CAIRO_FONT_TYPE_DWRITE) {
+        if (!glyph_indexing) return CAIRO_INT_STATUS_UNSUPPORTED;
+
+        // FIXME: fake values for params that aren't currently passed in here
+        cairo_operator_t op = CAIRO_OPERATOR_SOURCE;
+        cairo_clip_t *clip = NULL;
+        return _cairo_dwrite_show_glyphs_on_surface (dst, op, source, glyphs, num_glyphs, scaled_font, clip /* , glyph_indexing */ );
+    }
+#endif
 #if CAIRO_HAS_WIN32_FONT
     WORD glyph_buf_stack[STACK_GLYPH_SIZE];
     WORD *glyph_buf = glyph_buf_stack;
@@ -296,7 +263,14 @@ _cairo_win32_surface_emit_glyphs (cairo_win32_surface_t *dst,
             next_logical_y = _cairo_lround (next_user_y);
 
             dxy_buf[j] = _cairo_lround (next_logical_x - logical_x);
-            dxy_buf[j+1] = _cairo_lround (next_logical_y - logical_y);
+            /* When delta-y values are present in dxy_buf (the ETO_PDY flag is used), these
+             * represent "displacement along the vertical direction of the font" (per MSDN:
+             * https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-exttextoutw)
+             * with positive values being upward (observed behavior, not explicitly documented).
+             * This is the opposite of the top-to-bottom logical coordinate space used here,
+             * so the subtraction is reversed compared to what would otherwise be expected.
+             */
+            dxy_buf[j+1] = _cairo_lround (logical_y - next_logical_y);
 
             logical_x = next_logical_x;
             logical_y = next_logical_y;
@@ -317,7 +291,7 @@ _cairo_win32_surface_emit_glyphs (cairo_win32_surface_t *dst,
                              num_glyphs,
                              dxy_buf);
     if (!win_result) {
-        _cairo_win32_print_gdi_error("_cairo_win32_surface_show_glyphs(ExtTextOutW failed)");
+        fprintf (stderr, "%s:%s\n", __FUNCTION__, "ExtTextOut");
     }
 
     RestoreDC(dst->dc, -1);

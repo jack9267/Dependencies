@@ -61,13 +61,10 @@ preamble (cairo_test_context_t *ctx)
     surface = cairo_image_surface_create_from_png_stream (read_png_from_data,
 							  &offset);
 
-    /* XXX: The actual error is CAIRO_STATUS_PNG_ERROR, but
-     * _cairo_surface_create_in_error() does not support that.
-     */
-    expected = CAIRO_STATUS_NO_MEMORY;
+    expected = CAIRO_STATUS_PNG_ERROR;
     status = cairo_surface_status (surface);
     cairo_surface_destroy (surface);
-    if (status != CAIRO_STATUS_NO_MEMORY) {
+    if (status != expected) {
 	cairo_test_log (ctx,
 			"Error: expected error %s, but got %s\n",
 			cairo_status_to_string (expected),

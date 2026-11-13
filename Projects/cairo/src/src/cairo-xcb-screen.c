@@ -169,7 +169,7 @@ _cairo_xcb_screen_finish (cairo_xcb_screen_t *screen)
 
     for (i = 0; i < ARRAY_LENGTH (screen->gc); i++) {
 	if (screen->gc_depths[i] != 0)
-	    _cairo_xcb_connection_free_gc (screen->connection, screen->gc[i]);
+	    xcb_free_gc (screen->connection->xcb_connection, screen->gc[i]);
     }
 
     _cairo_cache_fini (&screen->linear_pattern_cache);
@@ -249,7 +249,7 @@ _cairo_xcb_screen_get (xcb_connection_t *xcb_connection,
 	}
     }
 
-    screen = _cairo_malloc (sizeof (cairo_xcb_screen_t));
+    screen = _cairo_calloc (sizeof (cairo_xcb_screen_t));
     if (unlikely (screen == NULL))
 	goto unlock;
 
@@ -350,7 +350,7 @@ _cairo_xcb_screen_put_gc (cairo_xcb_screen_t *screen, int depth, xcb_gcontext_t 
     if (i == ARRAY_LENGTH (screen->gc)) {
 	/* perform random substitution to ensure fair caching over depths */
 	i = rand () % ARRAY_LENGTH (screen->gc);
-	_cairo_xcb_connection_free_gc (screen->connection, screen->gc[i]);
+	xcb_free_gc (screen->connection->xcb_connection, screen->gc[i]);
     }
 
     screen->gc[i] = gc;

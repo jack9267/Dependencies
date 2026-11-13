@@ -29,9 +29,7 @@
  *	    Chris Wilson <chris@chris-wilson.co.uk>
  */
 
-#define _GNU_SOURCE 1	/* for sched_getaffinity() and getline() */
-
-#include "../cairo-version.h" /* for the real version */
+#include "config.h"
 
 #include "cairo-perf.h"
 #include "cairo-stats.h"
@@ -292,11 +290,11 @@ read_excludes (cairo_perf_t *perf,
 
 	/* whitespace delimits */
 	s = line;
-	while (*s != '\0' && isspace (*s))
+	while (*s != '\0' && isspace ((unsigned char)*s))
 	    s++;
 
 	t = s;
-	while (*t != '\0' && ! isspace (*t))
+	while (*t != '\0' && ! isspace ((unsigned char)*t))
 	    t++;
 
 	if (s != t) {

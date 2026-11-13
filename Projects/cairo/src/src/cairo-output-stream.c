@@ -1,3 +1,4 @@
+/* -*- Mode: c; tab-width: 8; c-basic-offset: 4; indent-tabs-mode: t; -*- */
 /* cairo-output-stream.c: Output stream abstraction
  *
  * Copyright © 2005 Red Hat, Inc
@@ -147,7 +148,7 @@ _cairo_output_stream_create (cairo_write_func_t		write_func,
 {
     cairo_output_stream_with_closure_t *stream;
 
-    stream = _cairo_malloc (sizeof (cairo_output_stream_with_closure_t));
+    stream = _cairo_calloc (sizeof (cairo_output_stream_with_closure_t));
     if (unlikely (stream == NULL)) {
 	_cairo_error_throw (CAIRO_STATUS_NO_MEMORY);
 	return (cairo_output_stream_t *) &_cairo_output_stream_nil;
@@ -173,7 +174,7 @@ _cairo_output_stream_create_in_error (cairo_status_t status)
     if (status == CAIRO_STATUS_WRITE_ERROR)
 	return (cairo_output_stream_t *) &_cairo_output_stream_nil_write_error;
 
-    stream = _cairo_malloc (sizeof (cairo_output_stream_t));
+    stream = _cairo_calloc (sizeof (cairo_output_stream_t));
     if (unlikely (stream == NULL)) {
 	_cairo_error_throw (CAIRO_STATUS_NO_MEMORY);
 	return (cairo_output_stream_t *) &_cairo_output_stream_nil;
@@ -258,11 +259,13 @@ void
 _cairo_output_stream_write (cairo_output_stream_t *stream,
 			    const void *data, size_t length)
 {
-    if (length == 0)
+    if (length == 0 || stream->status)
 	return;
 
-    if (stream->status)
+    if (stream->closed) {
+	stream->status = CAIRO_STATUS_WRITE_ERROR;
 	return;
+    }
 
     stream->status = stream->write_func (stream, data, length);
     stream->position += length;
@@ -276,9 +279,6 @@ _cairo_output_stream_write_hex_string (cairo_output_stream_t *stream,
     const char hex_chars[] = "0123456789abcdef";
     char buffer[2];
     unsigned int i, column;
-
-    if (stream->status)
-	return;
 
     for (i = 0, column = 0; i < length; i++, column++) {
 	if (column == 38) {
@@ -382,7 +382,8 @@ _cairo_dtostr (char *buffer, size_t size, double d, cairo_bool_t limited_precisi
 }
 
 enum {
-    LENGTH_MODIFIER_LONG = 0x100
+    LENGTH_MODIFIER_LONG = 0x100,
+    LENGTH_MODIFIER_LONG_LONG = 0x200
 };
 
 /* Here's a limited reimplementation of printf.  The reason for doing
@@ -404,9 +405,6 @@ _cairo_output_stream_vprintf (cairo_output_stream_t *stream,
     const char *f, *start;
     int length_modifier, width;
     cairo_bool_t var_width;
-
-    if (stream->status)
-	return;
 
     f = fmt;
     p = buffer;
@@ -440,6 +438,10 @@ _cairo_output_stream_vprintf (cairo_output_stream_t *stream,
 	if (*f == 'l') {
 	    length_modifier = LENGTH_MODIFIER_LONG;
 	    f++;
+	    if (*f == 'l') {
+		length_modifier = LENGTH_MODIFIER_LONG_LONG;
+		f++;
+	    }
 	}
 
 	/* The only format strings exist in the cairo implementation
@@ -489,6 +491,20 @@ _cairo_output_stream_vprintf (cairo_output_stream_t *stream,
                 snprintf (buffer, sizeof buffer,
                           single_fmt, va_arg (ap, long int));
             }
+	    break;
+	case 'd' | LENGTH_MODIFIER_LONG_LONG:
+	case 'u' | LENGTH_MODIFIER_LONG_LONG:
+	case 'o' | LENGTH_MODIFIER_LONG_LONG:
+	case 'x' | LENGTH_MODIFIER_LONG_LONG:
+	case 'X' | LENGTH_MODIFIER_LONG_LONG:
+	    if (var_width) {
+		width = va_arg (ap, int);
+		snprintf (buffer, sizeof buffer,
+			  single_fmt, width, va_arg (ap, long long int));
+	    } else {
+		snprintf (buffer, sizeof buffer,
+			  single_fmt, va_arg (ap, long long int));
+	    }
 	    break;
 	case 's': {
 	    /* Write out strings as they may be larger than the buffer. */
@@ -570,7 +586,7 @@ _cairo_output_stream_print_matrix (cairo_output_stream_t *stream,
 				 m.xx, m.yx, m.xy, m.yy, m.x0, m.y0);
 }
 
-long
+long long
 _cairo_output_stream_get_position (cairo_output_stream_t *stream)
 {
     return stream->position;
@@ -639,7 +655,7 @@ _cairo_output_stream_create_for_file (FILE *file)
 	return (cairo_output_stream_t *) &_cairo_output_stream_nil_write_error;
     }
 
-    stream = _cairo_malloc (sizeof *stream);
+    stream = _cairo_calloc (sizeof *stream);
     if (unlikely (stream == NULL)) {
 	_cairo_error_throw (CAIRO_STATUS_NO_MEMORY);
 	return (cairo_output_stream_t *) &_cairo_output_stream_nil;
@@ -678,7 +694,7 @@ _cairo_output_stream_create_for_filename (const char *filename)
 	}
     }
 
-    stream = _cairo_malloc (sizeof *stream);
+    stream = _cairo_calloc (sizeof *stream);
     if (unlikely (stream == NULL)) {
 	fclose (file);
 	_cairo_error_throw (CAIRO_STATUS_NO_MEMORY);
@@ -722,7 +738,7 @@ _cairo_memory_stream_create (void)
 {
     memory_stream_t *stream;
 
-    stream = _cairo_malloc (sizeof *stream);
+    stream = _cairo_calloc (sizeof *stream);
     if (unlikely (stream == NULL)) {
 	_cairo_error_throw (CAIRO_STATUS_NO_MEMORY);
 	return (cairo_output_stream_t *) &_cairo_output_stream_nil;
@@ -749,7 +765,7 @@ _cairo_memory_stream_destroy (cairo_output_stream_t *abstract_stream,
     stream = (memory_stream_t *) abstract_stream;
 
     *length_out = _cairo_array_num_elements (&stream->array);
-    *data_out = _cairo_malloc (*length_out);
+    *data_out = _cairo_calloc (*length_out);
     if (unlikely (*data_out == NULL)) {
 	status = _cairo_output_stream_destroy (abstract_stream);
 	assert (status == CAIRO_STATUS_SUCCESS);
@@ -765,9 +781,6 @@ _cairo_memory_stream_copy (cairo_output_stream_t *base,
 			   cairo_output_stream_t *dest)
 {
     memory_stream_t *stream = (memory_stream_t *) base;
-
-    if (dest->status)
-	return;
 
     if (base->status) {
 	dest->status = base->status;
@@ -799,7 +812,7 @@ _cairo_null_stream_create (void)
 {
     cairo_output_stream_t *stream;
 
-    stream = _cairo_malloc (sizeof *stream);
+    stream = _cairo_calloc (sizeof *stream);
     if (unlikely (stream == NULL)) {
 	_cairo_error_throw (CAIRO_STATUS_NO_MEMORY);
 	return (cairo_output_stream_t *) &_cairo_output_stream_nil;

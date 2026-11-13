@@ -46,7 +46,7 @@
 #include <zlib.h>
 
 #if HAVE_LZO
-#include <lzo/lzo2a.h>
+#include <lzo2a.h>
 #endif
 
 #define DEBUG_SCAN 0
@@ -1054,6 +1054,7 @@ scan_token:
 	switch (c) {
 	case 0xa:
 	    scan->line_number++;
+	    /* fall through */
 	case 0x0:
 	case 0x9:
 	case 0xc:
@@ -1558,7 +1559,7 @@ _translate_real (csi_t *ctx,
 {
     uint8_t hdr;
 
-    if (real >= INT32_MIN && real <= INT32_MAX && (int) real == real)
+    if ((double)real >= INT32_MIN && (double)real <= INT32_MAX && (int) real == real)
 	return _translate_integer (ctx, real, closure);
 
 #if WORDS_BIGENDIAN
@@ -1594,7 +1595,10 @@ _translate_string (csi_t *ctx,
 
 #if HAVE_LZO
     if (method == NONE && buf_len > 16) {
-	unsigned long mem_len = 2*string->len > LZO2A_999_MEM_COMPRESS ? 2*string->len : LZO2A_999_MEM_COMPRESS;
+        lzo_uint mem_len = 2 * (lzo_uint)string->len;
+        if (mem_len < LZO2A_999_MEM_COMPRESS)
+            mem_len = LZO2A_999_MEM_COMPRESS;
+
 	void *mem = malloc (mem_len);
 	void *work = malloc(LZO2A_999_MEM_COMPRESS);
 
@@ -1627,7 +1631,7 @@ _translate_string (csi_t *ctx,
 		method = NONE;
 		deflate = 0;
 	    } else {
-		unsigned long mem_len = 2*string->deflate;
+		lzo_uint mem_len = 2*string->deflate;
 		void *mem = malloc (mem_len);
 		void *work = malloc(LZO2A_999_MEM_COMPRESS);
 
