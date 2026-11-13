@@ -1070,42 +1070,44 @@ dep("curl", {
 		"Projects/curl/src/lib/vtls/*.c" },
 })
 
+-- meson_files(file, var): the .c/.cpp files named in a meson.build's `var = files(...)` or `var = [...]`;
+-- meson_dict_files(file, var, key): those of one key's list in a `var = { 'key': [...], ... }`. pixman and cairo
+-- take their source lists from their own meson.build this way.
+local function meson_text(file)
+	local text = io.readfile(path.join(_SCRIPT_DIR, file))
+	if not text then error("no " .. file) end
+	return "\n" .. text:gsub("\r", "")  -- so a name on the first line has a newline before it too
+end
+local function meson_names(block, prefix)
+	local t = {}
+	for f in block:gmatch("'([^']+%.cp?p?)'") do t[#t + 1] = prefix .. f end
+	return t
+end
+local function meson_files(file, var, prefix)
+	local text = meson_text(file)
+	local block = text:match("\n" .. var .. "%s*=%s*files%((.-)%)") or text:match("\n" .. var .. "%s*=%s*%[(.-)%]")
+	if not block then error("no " .. var .. " in " .. file) end
+	return meson_names(block, prefix)
+end
+local function meson_dict_files(file, var, key, prefix)
+	local dict = meson_text(file):match("\n" .. var .. "%s*=%s*{(.-)\n}")
+	if not dict then error("no " .. var .. " in " .. file) end
+	local block = dict:match("'" .. key:gsub("%-", "%%-") .. "'%s*:%s*%[(.-)%]")
+	if not block then error("no " .. key .. " in " .. var .. " in " .. file) end
+	return meson_names(block, prefix)
+end
+
+-- pixman: plain C (no MMX/SSE2/SSSE3 code, as before) and static only. The sources are pixman/meson.build's
+-- pixman_files; pixman-config.h (beside src) and include/pixman-version.h were made by the release's own meson
+-- (Dependencies' CLAUDE.md says how), include/pixman.h is a copy of src/pixman/pixman.h. PIXMAN_NO_TLS: meson's
+-- TLS is __declspec(thread), which a LoadLibrary'd module can't have on XP; without it the fast-path cache is one
+-- static for every thread, as it always was here.
 dep("pixman", {
 	systems = WINDOWS,
-	includedirs = { "Projects/pixman/include", "Projects/pixman/src/pixman" },
-	defines = { "PIXMAN_NO_TLS", "PACKAGE=\"pixman\"", "PACKAGE_VERSION=\"0.38.0\"", "PACKAGE_BUGREPORT=\"\"" },
-	files = {
-		"Projects/pixman/src/pixman/pixman.c",
-		"Projects/pixman/src/pixman/pixman-access.c",
-		"Projects/pixman/src/pixman/pixman-access-accessors.c",
-		"Projects/pixman/src/pixman/pixman-bits-image.c",
-		"Projects/pixman/src/pixman/pixman-combine32.c",
-		"Projects/pixman/src/pixman/pixman-combine-float.c",
-		"Projects/pixman/src/pixman/pixman-conical-gradient.c",
-		"Projects/pixman/src/pixman/pixman-filter.c",
-		"Projects/pixman/src/pixman/pixman-x86.c",
-		"Projects/pixman/src/pixman/pixman-mips.c",
-		"Projects/pixman/src/pixman/pixman-arm.c",
-		"Projects/pixman/src/pixman/pixman-ppc.c",
-		"Projects/pixman/src/pixman/pixman-edge.c",
-		"Projects/pixman/src/pixman/pixman-edge-accessors.c",
-		"Projects/pixman/src/pixman/pixman-fast-path.c",
-		"Projects/pixman/src/pixman/pixman-glyph.c",
-		"Projects/pixman/src/pixman/pixman-general.c",
-		"Projects/pixman/src/pixman/pixman-gradient-walker.c",
-		"Projects/pixman/src/pixman/pixman-image.c",
-		"Projects/pixman/src/pixman/pixman-implementation.c",
-		"Projects/pixman/src/pixman/pixman-linear-gradient.c",
-		"Projects/pixman/src/pixman/pixman-matrix.c",
-		"Projects/pixman/src/pixman/pixman-noop.c",
-		"Projects/pixman/src/pixman/pixman-radial-gradient.c",
-		"Projects/pixman/src/pixman/pixman-region16.c",
-		"Projects/pixman/src/pixman/pixman-region32.c",
-		"Projects/pixman/src/pixman/pixman-solid-fill.c",
-		"Projects/pixman/src/pixman/pixman-timer.c",
-		"Projects/pixman/src/pixman/pixman-trap.c",
-		"Projects/pixman/src/pixman/pixman-utils.c",
-	},
+	includedirs = { "Projects/pixman", "Projects/pixman/include", "Projects/pixman/src/pixman" },
+	defines = { "HAVE_CONFIG_H", "PIXMAN_NO_TLS" },
+	buildoptions = { "/utf-8" },
+	files = meson_files("Projects/pixman/src/pixman/meson.build", "pixman_files", "Projects/pixman/src/pixman/"),
 })
 
 dep("cairo", {
