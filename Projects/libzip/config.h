@@ -1,89 +1,87 @@
+/* libzip 1.12.1 config.h for Windows (x86 and x64), made by libzip's own CMake (Visual Studio 2022, -A Win32 and
+ -A x64; zlib, no bzip2/lzma/zstd, no crypto backend) and merged: the two differed only in SIZEOF_SIZE_T, chosen
+ by _WIN64 here, and HAVE_GETSECURITYINFO, which check_function_exists misses on Win32 (the export is
+ _GetSecurityInfo@32) - GetSecurityInfo is in advapi32 on every Windows NT, so it is on for both. Make it again
+ from the release's config.h.in after an update (Dependencies' CLAUDE.md). */
 #ifndef HAD_CONFIG_H
 #define HAD_CONFIG_H
 #ifndef _HAD_ZIPCONF_H
 #include "zipconf.h"
 #endif
 /* BEGIN DEFINES */
+#define ENABLE_FDOPEN
 /* #undef HAVE___PROGNAME */
-#define HAVE__CHMOD
 #define HAVE__CLOSE
 #define HAVE__DUP
 #define HAVE__FDOPEN
 #define HAVE__FILENO
-#define HAVE__OPEN
+#define HAVE__FSEEKI64
+#define HAVE__FSTAT64
+#define HAVE__FTELLI64
 #define HAVE__SETMODE
-/* #undef HAVE__SNPRINTF */
+#define HAVE__SNPRINTF
+#define HAVE__SNPRINTF_S
+#define HAVE__SNWPRINTF_S
+#define HAVE__STAT64
 #define HAVE__STRDUP
 #define HAVE__STRICMP
 #define HAVE__STRTOI64
 #define HAVE__STRTOUI64
-#define HAVE__UMASK
 #define HAVE__UNLINK
+/* #undef HAVE_ARC4RANDOM */
 /* #undef HAVE_CLONEFILE */
 /* #undef HAVE_COMMONCRYPTO */
 /* #undef HAVE_CRYPTO */
+/* #undef HAVE_EXPLICIT_BZERO */
+/* #undef HAVE_EXPLICIT_MEMSET */
 /* #undef HAVE_FICLONERANGE */
 #define HAVE_FILENO
+/* #undef HAVE_FCHMOD */
 /* #undef HAVE_FSEEKO */
 /* #undef HAVE_FTELLO */
 /* #undef HAVE_GETPROGNAME */
+#define HAVE_GETSECURITYINFO
 /* #undef HAVE_GNUTLS */
-/* #define HAVE_LIBBZ2 */
-#define HAVE_OPEN
-/* #undef HAVE_OPENSSL */
+/* #undef HAVE_LIBBZ2 */
+/* #undef HAVE_LIBLZMA */
+/* #undef HAVE_LIBZSTD */
+/* #undef HAVE_LOCALTIME_R */
+#define HAVE_LOCALTIME_S
+#define HAVE_MEMCPY_S
 /* #undef HAVE_MKSTEMP */
+/* #undef HAVE_OPENSSL */
 #define HAVE_SETMODE
-/* #undef HAVE_SNPRINTF */
-/* #undef HAVE_SSIZE_T_LIBZIP */
+#define HAVE_SNPRINTF
+/* #undef HAVE_SNPRINTF_S */
 /* #undef HAVE_STRCASECMP */
 #define HAVE_STRDUP
+#define HAVE_STRERROR_S
+/* #undef HAVE_STRERRORLEN_S */
 #define HAVE_STRICMP
+#define HAVE_STRNCPY_S
 #define HAVE_STRTOLL
 #define HAVE_STRTOULL
 /* #undef HAVE_STRUCT_TM_TM_ZONE */
 #define HAVE_STDBOOL_H
 /* #undef HAVE_STRINGS_H */
 /* #undef HAVE_UNISTD_H */
-#define __INT8_LIBZIP 1
-#define INT8_T_LIBZIP 1
-#define UINT8_T_LIBZIP 1
-#define __INT16_LIBZIP 2
-#define INT16_T_LIBZIP 2
-#define UINT16_T_LIBZIP 2
-#define __INT32_LIBZIP 4
-#define INT32_T_LIBZIP 4
-#define UINT32_T_LIBZIP 4
-#define __INT64_LIBZIP 8
-#define INT64_T_LIBZIP 8
-#define UINT64_T_LIBZIP 8
-#define SHORT_LIBZIP 2
-#define INT_LIBZIP 4
-#define LONG_LIBZIP 4
-#define LONG_LONG_LIBZIP 8
+/* #undef HAVE_WINDOWS_CRYPTO */
 #define SIZEOF_OFF_T 4
-#define SIZE_T_LIBZIP 4
-/* #undef SSIZE_T_LIBZIP */
+#ifdef _WIN64
+#define SIZEOF_SIZE_T 8
+#else
+#define SIZEOF_SIZE_T 4
+#endif
 /* #undef HAVE_DIRENT_H */
 /* #undef HAVE_FTS_H */
 /* #undef HAVE_NDIR_H */
 /* #undef HAVE_SYS_DIR_H */
 /* #undef HAVE_SYS_NDIR_H */
 /* #undef WORDS_BIGENDIAN */
-#define HAVE_SHARED
+/* #undef HAVE_SHARED */
+/* #undef LZMA_WINDOW_LIMIT */
 /* END DEFINES */
 #define PACKAGE "libzip"
-#define VERSION "1.5.1"
-
-#ifndef HAVE_SSIZE_T_LIBZIP
-#  if SIZE_T_LIBZIP == INT_LIBZIP
-typedef int ssize_t;
-#  elif SIZE_T_LIBZIP == LONG_LIBZIP
-typedef long ssize_t;
-#  elif SIZE_T_LIBZIP == LONG_LONG_LIBZIP
-typedef long long ssize_t;
-#  else
-#error no suitable type for ssize_t found
-#  endif
-#endif
+#define VERSION "1.12.1"
 
 #endif /* HAD_CONFIG_H */

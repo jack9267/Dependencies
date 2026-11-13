@@ -292,6 +292,34 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   clusters, Devanagari reordering (Nirmala UI: the i sign before its consonant), and Arial subset to "Hello" (5 of
   4652 glyphs), which FreeType opens with the right cmap.
 
+## libzip (`Projects/libzip`)
+
+- **1.12.1, stock** (2026-11-13, from 1.5.1 of 2018; tarball checked against the SHA-256 GitHub gives for the
+  release asset), Windows only, `zip_static`. `src` is the release less `examples`, `man`, `regress` and `src` (the
+  tools). Nothing here or in Galactic, ModLauncher, GTAC, GalacticSamples or GalacticTools links it (Galactic reads
+  zips itself).
+- **Three files beside `src` are made by libzip's own CMake** (`cmake -S <release> -B <dir> -G "Visual Studio 17
+  2022" -A Win32` and `-A x64`, `-DBUILD_SHARED_LIBS=OFF -DBUILD_TOOLS=OFF -DBUILD_REGRESS=OFF -DBUILD_OSSFUZZ=OFF
+  -DBUILD_EXAMPLES=OFF -DBUILD_DOC=OFF -DENABLE_BZIP2=OFF -DENABLE_LZMA=OFF -DENABLE_ZSTD=OFF
+  -DENABLE_COMMONCRYPTO=OFF -DENABLE_GNUTLS=OFF -DENABLE_OPENSSL=OFF -DENABLE_WINDOWS_CRYPTO=OFF
+  -DZLIB_INCLUDE_DIR=<Dependencies>/include -DZLIB_LIBRARY=<...>/zlib_static.lib`), and made again after an update:
+  `config.h` (the two arches' merged - they differ only in `SIZEOF_SIZE_T`, chosen by `_WIN64`, and
+  `HAVE_GETSECURITYINFO`, which `check_function_exists` misses on Win32 because the export is decorated
+  `_GetSecurityInfo@32`, so it is on for both); `zipconf.h` (the same for both); and `zip_err_str.c`, the error
+  strings its CMake generates from `zip.h` and `zipint.h` at build time (`cmake --build <dir> --target zip`, then
+  take `<dir>/lib/zip_err_str.c`). The 1.5.1 `config.h` was hand-written for 32-bit only: `SIZE_T_LIBZIP 4`, so x64
+  builds had `ssize_t` as `int`.
+- **Sources**: `lib/CMakeLists.txt`'s `ZIP_SOURCES`, read by premake, plus its `if(WIN32)` branch's (named in
+  premake5.lua) and `zip_err_str.c`: 121 files, the same list CMake's own project compiles. Deflate only (zlib); no
+  bzip2/lzma/zstd, and no crypto backend, so no WinZip AES (the Windows one is BCrypt, Vista's) - traditional PKWARE
+  encryption is still there. `WIN32_LEAN_AND_MEAN`, as its CMake defines. `zip.h` (from `src/lib`) and `zipconf.h`
+  are what `include\` gets.
+- **XP**: its Windows imports are all there (`CreateFileW`, `GetFileSizeEx`, `SetFilePointerEx`, `MoveFileExW`,
+  `GetSecurityInfo`, `CryptAcquireContextW`/`CryptGenRandom`); a consumer links `advapi32`. Tested, x86 and x64,
+  Debug and Release: an archive written with stored and deflated entries, a UTF-8 name and comments, read back with
+  `ZIP_CHECKCONS` and CRCs; a file replaced and one deleted, then read again; an archive in memory; the error
+  strings.
+
 ## AngelScript (`Projects/angelscript`)
 
 - **2.39.0, stock** (2026-11-13, from 2.38.0 of 2026-11-02), for Galactic's AngelScript backend. `src` is the SDK

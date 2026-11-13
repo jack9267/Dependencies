@@ -598,21 +598,32 @@ dep("discord-rpc", {
 	},
 })
 
+-- libzip: as its own CMake builds it for Windows with zlib and nothing else - no bzip2, lzma or zstd, and no
+-- crypto backend, so no WinZip AES (the Windows one is BCrypt, Vista's). The sources are lib/CMakeLists.txt's
+-- ZIP_SOURCES, read from it, plus its if(WIN32) branch's (named here) and zip_err_str.c, which its CMake makes
+-- from zip.h and zipint.h at build time - ours, made by that CMake, beside config.h and zipconf.h (both made by it
+-- too; Dependencies' CLAUDE.md says how). CryptGenRandom and GetSecurityInfo: a consumer links advapi32.
+local LIBZIP_SOURCES = (function()
+	local text = io.readfile(path.join(_SCRIPT_DIR, "Projects/libzip/src/lib/CMakeLists.txt")) or ""
+	local block = text:match("set%(ZIP_SOURCES%s*\n(.-)\n%s*%)")
+	if not block then error("libzip: no ZIP_SOURCES in lib/CMakeLists.txt") end
+	local t = {}
+	for line in block:gmatch("[^\n]+") do
+		local f = line:match("^%s*([%w_%-]+%.c)%s*$")
+		if f then t[#t + 1] = "Projects/libzip/src/lib/" .. f end
+	end
+	for _, f in ipairs({ "zip_source_file_win32.c", "zip_source_file_win32_named.c", "zip_source_file_win32_utf16.c",
+		"zip_source_file_win32_utf8.c", "zip_source_file_win32_ansi.c", "zip_random_win32.c" }) do
+		t[#t + 1] = "Projects/libzip/src/lib/" .. f
+	end
+	t[#t + 1] = "Projects/libzip/zip_err_str.c"
+	return t
+end)()
 dep("zip", {
 	systems = WINDOWS,
-	defines     = { "ZIP_STATIC", "HAVE_CONFIG_H" },
-	includedirs = { "Projects/libzip/src/include", "Projects/libzip", "Projects/zlib/include" },
-	files       = { "Projects/libzip/src/lib/**.c" },
-	removefiles = {
-		"Projects/libzip/src/lib/zip_source_file.c",
-		"Projects/libzip/src/lib/zip_algorithm_bzip2.c",
-		"Projects/libzip/src/lib/zip_crypto_commoncrypto.c",
-		"Projects/libzip/src/lib/zip_crypto_gnutls.c",
-		"Projects/libzip/src/lib/zip_crypto_openssl.c",
-		"Projects/libzip/src/lib/zip_random_unix.c",
-		"Projects/libzip/src/lib/zip_random_uwp.c",
-		"Projects/libzip/src/lib/zip_winzip_aes.c",
-	},
+	defines     = { "ZIP_STATIC", "HAVE_CONFIG_H", "WIN32_LEAN_AND_MEAN" },
+	includedirs = { "Projects/libzip", "Projects/libzip/src/lib", "Projects/zlib/include" },
+	files       = LIBZIP_SOURCES,
 })
 
 -- SDL2: no config generation needed on Windows - the shipped SDL_config.h selects
@@ -764,7 +775,8 @@ headers_project {
 	{ dir = "Projects/MinHook/include", systems = WINDOWS },
 	{ files = "Projects/asmjit/src/src/*.h", recursive = true, systems = WINDOWS },
 	{ dir = "Projects/discord-rpc/src/include", systems = WINDOWS },
-	{ dir = "Projects/libzip/src/include", systems = WINDOWS },
+	{ file = "Projects/libzip/src/lib/zip.h", systems = WINDOWS },
+	{ file = "Projects/libzip/zipconf.h", systems = WINDOWS },
 	{ dir = "Projects/rapidjson/include", systems = WINDOWS },
 	{ dir = "Projects/SDL/src/include", systems = GUI },
 	{ dir = "Projects/libressl/src/include", systems = TLS },

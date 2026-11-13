@@ -1,16 +1,145 @@
-# Soon
+## Tests
 
+### Infrastructure
+
+- Make `ziptool` take command from stdin, one command per line.
+- Add option to `ziptool` to not abort on errors.
+- Find framework for C unit tests.
+- Add test program for testing sources, which takes commands from stdin.
+- Switch existing dedicated test programs to one of the above, where possible.
+
+### CI
+
+- Add CI build with sanitizers enabled.
+
+### Specific Tests
+
+- Add test to add/replace/remove files in torrentzip archives.
+
+## Fuzzing
+
+- improve AES and PKWARE encryption tests
+- add more
+- review memset() uses
+
+## Torrentzip
+
+- Handle data sources with unknown uncompressed size: if we forced ZIP64 and don't need it, return specific error (so calling code can decide what to do (e. g. clear torrentzip flag and call `zip_close()` again)).
+
+## Other
+
+- Add central overflow check macros, maybe based on C23 `<stdckdint.h>` with fallback backwards compatibility implementation.
+
+- Integrate website into main repository.
+
+- split `zip_source_t` in main part and reference so we can keep track which reference called open and we can invalidate references if the underlying source gets invalidated (e. g. by `zip_close`).
+
+## Prefixes
+
+The zip format allows for a prefix before the zip archive.  This is used by some applications to store additional data before the zip archive, e.g. self-extracting archives.  libzip can open such archives, but currently does not support creating such archives and deletes the prefix if the archive is modified.
+
+According to the zip format specification, the offsets in archives with a prefix are relative to the start of the file, not the start of the zip archive itself. 
+
+Suggestions for the API:
+````c
+zip_set_archive_prefix(struct zip *za, const zip_uint8_t *data, zip_uint64_t length);
+const zip_uint8_t *zip_get_archive_prefix(struct zip *za, zip_uint64_t *lengthp);
+````
+
+## Compression
+
+* add lzma2 support
+* add deflate64 support (https://github.com/madler/zlib/blob/master/contrib/infback9/infback9.h)
+
+## API Issues
+
+* Add `zip_file_use_password` to set per-file password to use if libzip needs to decrypt the file (e.g. when changing encryption or compression method).
+
+* `zip_get_archive_comment` has `int *lenp` argument.  Cleaner would be `zip_uint32_t *`.
+  rename and fix.  which other functions for naming consistency?
+* rename remaining `zip_XXX_{file,archive}_*` to `zip_{file,archive}_XXX_*`?
+* compression/crypt implementations: how to set error code on failure
+* compression/crypt error messages a la `ZIP_ER_ZLIB` (no detailed info passing)
+
+## Features
+
+* Let sources create extra fields, remove WinZip AES special case from `zip_dirent_write()`.
+
+* consistently use `_zip_crypto_clear()` for passwords
+* support setting extra fields from `zip_source`
+  * introduce layers of extra fields:
+    * original
+    * from `zip_source`
+    * manually set
+  * when querying extra fields, search all of them in reverse order
+  * add whiteout (deleted) flag
+  * allow invalid data flag, used when computing extra field size before writing data
+  * new command `ZIP_SOURCE_EXTRA_FIELDS`
+  * no support for multiple copies of same extra field
+* function to copy file from one archive to another
+* set `O_CLOEXEC` flag after fopen and mkstemp
+* support streaming output (creating new archive to e.g. stdout)
+* add function to read/set ASCII file flag
+* add custom compression function support
+* `zip_source_zip()`: allow rewinding
+* `zipcmp`: add option for file content comparison
+* `zipcmp`: add more paranoid checks:
+  * external attributes/opsys
+  * version needed/made by
+  * general purpose bit flags
+* add more consistency checks:
+  * for stored files, test compressed = uncompressed
+  * data descriptor
+  * local headers come before central dir
+* support for old compression methods?
+
+## Bugs
+
+* ensure that nentries is small enough not to cause overflow (size_t for entry, uint64 for CD on disk)
+* check for limits imposed by format (central dir size, file size, extra fields, ...)
+* `_zip_u2d_time()`: handle `localtime(3)` failure
+* POSIX: `zip_open()`: check whether file can be created and fail if not
+* fix inconsistent usage of valid flags (not checked in many places)
+* `cdr == NULL` -> `ER_NOENT` vs. `idx > cdir->nentry` -> `ER_INVAL` inconsistent (still there?)
+
+## Cleanup
+
+* go over cdir parser and rename various offset/size variables to make it clearer
+* use bool
+* use `ZIP_SOURCE_SUPPORTS_{READABLE,SEEKABLE,WRITABLE}`
+* use `zip_source_seek_compute_offset()`
+* get rid of `zip_get_encryption_implementation()`
+* use `zip_*int*_t` internally
+* `zip_source_file()`: don't allow write if start/len specify a part of the file
+
+## Documentation
+
+* document valid file paths
+* document: `zip_source_write()`: length can't be > `ZIP_INT64_MAX`
+* document: `ZIP_SOURCE_CLOSE` implementation can't return error
+* keep error codes in man pages in sync
+* document error codes in new man pages
+
+## Infrastructure
+
+* add coverage reports, e.g. using gcovr or https://github.com/eddyxu/cpp-coveralls (coveralls.io)
 * review guidelines/community standards
-  - (Linux Foundation Core Infrastructure Initiative Best Practices)[https://bestpractices.coreinfrastructure.org/]
-  - (Readme Maturity Level)[https://github.com/LappleApple/feedmereadmes/blob/master/README-maturity-model.md]
-  - (Github Community Profile)[https://github.com/nih-at/libzip/community]
-
-* test different crypto backends with TravisCI.
-
-* test for zipcmp reading directory (requires fts)
-
+  - [Linux Foundation Core Infrastructure Initiative Best Practices](https://bestpractices.coreinfrastructure.org/)
+  - [Readme Maturity Level](https://github.com/LappleApple/feedmereadmes/blob/master/README-maturity-model.md)
+  - [Github Community Profile](https://github.com/nih-at/libzip/community)
+* test different crypto backends with GitHub actions.
 * improve man page formatting of tagged lists on webpage (`<dl>`)
+* rewrite `make_zip_errors.sh` in cmake
+* script to check if all exported symbols are marked with `ZIP_EXTERN`, add to `make distcheck`
 
+## macOS / iOS framework
+
+* get cmake to optionally build frameworks
+
+## Test Case Issues
+
+* add test cases for all `ZIP_INCONS` detail errors
+* `incons-local-filename-short.zzip` doesn't test short filename, since extra fields fail to parse.
 * test error cases with special source
   - tell it which command should fail
   - use it both as source for `zip_add` and `zip_open_from_source`
@@ -25,109 +154,16 @@
 	  - Nth call of command
       - read/write: total byte count so far
 	  - state of source (opened, EOF reached, ...)
-
-* add license to generated documentation (man, html)
-
-# Later
-
-## macOS / iOS framework
-
-* get cmake to optionally build frameworks
-
-## Prefixes
-
-For example for adding extractors for self-extracting zip archives.
-````c
-zip_set_archive_prefix(struct zip *za, const zip_uint8_t *data, zip_uint64_t length);
-const zip_uint8_t *zip_get_archive_prefix(struct zip *za, zip_uint64_t *lengthp);
-````
-
-## Compression
-
-* add lzma support
-
-## API Issues
-
-* `zip_get_archive_comment` has `int *lenp` argument.  Cleaner would be `zip_uint32_t *`.
-  rename and fix.  which other functions for naming consistency?
-* rename remaining `zip_XXX_{file,archive}_*` to `zip_{file,archive}_XXX_*`?
-* compression/crypt implementations: how to set error code on failure
-* compression/crypt error messages a la `ZIP_ER_ZLIB` (no detailed info passing)
-
-## Features
-
-* consistently use `_zip_crypto_clear()` for passwords
-* support setting extra fields from `zip_source`
-  * introduce layers of extra fields:
-    * original
-    * from `zip_source`
-    * manually set
-  * when querying extra fields, search all of them in reverse order
-  * add whiteout (deleted) flag
-  * allow invalid data flag, used when computing extra field size before writing data
-  * new command `ZIP_SOURCE_EXTRA_FIELDS`
-  * no support for multiple copies of same extra field
-* delete all extra fields during `zip_replace()`
-* function to copy file from one archive to another
-* set `O_CLOEXEC` flag after fopen and mkstemp
-* `zip_file_set_mtime()`: support InfoZIP time stamps
-* support streaming output (creating new archive to e.g. stdout)
-* add function to read/set ASCII file flag
-* `zip_commit()` (to finish changes without closing archive)
-* add custom compression function support
-* `zip_source_zip()`: allow rewinding
-* add `zip_abort()` to allow aborting `zip_close()` (can be called from progress callback)
-* `zipcmp`: add option for file content comparison
-* `zipcmp`: add more paranoid checks:
-  * external attributes/opsys
-  * last_mod
-  * version needed/made by
-  * general purpose bit flags
-* add more consistency checks:
-  * for stored files, test compressed = uncompressed
-  * data descriptor
-  * local headers come before central dir
-* support for old compression methods?
-
-## Bugs
-
-* support InfoZIP encryption header extension (copy data descriptor for encrypted files)
-* ensure that nentries is small enough not to cause overflow (size_t for entry, uint64 for CD on disk)
-* check for limits imposed by format (central dir size, file size, extra fields, ...)
-* `_zip_u2d_time()`: handle `localtime(3)` failure
-* POSIX: `zip_open()`: check whether file can be created and fail if not
-* fix inconsistent usage of valid flags (not checked in many places)
-* `cdr == NULL` -> `ER_NOENT` vs. `idx > cdir->nentry` -> `ER_INVAL` inconsistent (still there?)
-
-
-## Cleanup
-
-* drop _LIBZIP suffixes in cmake defines (no longer needed since they no longer appear in zipconf.h)
-* go over cdir parser and rename various offset/size variables to make it clearer
-* use bool
-* use `ZIP_SOURCE_SUPPORTS_{READABLE,SEEKABLE,WRITABLE}`
-* use `zip_source_seek_compute_offset()`
-* get rid of `zip_get_{compression,encryption}_implementation()`
-* use `zip_*int*_t` internally
-
-## Infrastructure
-
-* rewrite `make_zip_errors.sh` in cmake
-* rewrite `make_zip_err_str.sh` in cmake
-* configure appveyor for Windows builds of libzip
-
-## Test Case Issues
-
+* test for zipcmp reading directory (requires fts)
 * add test case for clone with files > 4k
-* consider testing for malloc/realloc failures
+* consider testing for `malloc`/`realloc` failures
 * Winzip AES support
   * test cases decryption: <=20, >20, stat for both
   * test cases encryption: no password, default password, file-specific password, 128/192/256, <=20, >20
   * support testing on macOS
 * add test cases for lots of files (including too many)
 * add test cases for holes (between files, between files and cdir, between cdir and eocd, + zip64 where appropriate)
-* unchange on added file
-* test seek in `zip_source_crc()`
+* test seek in `zip_source_crc_create()`
 * test cases for `set_extra*`, `delete_extra*`, `*extra_field*`
 * test cases for in memory archives
   * add
@@ -138,7 +174,6 @@ const zip_uint8_t *zip_get_archive_prefix(struct zip *za, zip_uint64_t *lengthp)
 * add test case to change values for newly added files (name, compression method, comment, mtime, . . .)
 * `zip_open()` file less than `EOCDLEN` bytes long
 * test calls against old API
-* run regression tests also from CMake framework
 * rename file to dir/ and vice versa (fails)
 * fix comment test to be newline insensitive
 * check if http://bugs.python.org/issue20078 provides ideas for new tests
@@ -158,7 +193,7 @@ const zip_uint8_t *zip_get_archive_prefix(struct zip *za, zip_uint64_t *lengthp)
   * close
   * zipcmp copy expected
   * remove copy
-* (`error_get)
+* (`error_get`)
 * (`error_get_sys_type`)
 * (`error_to_str`)
 * (`extra_fields`)
@@ -178,13 +213,4 @@ const zip_uint8_t *zip_get_archive_prefix(struct zip *za, zip_uint64_t *lengthp)
 * I/O abstraction layer
   * `zip_open_from_source`
 * read two zip entries interleaved
-
-## Unsorted
-
-* `zip_source_file()`: don't allow write if start/len specify a part of the file
-* script to check if all exported symbols are marked with `ZIP_EXTERN`, add to make distcheck
-
-* document: `zip_source_write()`: length can't be > `ZIP_INT64_MAX`
-* document: `ZIP_SOURCE_CLOSE` implementation can't return error
-* keep error codes in man pages in sync
-* document error codes in new man pages
+* test `zip_file_is_seekable` (via `ziptool`?)

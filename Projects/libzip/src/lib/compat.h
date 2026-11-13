@@ -3,10 +3,10 @@
 
 /*
   compat.h -- compatibility defines.
-  Copyright (C) 1999-2017 Dieter Baron and Thomas Klausner
+  Copyright (C) 1999-2025 Dieter Baron and Thomas Klausner
 
   This file is part of libzip, a library to manipulate ZIP archives.
-  The authors can be contacted at <libzip@nih.at>
+  The authors can be contacted at <info@libzip.org>
 
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions
@@ -34,14 +34,15 @@
   IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "zipconf.h"
-
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
 /* to have *_MAX definitions for all types when compiling with g++ */
 #define __STDC_LIMIT_MACROS
+
+/* to have ISO C secure library functions */
+#define __STDC_WANT_LIB_EXT1__ 1
+
+#include "config.h"
+
+#include <sys/stat.h>
 
 #ifdef _WIN32
 #ifndef ZIP_EXTERN
@@ -77,10 +78,14 @@ typedef char bool;
 #define EOVERFLOW EFBIG
 #endif
 
-#ifdef _WIN32
-#if defined(HAVE__CHMOD)
-#define chmod _chmod
+#include <fcntl.h>
+
+/* not supported on at least Windows */
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
 #endif
+
+#ifdef _WIN32
 #if defined(HAVE__CLOSE)
 #define close _close
 #endif
@@ -94,12 +99,11 @@ typedef char bool;
 #if !defined(HAVE_FILENO) && defined(HAVE__FILENO)
 #define fileno _fileno
 #endif
-/* Windows' open() doesn't understand Unix permissions */
-#if defined(HAVE__OPEN)
-#define open(a, b, c) _open((a), (b))
-#endif
-#if defined(HAVE__SNPRINTF)
+#if !defined(HAVE_SNPRINTF) && defined(HAVE__SNPRINTF)
 #define snprintf _snprintf
+#endif
+#if !defined(HAVE__SNWPRINTF_S)
+#define _snwprintf_s(buf, bufsz, len, fmt, ...) (_snwprintf((buf), (len), (fmt), __VA_ARGS__))
 #endif
 #if defined(HAVE__STRDUP)
 #if !defined(HAVE_STRDUP) || defined(_WIN32)
@@ -116,35 +120,32 @@ typedef char bool;
 #if !defined(HAVE_STRTOULL) && defined(HAVE__STRTOUI64)
 #define strtoull _strtoui64
 #endif
-#if defined(HAVE__UMASK)
-#define umask _umask
-#endif
 #if defined(HAVE__UNLINK)
 #define unlink _unlink
 #endif
 #endif
 
-#ifndef HAVE_FSEEKO
-#define fseeko(s, o, w) (fseek((s), (long int)(o), (w)))
-#endif
 
-#ifndef HAVE_FTELLO
-#define ftello(s) ((long)ftell((s)))
-#endif
+#if defined(HAVE__FSEEKI64) && defined(HAVE__FSTAT64) && defined(HAVE__FTELLI64)
+/* Windows API using int64 */
+typedef zip_int64_t zip_off_t;
+typedef struct _stat64 zip_os_stat_t;
+#define zip_os_stat _stat64
+#define zip_os_fstat _fstat64
+#define zip_os_fseek _fseeki64
+#define zip_os_ftell _ftelli64
+#define ZIP_FSEEK_MAX ZIP_INT64_MAX
+#define ZIP_FSEEK_MIN ZIP_INT64_MIN
+#else
 
-#ifndef HAVE_MKSTEMP
-int _zip_mkstemp(char *);
-#define mkstemp _zip_mkstemp
-#endif
+/* Normal API */
+typedef struct stat zip_os_stat_t;
+#define zip_os_fstat fstat
+#define zip_os_stat stat
 
-#if !defined(HAVE_STRCASECMP)
-#if defined(HAVE__STRICMP)
-#define strcasecmp _stricmp
-#elif defined(HAVE_STRICMP)
-#define strcasecmp stricmp
-#endif
-#endif
-
+#if defined(HAVE_FTELLO) && defined(HAVE_FSEEKO)
+/* Using off_t */
+typedef off_t zip_off_t;
 #if SIZEOF_OFF_T == 8
 #define ZIP_OFF_MAX ZIP_INT64_MAX
 #define ZIP_OFF_MIN ZIP_INT64_MIN
@@ -158,14 +159,78 @@ int _zip_mkstemp(char *);
 #error unsupported size of off_t
 #endif
 
-#if defined(HAVE_FTELLO) && defined(HAVE_FSEEKO)
 #define ZIP_FSEEK_MAX ZIP_OFF_MAX
 #define ZIP_FSEEK_MIN ZIP_OFF_MIN
+
+#define zip_os_fseek fseeko
+#define zip_os_ftell ftello
 #else
+
+/* Using long */
+typedef long zip_off_t;
 #include <limits.h>
 #define ZIP_FSEEK_MAX LONG_MAX
 #define ZIP_FSEEK_MIN LONG_MIN
+
+#define zip_os_fseek fseek
+#define zip_os_ftell ftell
 #endif
+
+#endif
+
+#ifndef HAVE_FTELLO
+#define ftello(s) ((long)ftell((s)))
+#endif
+
+
+#ifdef HAVE_LOCALTIME_S
+#ifdef _WIN32
+/* Windows is incompatible to the C11 standard, hurray! */
+#define zip_localtime(t, tm) (localtime_s((tm), (t)) == 0 ? tm : NULL)
+#else
+#define zip_localtime localtime_s
+#endif
+#else
+#ifdef HAVE_LOCALTIME_R
+#define zip_localtime localtime_r
+#else
+#define zip_localtime(t, tm) (localtime(t))
+#endif
+#endif
+
+#ifndef HAVE_MEMCPY_S
+#define memcpy_s(dest, destsz, src, count) (memcpy((dest), (src), (count)) == NULL)
+#endif
+
+#ifndef HAVE_SNPRINTF_S
+#ifdef HAVE__SNPRINTF_S
+#define snprintf_s(buf, bufsz, fmt, ...) (_snprintf_s((buf), (bufsz), (bufsz), (fmt), __VA_ARGS__))
+#else
+#define snprintf_s snprintf
+#endif
+#endif
+
+#if !defined(HAVE_STRCASECMP)
+#if defined(HAVE__STRICMP)
+#define strcasecmp _stricmp
+#elif defined(HAVE_STRICMP)
+#define strcasecmp stricmp
+#endif
+#endif
+
+#ifndef HAVE_STRNCPY_S
+#define strncpy_s(dest, destsz, src, count) (strncpy((dest), (src), (count)), 0)
+#endif
+
+#ifndef HAVE_STRERROR_S
+#define strerrorlen_s(errnum) (strlen(strerror(errnum)))
+#define strerror_s(buf, bufsz, errnum) ((void)strncpy_s((buf), (bufsz), strerror(errnum), (bufsz)), (buf)[(bufsz) - 1] = '\0', strerrorlen_s(errnum) >= (bufsz))
+#else
+#ifndef HAVE_STRERRORLEN_S
+#define strerrorlen_s(errnum) 8192
+#endif
+#endif
+
 
 #ifndef SIZE_MAX
 #if SIZEOF_SIZE_T == 8
@@ -196,7 +261,11 @@ int _zip_mkstemp(char *);
 #endif
 
 #ifndef S_ISDIR
-#define S_ISDIR(mode) (((mode)&S_IFMT) == S_IFDIR)
+#define S_ISDIR(mode) (((mode) & S_IFMT) == S_IFDIR)
+#endif
+
+#ifndef S_ISREG
+#define S_ISREG(mode) (((mode) & S_IFMT) == S_IFREG)
 #endif
 
 #endif /* compat.h */
