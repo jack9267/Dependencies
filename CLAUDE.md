@@ -521,6 +521,31 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   packet concealed (`opus_decode(NULL, ...)`). Waveform SNR is only about 3 dB at that rate: SILK keeps how speech
   sounds, not its phase, so don't test it that way.
 
+## SpeexDSP (`Projects/speexdsp`)
+
+- **1.2.1, stock** (2026-11-14), for voice chat's echo cancellation and noise suppression (the xlive DLL). `src` is
+  the release tarball unchanged (SHA-256 checked against xiph's `SHA256SUMS.txt`); `speexdsp_static`, static only,
+  with `speex_echo.h`, `speex_preprocess.h`, `speex_jitter.h`, `speex_resampler.h`, `speex_buffer.h`,
+  `speexdsp_types.h` in `include\speex\` (`#include <speex/speex_echo.h>`, as its own install puts them). Built for
+  every target.
+- **`speexdsp_config_types.h` is ours** (`Projects/speexdsp/include/speex`, `<stdint.h>` types), as ogg's
+  `config_types.h`: the release has only `speexdsp_config_types.h.in`, which configure fills in. `speexdsp_types.h`
+  includes it from its own folder, so it is installed beside the others. Keep it unless the `.in` changes.
+- **Built as configure's defaults are**: floating point, smallft's FFT (`USE_SMALLFT`; kiss_fft is the fixed-point
+  one). No `config.h` (the sources include it only under `HAVE_CONFIG_H`), so its settings are defines in
+  premake5.lua: `FLOATING_POINT`, `USE_SMALLFT`, `EXPORT=` (static), `USE_ALLOCA` on MSVC and `VAR_ARRAYS`
+  elsewhere. Plain C, as opus: no `USE_SSE`/`USE_NEON`. The source list is `libspeexdsp/Makefile.am`'s
+  `libspeexdsp_la_SOURCES`, read when premake runs, plus `smallft.c` (its `$(FFTSRC)`); 9 files for 1.2.1.
+- The library calls nothing outside the C runtime (`dumpbin /symbols` on the Debug library; Release's are LTCG
+  objects, which show none). Its warnings (`speex_warning`) go to stderr. `speex_fatal`, which `exit`s, is reached
+  only from kiss_fft (not built) and the echo canceller's dump files (`DUMP_ECHO_CANCEL_DATA`, not defined).
+- Seen working (Windows x86 and x64, Debug and Release, identical results; the other targets' fragments are
+  generated but not built), by a scratch test at 24 kHz with 20 ms frames and a 200 ms filter: a voice-like signal's
+  echo through a made-up room 71 ms away was 33 dB quieter after the echo canceller alone and 53 dB with the
+  preprocessor's residual echo suppression after it; with a near-end voice over the echo, the echo left under it
+  went from 1.3 dB to 14.2 dB below it (the near voice kept); the denoiser took steady noise down 14 dB; the
+  resampler turned 480 samples at 24 kHz into 320 at 16 kHz with a 1 kHz tone's level unchanged.
+
 ## litehtml (`Projects/litehtml`)
 
 - **Upstream master 6293d441 (v0.10 + 55, 2026-11-07), with two patches of ours** (2026-11-08). `src` is

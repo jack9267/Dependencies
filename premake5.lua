@@ -316,6 +316,27 @@ dep("opus", {
 		opus_sources("celt_sources.mk", "CELT_SOURCES"),
 		opus_sources("silk_sources.mk", "SILK_SOURCES"), opus_sources("silk_sources.mk", "SILK_SOURCES_FLOAT")) })
 
+-- speexdsp: the echo canceller, preprocessor (noise suppression, AGC, residual echo), jitter buffer and resampler,
+-- as configure builds them by default: floating point with smallft's FFT. Plain C, as opus: no USE_SSE/USE_NEON. No
+-- config.h (the sources include it only under HAVE_CONFIG_H), so its few settings are defines here: EXPORT empty
+-- (static), alloca on MSVC and C99 arrays elsewhere. speexdsp_config_types.h, which configure writes from
+-- speexdsp_config_types.h.in, is ours, in Projects/speexdsp/include/speex. The list is the release's Makefile.am's
+-- libspeexdsp_la_SOURCES, read when premake runs, plus smallft.c (its $(FFTSRC) for the default FFT). Static only.
+local function speexdsp_sources()
+	local text = io.readfile(path.join(_SCRIPT_DIR, "Projects/speexdsp/src/libspeexdsp/Makefile.am")) or ""
+	local line = text:match("libspeexdsp_la_SOURCES%s*=%s*([^\r\n]*)")
+	if not line then error("speexdsp: no libspeexdsp_la_SOURCES in Makefile.am") end
+	local t = {}
+	for f in line:gmatch("(%S+%.c)") do t[#t + 1] = "Projects/speexdsp/src/libspeexdsp/" .. f end
+	t[#t + 1] = "Projects/speexdsp/src/libspeexdsp/smallft.c"
+	return t
+end
+dep("speexdsp", {
+	includedirs = { "Projects/speexdsp/include/speex", "Projects/speexdsp/src/include" },
+	defines     = table.join({ "FLOATING_POINT", "USE_SMALLFT", "EXPORT=" },
+		WINDOWS_TARGET and { "USE_ALLOCA" } or { "VAR_ARRAYS" }),
+	files       = speexdsp_sources() })
+
 -- mongoose6: 64 KB per socket read/write and of a served file kept queued, where mongoose's defaults are
 -- 1460 and 1024 - one TCP segment per connection per mg_mgr_poll() held HTTP file serving to about 23 KB/s
 -- against a server loop that sleeps between polls. Used only inside mongoose.c, so consumers need not match.
@@ -769,6 +790,10 @@ headers_project {
 	{ file = "Projects/opus/src/include/opus_multistream.h", to = "opus" },
 	{ file = "Projects/opus/src/include/opus_projection.h", to = "opus" },
 	{ file = "Projects/opus/src/include/opus_types.h", to = "opus" },
+	-- speexdsp's public headers, where its own install puts them (<speex/speex_echo.h>), with our
+	-- speexdsp_config_types.h beside them (speexdsp_types.h includes it from its own folder)
+	{ files = "Projects/speexdsp/src/include/speex/*.h", to = "speex" },
+	{ file = "Projects/speexdsp/include/speex/speexdsp_config_types.h", to = "speex" },
 	{ dir = "Projects/mongoose6/include" },
 	{ dir = "Projects/mongoose7/include" },
 	{ dir = "Projects/sqlite/include" },
