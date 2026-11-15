@@ -4,7 +4,7 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/Include")
 
 install_include("${CMAKE_CURRENT_SOURCE_DIR}/Include")
 
-add_definitions(-DRMLUI_VERSION="6.2")
+add_definitions(-DRMLUI_VERSION="6.3")
 add_definitions(-DRMLUI_FONT_ENGINE_FREETYPE)
 
 new_library_static(rmlui_core "${SOURCES}" "RMLUI_STATIC_LIB")

@@ -58,8 +58,10 @@ struct hash<::Rml::SVG::SVGKey> {
 namespace Rml {
 namespace SVG {
 
+	// Dependencies: base is what an <image href> in the SVG is relative to (the SVG's own path, or for one written in a
+	// document the document's), given to lunasvg for the host's image loader (lunasvg::setImageLoader).
 	static SharedPtr<SVGData> GetHandle(RenderManager& render_manager, String source_id, const String& source, SVGCache::SourceType source_type,
-		Vector2i dimensions, bool crop_to_content, ColourbPremultiplied colour);
+		Vector2i dimensions, bool crop_to_content, ColourbPremultiplied colour, const String& base);
 	static void ReleaseHandle(SVGData* handle);
 
 	struct SVGGeometry {
@@ -126,7 +128,7 @@ namespace SVG {
 	}
 
 	static SharedPtr<SVGData> GetHandle(RenderManager& render_manager, String move_from_id, const String& source, SVGCache::SourceType source_type,
-		const Vector2i dimensions, const bool crop_to_content, const ColourbPremultiplied colour)
+		const Vector2i dimensions, const bool crop_to_content, const ColourbPremultiplied colour, const String& base)
 	{
 		SVGKey key{std::move(move_from_id), dimensions, crop_to_content, colour};
 		const String& source_id = key.source_id;
@@ -163,14 +165,14 @@ namespace SVG {
 
 				// We use a reset-release approach here in case clients use a non-std unique_ptr (lunasvg uses std::unique_ptr). We also use
 				// loadFromData(char*, size_t) instead of loadFromData(std::string) in case clients use a non-std string.
-				doc.svg_document.reset(lunasvg::Document::loadFromData(svg_data.data(), svg_data.size()).release());
+				doc.svg_document.reset(lunasvg::Document::loadFromData(svg_data.data(), svg_data.size(), base).release());
 			}
 			else
 			{
 				RMLUI_SVG_DEBUG_LOG("Loading SVG document from element %s contents", source_id.c_str());
 				// We use a reset-release approach here in case clients use a non-std unique_ptr (lunasvg uses std::unique_ptr). We also use
 				// loadFromData(char*, size_t) instead of loadFromData(std::string) in case clients use a non-std string.
-				doc.svg_document.reset(lunasvg::Document::loadFromData(source.data(), source.size()).release());
+				doc.svg_document.reset(lunasvg::Document::loadFromData(source.data(), source.size(), base).release());
 			}
 
 			if (!doc.svg_document)
@@ -372,18 +374,19 @@ namespace SVG {
 		if (dimensions.x == 0 || dimensions.y == 0)
 			dimensions = {0, 0};
 
+		String document_source_url;
+		if (ElementDocument* document = element->GetOwnerDocument())
+			document_source_url = StringUtilities::Replace(document->GetSourceURL(), '|', ':');
+
 		if (source_type == File)
 		{
 			String path;
-			if (ElementDocument* document = element->GetOwnerDocument())
-			{
-				const String document_source_url = StringUtilities::Replace(document->GetSourceURL(), '|', ':');
+			if (!document_source_url.empty())
 				GetSystemInterface()->JoinPath(path, document_source_url, source_id);
-			}
-			return Rml::SVG::GetHandle(*render_manager, path, path, source_type, dimensions, crop_to_content, colour);
+			return Rml::SVG::GetHandle(*render_manager, path, path, source_type, dimensions, crop_to_content, colour, path);
 		}
 
-		return Rml::SVG::GetHandle(*render_manager, source_id, source, source_type, dimensions, crop_to_content, colour);
+		return Rml::SVG::GetHandle(*render_manager, source_id, source, source_type, dimensions, crop_to_content, colour, document_source_url);
 	}
 
 } // namespace SVG

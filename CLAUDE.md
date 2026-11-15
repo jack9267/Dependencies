@@ -570,3 +570,39 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   `document_container`; the fork also changed `draw_text` to take the element (now the overload above) and made
   `fix_tables_layout` public (now inside `restyle()`). Don't install a build with it until they are ported.
 
+## RmlUi (`Projects/RmlUi`) and LunaSVG (`Projects/lunasvg`)
+
+- **RmlUi 6.3, with one patch of ours** (2026-11-14, from 6.2, which was stock): `Include`, `Source` and `Backends`
+  are the `6.3` tag's (github.com/mikke89/RmlUi), unchanged but for the SVG image patch below. `CMakeLists.txt`
+  beside them is the old CMake build's wrapper, not what is built. Built by premake5.lua as `rmlui_core_static` (FreeType font engine) and `rmlui_debugger_static`;
+  the version string is a define there (`RMLUI_VERSION`), so change it with an update. 6.3 needs C++17 (every
+  build here already is) and its custom RTTI is always on: a class of ours derived from an RmlUi one that is
+  `rmlui_dynamic_cast` to needs `RMLUI_RTTI_DeclareWithParent`/`RMLUI_RTTI_Define` - nothing does yet.
+- **The SVG plugin is in `rmlui_core_static`** (`Source/SVG`, `RMLUI_SVG_PLUGIN`), as RmlUi's own CMake builds
+  it, so `<svg src>` and the `svg` decorator work wherever RmlUi does - and **a program linking
+  `rmlui_core_static` must link `lunasvg_static` and `plutovg_static` too** (GTAC's client and launcher,
+  GalacticSamples' RmlTest). `lunasvg.h` is installed (for the image loader below); plutovg's headers are not.
+- **An SVG's pictures (`<image href>`) come from the host: a patch to each of LunaSVG and RmlUi, which an update must
+  put back** (2026-11-14, the user's call). Upstream LunaSVG decoded a `data:` URI with plutovg's stb_image (not safe
+  on untrusted input, and SVGs come from servers) and handed any other href to `fopen` - a server's SVG reading any
+  file on the player's disk, past the program's file system. Now:
+  - LunaSVG (`lunasvg.h`, `source/lunasvg.cpp`, `source/svgelement.cpp`, each marked `Dependencies`):
+    `lunasvg::setImageLoader(fn)`, a function given the href as written and the document's base, returning a
+    `Bitmap`; `Document::loadFromData(data, length, base)` keeps the base (`Document::base()`); `<image>` asks the
+    loader, and with none set shows nothing. plutovg's image loading is never reached.
+  - RmlUi (`Source/SVG/SVGCache.cpp`, marked `Dependencies`): passes the base - the SVG's own path for `<svg src>`
+    and the `svg()` decorator, the document's URL for an SVG written in the document - so an href is relative to it.
+  - Galactic's RmlGUI sets the loader (`LoadSVGImage`, `RmlUi.cpp`): joins with the system interface's `JoinPath`,
+    reads through Rml's file interface, decodes with the engine's `CMipLevel::LoadFromImage` (libpng, libjpeg-turbo),
+    as an `<img>` is. A host that sets none gets SVGs without pictures.
+
+  (plutovg still scans the system font folder for an SVG's text, `plutovg_font_face_cache_load_sys`: a fixed folder
+  the document can't name.)
+- **LunaSVG 3.5.0**: `src` is the `v3.5.0` tarball (github.com/sammycage/lunasvg), unchanged but for the patch, with the
+  plutovg 1.3.1 it carries in `src/plutovg` (its CMake's `add_subdirectory`) - built from there, not a plutovg of
+  its own. Both static (`LUNASVG_BUILD_STATIC`, `PLUTOVG_BUILD_STATIC`; `rmlui_core` defines the first too, or
+  `lunasvg.h` declares everything `dllimport`). On Windows plutovg counts references with `Interlocked*` and locks
+  its font cache with a critical section (no C11 atomics or threads); its imports are kernel32's file, mapping,
+  `FindFirstFileA` and critical-section calls, all on XP. Its stb copies (stb_image's thread-local failure reason
+  included - YY-Thunks gives XP implicit TLS) are all `static`; stb_image is still compiled in, only unreached.
+

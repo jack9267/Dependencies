@@ -1203,18 +1203,21 @@ dep("lunasvg", {
 	files = { "Projects/lunasvg/src/source/*.cpp" },
 })
 
+-- The SVG plugin is compiled into the core, as RmlUi's own CMake does (RMLUI_SVG_PLUGIN), so a program linking
+-- rmlui_core_static links lunasvg_static and plutovg_static too.
 dep("rmlui_core", {
 	systems = GUI,
 	lang = "C++",
-	defines = { "RMLUI_VERSION=\"6.2\"", "RMLUI_FONT_ENGINE_FREETYPE", "RMLUI_STATIC_LIB" },
-	includedirs = { "Projects/RmlUi/Include", "Projects/freetype/include" },
-	files = { "Projects/RmlUi/Source/Core/**.cpp" },
+	defines = { "RMLUI_VERSION=\"6.3\"", "RMLUI_FONT_ENGINE_FREETYPE", "RMLUI_STATIC_LIB", "RMLUI_SVG_PLUGIN",
+		"LUNASVG_BUILD_STATIC" },
+	includedirs = { "Projects/RmlUi/Include", "Projects/freetype/include", "Projects/lunasvg/src/include" },
+	files = { "Projects/RmlUi/Source/Core/**.cpp", "Projects/RmlUi/Source/SVG/*.cpp" },
 })
 
 dep("rmlui_debugger", {
 	systems = GUI,
 	lang = "C++",
-	defines = { "RMLUI_VERSION=\"6.2\"", "RMLUI_FONT_ENGINE_FREETYPE", "RMLUI_STATIC_LIB" },
+	defines = { "RMLUI_VERSION=\"6.3\"", "RMLUI_FONT_ENGINE_FREETYPE", "RMLUI_STATIC_LIB" },
 	includedirs = { "Projects/RmlUi/Include", "Projects/freetype/include" },
 	files = { "Projects/RmlUi/Source/Debugger/**.cpp" },
 })

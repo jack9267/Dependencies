@@ -3,6 +3,7 @@
 #include <RmlUi/Core/Input.h>
 #include <RmlUi/Core/StringUtilities.h>
 #include <RmlUi/Core/SystemInterface.h>
+#include <RmlUi/Core/TextInputContext.h>
 
 static Rml::TouchList TouchEventToTouchList(SDL_Event& ev, Rml::Context* context, SDL_FingerID finger_id)
 {
@@ -10,8 +11,10 @@ static Rml::TouchList TouchEventToTouchList(SDL_Event& ev, Rml::Context* context
 	return {Rml::Touch{static_cast<Rml::TouchId>(finger_id), position}};
 }
 
-SystemInterface_SDL::SystemInterface_SDL()
+SystemInterface_SDL::SystemInterface_SDL(SDL_Window* in_window) : window(in_window)
 {
+	RMLUI_ASSERTMSG(window, "Please provide a valid SDL window to the SDL system interface");
+
 #if SDL_MAJOR_VERSION >= 3
 	cursor_default = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_DEFAULT);
 	cursor_move = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_MOVE);
@@ -28,6 +31,7 @@ SystemInterface_SDL::SystemInterface_SDL()
 	cursor_cross = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_CROSSHAIR);
 	cursor_text = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_IBEAM);
 	cursor_unavailable = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NO);
+	(void)window; // Window is unused on SDL 2.
 #endif
 }
 
@@ -46,11 +50,6 @@ SystemInterface_SDL::~SystemInterface_SDL()
 	DestroyCursor(cursor_cross);
 	DestroyCursor(cursor_text);
 	DestroyCursor(cursor_unavailable);
-}
-
-void SystemInterface_SDL::SetWindow(SDL_Window* in_window)
-{
-	window = in_window;
 }
 
 double SystemInterface_SDL::GetElapsedTime()
@@ -99,30 +98,24 @@ void SystemInterface_SDL::GetClipboardText(Rml::String& text)
 
 void SystemInterface_SDL::ActivateKeyboard(Rml::Vector2f caret_position, float line_height)
 {
-	if (window)
-	{
 #if SDL_MAJOR_VERSION >= 3
-		const SDL_Rect rect = {int(caret_position.x), int(caret_position.y), 1, int(line_height)};
-		SDL_SetTextInputArea(window, &rect, 0);
-		SDL_StartTextInput(window);
+	const SDL_Rect rect = {int(caret_position.x), int(caret_position.y), 1, int(line_height)};
+	SDL_SetTextInputArea(window, &rect, 0);
+	SDL_StartTextInput(window);
 #else
-		(void)caret_position;
-		(void)line_height;
-		SDL_StartTextInput();
+	(void)caret_position;
+	(void)line_height;
+	SDL_StartTextInput();
 #endif
-	}
 }
 
 void SystemInterface_SDL::DeactivateKeyboard()
 {
-	if (window)
-	{
 #if SDL_MAJOR_VERSION >= 3
-		SDL_StopTextInput(window);
+	SDL_StopTextInput(window);
 #else
-		SDL_StopTextInput();
+	SDL_StopTextInput();
 #endif
-	}
 }
 
 bool RmlSDL::InputEventHandler(Rml::Context* context, SDL_Window* window, SDL_Event& ev)
@@ -250,6 +243,24 @@ bool RmlSDL::InputEventHandler(Rml::Context* context, SDL_Window* window, SDL_Ev
 	case event_window_size_changed:
 	{
 		Rml::Vector2i dimensions(ev.window.data1, ev.window.data2);
+		
+	#if SDL_MAJOR_VERSION >= 3
+		// SDL_Renderer backend (SDL3): if SDL_SetRenderLogicalPresentation() is enabled, the renderer uses a fixed logical
+		// output size (render coordinates) and scales it to the window; use that logical size for the RmlUi context.
+		// Input events should be converted to render coordinates first (e.g. SDL_ConvertEventToRenderCoordinates()).
+		SDL_Renderer* renderer = SDL_GetRenderer(window);
+		if (renderer)
+		{
+			int logical_w = 0;
+			int logical_h = 0;
+			SDL_RendererLogicalPresentation mode{};
+			if (SDL_GetRenderLogicalPresentation(renderer, &logical_w, &logical_h, &mode)
+				&& mode != SDL_LOGICAL_PRESENTATION_DISABLED
+				&& logical_w > 0 && logical_h > 0)
+				dimensions = Rml::Vector2i(logical_w, logical_h);
+		}
+	#endif
+
 		context->SetDimensions(dimensions);
 	}
 	break;
@@ -508,4 +519,51 @@ int RmlSDL::GetKeyModifierState()
 		retval |= Rml::Input::KM_CAPSLOCK;
 
 	return retval;
+}
+
+void TextInputMethodEditor_SDL::OnActivate(Rml::TextInputContext* input_context)
+{
+	context = input_context;
+}
+
+void TextInputMethodEditor_SDL::OnDeactivate(Rml::TextInputContext* input_context)
+{
+	if (context == input_context)
+		context = nullptr;
+}
+
+void TextInputMethodEditor_SDL::OnDestroy(Rml::TextInputContext* input_context)
+{
+	if (context == input_context)
+		context = nullptr;
+}
+
+void TextInputMethodEditor_SDL::HandleEdit(const SDL_TextEditingEvent& ev)
+{
+	if (context == nullptr)
+		return;
+
+	auto string = Rml::String(ev.text);
+	auto length = static_cast<int>(Rml::StringUtilities::LengthUTF8(string));
+
+	auto composing = start != end;
+
+	if (!composing)
+		context->GetSelectionRange(start, end);
+
+	if (composing || length > 0)
+		context->SetText(string, start, end);
+
+	end = start + length;
+	context->SetCompositionRange(start, end);
+
+	if (length > 0 && ev.start >= 0 && ev.length >= 0)
+		context->SetSelectionRange(start + ev.start, start + ev.start + ev.length);
+	else if (composing)
+		context->SetCursorPosition(end);
+
+	// When committing, SDL sends a text editing event with an empty string and a
+	// separate text input event with the committed text.
+	if (composing && length == 0)
+		context->CommitComposition(Rml::StringView());
 }
