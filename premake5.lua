@@ -826,6 +826,8 @@ headers_project {
 	{ file = "Projects/litehtml/src/src/gumbo/src/gumbo.h", to = "gumbo", systems = WINDOWS },
 	{ file = "Projects/litehtml/src/src/gumbo/src/tag_enum.h", to = "gumbo", systems = WINDOWS },
 	{ dir = "Projects/RmlUi/Include", systems = GUI },
+	-- lunasvg.h, for the host to set the SVG image loader (lunasvg::setImageLoader); plutovg's stays private
+	{ file = "Projects/lunasvg/src/include/lunasvg.h", systems = GUI },
 	{ dir = "Projects/flac/src/include/FLAC", to = "FLAC", systems = WINDOWS },
 	{ dir = "Projects/flac/src/include/FLAC++", to = "FLAC++", systems = WINDOWS },
 	-- bsdiff + prebuilt bass/fmod headers
@@ -1182,6 +1184,23 @@ dep("gumbo", {
 	includedirs = { "Projects/litehtml/src/src/gumbo/src",
 		"Projects/litehtml/src/src/gumbo/visualc/include" },
 	files = { "Projects/litehtml/src/src/gumbo/src/*.c" },
+})
+
+-- plutovg and lunasvg: RmlUi's SVG plugin (<svg> and the svg decorator). plutovg is the copy lunasvg's release
+-- carries (its CMake's add_subdirectory).
+dep("plutovg", {
+	systems = GUI,
+	defines = { "PLUTOVG_BUILD_STATIC" },
+	includedirs = { "Projects/lunasvg/src/plutovg/include" },
+	files = { "Projects/lunasvg/src/plutovg/source/*.c" },
+})
+
+dep("lunasvg", {
+	systems = GUI,
+	lang = "C++",
+	defines = { "LUNASVG_BUILD_STATIC", "PLUTOVG_BUILD_STATIC" },
+	includedirs = { "Projects/lunasvg/src/include", "Projects/lunasvg/src/plutovg/include" },
+	files = { "Projects/lunasvg/src/source/*.cpp" },
 })
 
 dep("rmlui_core", {
