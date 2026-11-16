@@ -166,6 +166,28 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   warnings; a test linking `sqlite3_static` passed in all four (version, JSON, a WAL database: 10,000 rows in a
   transaction, an indexed query, a rollback, read-only reopen, `integrity_check`).
 
+## SDL (`Projects/SDL`)
+
+- **2.32.10** (2026-11-16, from 2.28.4), the newest SDL2: `src` is the `release-2.32.10` tag's source (GitHub's
+  archive, as 2.28.4's was - it has `VisualC-GDK`, `visualtest` and the dotfiles the release tarball lacks), checked
+  against the signed release tarball (Sam Lantinga's key, `1528635D8053A57F77D1E08630A59377A7763BE6`), less
+  `.github`, `mingw`, `android-project-ant`, `VisualC/pkg-support` and `Xcode/SDL/pkg-support/resources/CMake`, as
+  2.28.4's was. `VERSION` holds the version (no newline). `WhatsNew.txt` lists only new API and stops at 2.30.0: the
+  release notes on GitHub are the only list after that.
+- **Two changes of ours, put back after every update** (`git show 6554f5640`): `#define HAVE_LIBC 1` after the
+  `HAVE_IMMINTRIN_H` block in `include/SDL_config_windows.h` (premake defines it too), and `SDL_DYNAMIC_API 0` in
+  `src/dynapi/SDL_dynapi.h` (with it on, the `SDL_DYNAMIC_API` environment variable can load another SDL in its
+  place). `SDL_revision.h` is the tag's, so `SDL_GetRevision()` is "".
+- **Built on Windows** (`SDL2_static`, and `SDL2.dll` with the version resource) and macOS (its own file list); other
+  targets take the system's SDL2, or only its headers. Every file 2.30 and 2.32 added is in a folder premake already
+  globs, and their CMake's Windows sources are 2.28.4's, so neither list changed.
+- **XP**: compare the DLL's imports with the last build's after an update. 2.32.10's take `EnumResourceNamesW`,
+  `GetFileTime`, `GetMessageTime`, `MsgWaitForMultipleObjects` and, in Release, `TlsFree`, where 2.28.4's took none
+  (all Windows 2000), and no longer `ExtractIconExW`; SDL loads anything newer itself. Exports: 2.28.4's 842 and
+  `SDL_GameControllerGetSteamHandle`. Built x86 and x64, Debug and Release, no warnings; a test linking
+  `SDL2_static` (x86, both configurations, under cdb) made a window and a Direct3D renderer, ran events and frames
+  for two seconds and shut down. Not yet built on the Mac, and nothing run on XP.
+
 ## libpng (`Projects/png`)
 
 - **1.6.59, stock** (2026-11-13, from 1.6.50, for the CVE fixes in 1.6.52-1.6.59). `src` is the release tarball
