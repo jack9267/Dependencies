@@ -1,4 +1,0 @@
-#include <WinVer.h>
-#include "src/C/7zVersion.rc"
-
-MY_VERSION_INFO_DLL("7-Zip Standalone", "7z")

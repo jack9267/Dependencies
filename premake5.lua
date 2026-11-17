@@ -178,6 +178,15 @@ dep("bzip2", {
 	},
 })
 
+-- lzma: Igor Pavlov's LZMA and LZMA2 decoders from the LZMA SDK (public domain), plain C with no assembly
+-- (Z7_LZMA_DEC_OPT is its x86-64 asm decoder, not built), so it compiles anywhere, one Apple compile included.
+-- Only the two decoders: nothing here packs, reads .7z or .xz, or uses threads. Headers in include\lzma.
+-- Static only.
+dep("lzma", {
+	includedirs = { "Projects/lzma/src/C" },
+	files = { "Projects/lzma/src/C/LzmaDec.c", "Projects/lzma/src/C/Lzma2Dec.c" },
+})
+
 -- zstd: the library from lib/ (common, compress, decompress, dictBuilder; not legacy or deprecated), as
 -- its own CMake builds it, multithreaded compression included - workers start only when a caller sets
 -- ZSTD_c_nbWorkers. On Windows that uses Vista's condition variables, which YY-Thunks supplies on XP.
@@ -757,6 +766,10 @@ headers_project {
 	{ file = "Projects/zstd/src/lib/zstd.h" },
 	{ file = "Projects/zstd/src/lib/zdict.h" },
 	{ file = "Projects/zstd/src/lib/zstd_errors.h" },
+	-- the LZMA SDK's decoder headers in a folder of their own (<lzma/LzmaDec.h>): its names (7zTypes.h) are generic
+	{ file = "Projects/lzma/src/C/7zTypes.h", to = "lzma" },
+	{ file = "Projects/lzma/src/C/LzmaDec.h", to = "lzma" },
+	{ file = "Projects/lzma/src/C/Lzma2Dec.h", to = "lzma" },
 	{ dir = "Projects/png/include" },
 	{ file = "Projects/jpeg/include/jconfig.h" },
 	{ file = "Projects/jpeg/src/src/jpeglib.h" },
@@ -837,8 +850,7 @@ headers_project {
 }
 -- --------------------------------------------------------------------------------------------
 -- The remaining Win32 / heavier libraries follow below (SDL, libressl, curl, cairo, pixman,
--- litehtml + gumbo, RmlUi, flac, bsdiff + libdivsufsort, and the prebuilt bass/fmod). Only lzma is
--- omitted - it is commented out in Projects/CMakeLists.txt.
+-- litehtml + gumbo, RmlUi, flac, bsdiff + libdivsufsort, and the prebuilt bass/fmod).
 
 -- --------------------------------------------------------------------------------------------
 -- libressl: crypto + ssl (no tls lib), 4.4.0. The source lists are src/crypto/CMakeLists.txt's and

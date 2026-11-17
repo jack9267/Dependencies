@@ -135,6 +135,22 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
 - **`ZSTD_DISABLE_ASM` everywhere**: the x86_64 assembly decoder is GCC/clang-only, and the Apple build compiles
   every architecture in one go. MSVC always uses the C decoder anyway.
 
+## LZMA SDK (`Projects/lzma`)
+
+- **26.06** (2026-11-17, from 18.01, which nothing built: it was commented out of the CMake build and never in
+  premake), Igor Pavlov's, public domain, `lzma2606.7z` from 7-zip.org's SDK page (the ip7z/7zip GitHub release).
+  `src` keeps the release's `C` and `DOC` folders unchanged; its `Asm`, `CPP`, `CS`, `Java` and `bin` (prebuilt
+  programs) are left out, as nothing builds from them.
+- **`lzma_static` is the two decoders only**, `LzmaDec.c` and `Lzma2Dec.c`, plain C, built for every target. Not
+  `Z7_LZMA_DEC_OPT` (its x86-64 assembly decoder). Nothing here packs, reads `.7z`/`.xz` or makes threads. Headers
+  in `include\lzma\` (`#include <lzma/LzmaDec.h>`): `7zTypes.h`, `LzmaDec.h`, `Lzma2Dec.h` - a folder of their own,
+  as the SDK's names (`7zTypes.h`, and `Compiler.h`/`Precomp.h` beside them) are too generic for `include\`. For
+  disc images whose CHD hunks are LZMA (Galactic).
+- Seen working (2026-11-17): x86 and x64, Debug and Release, and gcc 14 on Linux (Debian, WSL; no warnings at
+  `-Wall -Wextra`), by a scratch test that packed noise, text and runs of 1 byte to 3 MB with the SDK's own encoder
+  (compiled into the test only) and unpacked them through the library, LZMA and LZMA2: all 24 the same. The
+  macOS, iOS, Android and FreeBSD fragments are generated with it, not built.
+
 ## zlib (`Projects/zlib`)
 
 - **1.4, stock** (2026-11-13, from 1.3.1; tarball checked against zlib.net's SHA-256). `src` is the release's
