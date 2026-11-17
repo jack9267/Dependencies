@@ -148,8 +148,9 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   disc images whose CHD hunks are LZMA (Galactic).
 - Seen working (2026-11-17): x86 and x64, Debug and Release, and gcc 14 on Linux (Debian, WSL; no warnings at
   `-Wall -Wextra`), by a scratch test that packed noise, text and runs of 1 byte to 3 MB with the SDK's own encoder
-  (compiled into the test only) and unpacked them through the library, LZMA and LZMA2: all 24 the same. The
-  macOS, iOS, Android and FreeBSD fragments are generated with it, not built.
+  (compiled into the test only) and unpacked them through the library, LZMA and LZMA2: all 24 the same; and macOS
+  (melanie, a universal arm64 + x86_64 build, run natively and under Rosetta), the same. The iOS, Android and
+  FreeBSD fragments are generated with it, not built.
 
 ## zlib (`Projects/zlib`)
 
@@ -394,18 +395,32 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
 
 ## FLAC (`Projects/flac`)
 
-- **1.5.0, stock** (2026-11-13, from 1.3.2 of 2016; tarball checked against xiph's `SHA256SUMS`), Windows only. `src`
-  is the release; the 1.3.2 copy also held 66 `PaxHeaders.29360` folders, tar metadata unpacked as files, gone now.
+- **1.5.0, stock** (2026-11-13, from 1.3.2 of 2016; tarball checked against xiph's `SHA256SUMS`), built for every
+  target since 2026-11-17 (FLAC and FLAC++, headers in `include\FLAC`, `include\FLAC++` everywhere). `src` is the
+  release; the 1.3.2 copy also held 66 `PaxHeaders.29360` folders, tar metadata unpacked as files, gone now.
   Its users are the CHD disc image readers (GalacticSamples' `HarryPotter/Shared/DiscImage.cpp`, GalacticTools' `g7z`
   and `gmount`): the stream decoder only (`FLAC__stream_decoder_init_stream` and `process_single`), linking
   `FLAC_static` and `ogg_static`. Galactic's own FLAC playback is dr_flac, in miniaudio.
-- **Built as its CMake builds it for MSVC** (premake5.lua): intrinsics (`FLAC__HAS_X86INTRIN=1`), with SSE always
-  and AVX2/FMA chosen at run time (`FLAC__USE_AVX`; `cpu.c` checks OSXSAVE before `xgetbv`, so XP takes the SSE or C
-  paths), `/arch:AVX2` on the four `*_avx2.c`/`lpc_intrin_fma.c` files only, `/fp:fast`, `ENABLE_64_BIT_WORDS=1`
-  on x64. **1.4 removed the ia32 NASM assembly**, so the NASM build step (and Dependencies' `nasm_path()`) is gone.
-  Several config macros are `#cmakedefine01` - tested by value, so define them `=1`. No multithreaded encoding
-  (needs pthreads). `deduplication/*.c` are `#include`d by `bitreader.c` and `lpc.c`: the glob stays one level.
-  The version is read from the release's CMakeLists.txt (`project(FLAC VERSION ...)`).
+- **`Projects/flac/config/config.h` is ours**, in place of the one FLAC's CMake writes from `config.cmake.h.in`
+  (`HAVE_CONFIG_H`, FLAC and FLAC++ both, as CMake has it). It works out from the compiler's own macros what CMake
+  would find, so **one compile serves every target** - a universal Apple build does arm64 and x86_64 at once, so
+  nothing can come from premake's architecture. On x86/x64: intrinsics (`FLAC__HAS_X86INTRIN 1`), SSE always and
+  AVX2/FMA chosen at run time (`FLAC__USE_AVX`; `cpu.c` checks OSXSAVE before `xgetbv`, so XP takes the SSE or C
+  paths), `HAVE_CPUID_H` off MSVC. On arm64: the encoder's NEON (`FLAC__CPU_ARM64`, `FLAC__HAS_NEONINTRIN`,
+  `FLAC__HAS_A64NEONINTRIN` - only CMake ever set these; `cpu.h` finds x86 itself but not arm64).
+  `ENABLE_64_BIT_WORDS` where pointers are 64-bit (CMake leaves it 0; Windows x64 has always had it). Off Windows:
+  `HAVE_FSEEKO`, `HAVE_SYS_PARAM_H`, the `__builtin_bswap` pair, `_GNU_SOURCE`. Several of its macros are
+  `#cmakedefine01`, tested by value: define them 0 or 1, not just defined. Keep it in step with `config.cmake.h.in`
+  on an update.
+- **AVX2 and FMA are four encoder files** (`fixed_intrin_avx2.c`, `lpc_intrin_avx2.c`, `lpc_intrin_fma.c`,
+  `stream_encoder_intrin_avx2.c`); the decoder uses none of it, nor SSE or NEON - it is plain C. clang and gcc compile
+  just those functions for AVX2 by FLAC's own `__attribute__((target))` (`FLAC__SSE_TARGET`), so they need no flag;
+  MSVC has no such attribute, so those four files alone get `/arch:AVX2` (x86/x64 only), as CMake does. `/fp:fast`
+  with MSVC; elsewhere CMake's four `-fassociative-math -fno-signed-zeros -fno-trapping-math -freciprocal-math`
+  (not `-ffast-math`). `win_utf8_io.c` is Windows' only. **1.4 removed the ia32 NASM assembly**, so the NASM build
+  step (and Dependencies' `nasm_path()`) is gone. No multithreaded encoding (needs pthreads). `deduplication/*.c`
+  are `#include`d by `bitreader.c` and `lpc.c`: the glob stays one level. The version is read from the release's
+  CMakeLists.txt (`project(FLAC VERSION ...)`).
 - **API**: 1.5.0 is API version 14 (`FLAC_API_VERSION_CURRENT`), and only adds (chained Ogg streams, encoder threads,
   a minimum bitrate): the DLL exports all 290 of 1.3.2's, 306 now. FLAC++ warns C4005 (`M_LN2`, defined by
   `share/compat.h` and again by `corecrt_math_defines.h` under the workspace's `_USE_MATH_DEFINES`): the same value.
@@ -413,6 +428,11 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   decoded back bit for bit through `init_stream`, native and Ogg FLAC (an Ogg encoder that can seek needs a read
   callback too - without one `finish` crashes); Firefox's test files (24-bit, 16-bit mono and stereo) decoded to
   their STREAMINFO length with MD5 checking; a truncated crash-test file and an invalid one refused, no crash.
+  Again for every target (2026-11-17), mono and stereo, 16 and 24 bits, at levels 0 and 8 (8 takes the AVX2/FMA or
+  NEON code where there is any), native and Ogg, all bit for bit, and the same files with the same results: Windows
+  x86 and x64, Debug and Release; Linux x64 (gcc 14, Debian in WSL, no warnings; a CPU with AVX2); macOS universal
+  (melanie), arm64 natively and x86_64 under Rosetta, Debug and Release - its arm64 slice has the NEON functions and
+  no x86 ones, its x86_64 slice the reverse. iOS, Android and FreeBSD: fragments generated, not built.
 
 ## jpeg (`Projects/jpeg`)
 

@@ -841,8 +841,8 @@ headers_project {
 	{ dir = "Projects/RmlUi/Include", systems = GUI },
 	-- lunasvg.h, for the host to set the SVG image loader (lunasvg::setImageLoader); plutovg's stays private
 	{ file = "Projects/lunasvg/src/include/lunasvg.h", systems = GUI },
-	{ dir = "Projects/flac/src/include/FLAC", to = "FLAC", systems = WINDOWS },
-	{ dir = "Projects/flac/src/include/FLAC++", to = "FLAC++", systems = WINDOWS },
+	{ dir = "Projects/flac/src/include/FLAC", to = "FLAC" },
+	{ dir = "Projects/flac/src/include/FLAC++", to = "FLAC++" },
 	-- bsdiff + prebuilt bass/fmod headers
 	{ dir = "Projects/bsdiff/src/include", systems = WINDOWS },
 	{ file = "Projects/bass/src/c/bass.h", systems = WINDOWS },
@@ -1234,41 +1234,47 @@ dep("rmlui_debugger", {
 	files = { "Projects/RmlUi/Source/Debugger/**.cpp" },
 })
 
--- flac: as its own CMake builds it with MSVC - C with x86 intrinsics (FLAC__HAS_X86INTRIN), the SSE ones
--- always and AVX2/FMA (FLAC__USE_AVX) chosen at run time by cpu.c, which asks the OS too (OSXSAVE, xgetbv), so
--- XP and older CPUs take the SSE or C paths. Those four files alone are compiled with /arch:AVX2; /fp:fast for the
--- library, as CMake has it. No assembly since 1.4 (the ia32 .nasm went). No multithreaded encoding: that needs
--- pthreads (HAVE_PTHREAD). The deduplication/*.c are #included by bitreader.c and lpc.c, so the glob stays
--- one level. The version comes from the release's CMakeLists.txt.
+-- flac: as its own CMake builds it, for every target. What its configure step would find is our
+-- Projects/flac/config/config.h, worked out from the compiler's macros so one compile serves any target (an Apple
+-- build does all its architectures at once): on x86/x64 the SSE intrinsics always and AVX2/FMA (FLAC__USE_AVX)
+-- chosen at run time by cpu.c, which asks the OS too (OSXSAVE, xgetbv), so XP and older CPUs take the SSE or C
+-- paths; on arm64 the encoder's NEON. The AVX2/FMA code is four files, all encoder work: clang and gcc compile
+-- just those functions for AVX2 by FLAC's own __attribute__((target)), MSVC has none, so there the four files
+-- alone get /arch:AVX2, as CMake does. /fp:fast with MSVC, the four reassociation flags elsewhere, as CMake has it.
+-- No assembly since 1.4 (the ia32 .nasm went). No multithreaded encoding: that needs pthreads (HAVE_PTHREAD).
+-- The deduplication/*.c are #included by bitreader.c and lpc.c, so the glob stays one level. win_utf8_io.c is
+-- Windows' (compat.h maps fopen and the rest to it there). The version comes from the release's CMakeLists.txt.
 local FLAC_VERSION = (io.readfile(path.join(_SCRIPT_DIR, "Projects/flac/src/CMakeLists.txt")) or "")
 	:match("project%(FLAC VERSION ([%d%.]+)%)")
 if not FLAC_VERSION then error("flac: no version in CMakeLists.txt") end
 dep("FLAC", {
-	systems = WINDOWS,
-	defines = { "FLAC__NO_DLL", 'PACKAGE_VERSION="' .. FLAC_VERSION .. '"', "FLAC__HAS_OGG=1", "FLAC__ALIGN_MALLOC_DATA",
-		"HAVE_LROUND=1", "FLAC__HAS_X86INTRIN=1", "FLAC__USE_AVX" },
+	defines = { "FLAC__NO_DLL", 'PACKAGE_VERSION="' .. FLAC_VERSION .. '"', "HAVE_CONFIG_H" },
 	debugdefines = { "FLAC__OVERFLOW_DETECT" },
-	includedirs = { "Projects/flac/src/include", "Projects/flac/src/src/libFLAC/include",
+	includedirs = { "Projects/flac/config", "Projects/flac/src/include", "Projects/flac/src/src/libFLAC/include",
 		"Projects/ogg/include", "Projects/ogg/src/include" },
+	forceincludes = OGG_FORCEINCLUDES,
 	shared = { { defines = { "FLAC_API_EXPORTS" }, dropdefines = { "FLAC__NO_DLL" },
 		extra = function() links { "ogg" } end } },
-	files = { "Projects/flac/src/src/libFLAC/*.c",
-		"Projects/flac/src/src/share/win_utf8_io/win_utf8_io.c" },
+	files = table.join({ "Projects/flac/src/src/libFLAC/*.c" },
+		WINDOWS_TARGET and { "Projects/flac/src/src/share/win_utf8_io/win_utf8_io.c" } or {}),
 	extra = function()
-		floatingpoint "Fast"
-		filter "architecture:x86_64"
-			defines { "ENABLE_64_BIT_WORDS=1" }
-		filter "files:**/fixed_intrin_avx2.c or **/lpc_intrin_avx2.c or **/stream_encoder_intrin_avx2.c or **/lpc_intrin_fma.c"
-			buildoptions { "/arch:AVX2" }
-		filter {}
+		if WINDOWS_TARGET then
+			floatingpoint "Fast"
+			filter { "architecture:x86 or x86_64",
+				"files:**/fixed_intrin_avx2.c or **/lpc_intrin_avx2.c or **/stream_encoder_intrin_avx2.c or **/lpc_intrin_fma.c" }
+				buildoptions { "/arch:AVX2" }
+			filter {}
+		else
+			buildoptions { "-fassociative-math", "-fno-signed-zeros", "-fno-trapping-math", "-freciprocal-math" }
+		end
 	end,
 })
 
+-- FLAC++ reads the same config.h, as FLAC's CMake has it (HAVE_CONFIG_H is for the whole tree there).
 dep("FLAC++", {
-	systems = WINDOWS,
 	lang = "C++",
-	defines = { "FLAC__NO_DLL" },
-	includedirs = { "Projects/flac/src/include", "Projects/flac/src/src/libFLAC/include" },
+	defines = { "FLAC__NO_DLL", "HAVE_CONFIG_H" },
+	includedirs = { "Projects/flac/config", "Projects/flac/src/include", "Projects/flac/src/src/libFLAC/include" },
 	shared = { { defines = { "FLACPP_API_EXPORTS" }, dropdefines = { "FLAC__NO_DLL" },
 		extra = function() links { "FLAC" } end } },
 	files = { "Projects/flac/src/src/libFLAC++/*.cpp" },
