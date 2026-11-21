@@ -663,7 +663,29 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   its font cache with a critical section (no C11 atomics or threads); its imports are kernel32's file, mapping,
   `FindFirstFileA` and critical-section calls, all on XP. Its stb copies (stb_image's thread-local failure reason
   included - YY-Thunks gives XP implicit TLS) are all `static`; stb_image is still compiled in, only unreached.
-
+- **LunaSVG also draws into a ThorVG scene: a second patch, which an update must put back** (2026-11-21, the user's
+  call: SVG as geometry, for drawing it on the GPU later, keeping all the SVG LunaSVG reads). `Canvas` (`graphics.h`,
+  `graphics.cpp`) has a scene mode beside its plutovg pixels: `Canvas::createScene` builds a `tvg::Scene` of what the
+  renderer draws, and `Document::renderToScene(matrix, w, h)` / `renderToScene(w, h)` (`lunasvg.h`) hand it over as a
+  fresh paint. The renderer is untouched but for four `Canvas::create` -> `Canvas::createLike(parent's canvas, ...)`
+  (`svgrenderstate.cpp`, two in `svgelement.cpp`, `svgpaintelement.cpp`), so a layer, mask or pattern canvas is of
+  its parent's kind. In the scene: a path is a `tvg::Shape` (plutovg's path traversed, so arcs are its cubics) with
+  its paint; text is its glyph outlines; a clip is a child scene with that clipper, which drawing goes into until
+  `restore()`; a layer is its scene added with its opacity (true group opacity); a clip mask or mask makes a new root
+  holding the old one, masked (Alpha, Luma after `convertToLuminanceMask`); a pattern is its tile's scene repeated
+  over the shape's extents (at most 4096 tiles), masked by the shape; an image a raw picture (premultiplied ARGB32)
+  clipped to its rectangle. **ThorVG does not move a paint's clipper by that paint's own transform**: never give one
+  paint both (each pattern tile is an untransformed scene whose clipper and content each carry the tile's matrix).
+  **A program linking `lunasvg_static` now links `thorvg_static` too** (GTAC's client and launcher, GalacticSamples'
+  RmlTest), or `graphics.obj` leaves ThorVG's symbols unresolved. Forward declarations of ThorVG's types must say
+  `struct` (MSVC mangles `class` differently).
+  Checked against resvg's test suite (1801 SVGs with reference PNGs, a scratch harness: a test passes with under 1%
+  of pixels more than 48 out in a channel), Windows x86 Release; the same suite under cdb with the Debug libraries, no
+  assert or exception. LunaSVG's pixels 47%, ThorVG's own SVG loader 42%, LunaSVG as a scene drawn by ThorVG's CPU
+  engine 48%: 31 gained (masks 90% against 77%, as group opacity and masks are exact there), 3 lost, of which two are
+  patterns whose tiles now sit at fractional pixels (the same picture) and one a radial gradient whose focal point is
+  outside its circle (`focal-point-correction`: ThorVG draws that otherwise; moving the focal point onto the circle
+  didn't help). ThorVG's own SVG is not used: it lost markers (20 of 72 against 65), `clip-rule`, clip paths and text.
 
 ## ThorVG (`Projects/thorvg`)
 

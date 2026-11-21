@@ -515,6 +515,36 @@ Bitmap Document::renderToBitmap(int width, int height, uint32_t backgroundColor)
     return bitmap;
 }
 
+// Dependencies: as render() and renderToBitmap, into a ThorVG scene (Canvas::createScene)
+tvg::Scene* Document::renderToScene(const Matrix& matrix, float width, float height) const
+{
+    if(width <= 0.f || height <= 0.f)
+        return nullptr;
+    auto canvas = Canvas::createScene(width, height);
+    SVGRenderState state(nullptr, nullptr, matrix, SVGRenderMode::Painting, canvas);
+    rootElement(true)->render(state);
+    return canvas->releaseScene();
+}
+
+tvg::Scene* Document::renderToScene(float width, float height) const
+{
+    auto intrinsicWidth = rootElement(true)->intrinsicWidth();
+    auto intrinsicHeight = rootElement()->intrinsicHeight();
+    if(intrinsicWidth == 0.f || intrinsicHeight == 0.f)
+        return nullptr;
+    if(width <= 0.f && height <= 0.f) {
+        width = intrinsicWidth;
+        height = intrinsicHeight;
+    } else if(width > 0.f && height <= 0.f) {
+        height = width * intrinsicHeight / intrinsicWidth;
+    } else if(height > 0.f && width <= 0.f) {
+        width = height * intrinsicWidth / intrinsicHeight;
+    }
+
+    Matrix matrix(width / intrinsicWidth, 0, 0, height / intrinsicHeight, 0, 0);
+    return renderToScene(matrix, width, height);
+}
+
 Element Document::elementFromPoint(float x, float y) const
 {
     return rootElement(true)->elementFromPoint(x, y);

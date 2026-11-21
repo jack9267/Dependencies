@@ -1247,8 +1247,10 @@ dep("thorvg", {
 dep("lunasvg", {
 	systems = GUI,
 	lang = "C++",
-	defines = { "LUNASVG_BUILD_STATIC", "PLUTOVG_BUILD_STATIC" },
-	includedirs = { "Projects/lunasvg/src/include", "Projects/lunasvg/src/plutovg/include" },
+	-- with our patch drawing into a ThorVG scene (Canvas::createScene, Document::renderToScene): a program linking
+	-- lunasvg_static links thorvg_static too
+	defines = { "LUNASVG_BUILD_STATIC", "PLUTOVG_BUILD_STATIC", "TVG_STATIC" },
+	includedirs = { "Projects/lunasvg/src/include", "Projects/lunasvg/src/plutovg/include", "Projects/thorvg/src/inc" },
 	files = { "Projects/lunasvg/src/source/*.cpp" },
 })
 

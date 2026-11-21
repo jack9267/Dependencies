@@ -1,4 +1,9 @@
 #include "graphics.h"
+
+#include <thorvg.h> // Dependencies: Canvas::createScene
+
+#include <cstdlib>
+#include <cstring>
 #include "lunasvg.h"
 
 #include <cfloat>
@@ -510,6 +515,134 @@ std::shared_ptr<Canvas> Canvas::create(const Rect& extents)
     return create(extents.x, extents.y, extents.w, extents.h);
 }
 
+// Dependencies: drawing into a ThorVG scene (Canvas::createScene). Every call builds what plutovg would have filled:
+// a path is a tvg::Shape with its paint and transform; a clip is a scene with that clipper, which what is drawn next
+// goes into until restore(); a layer (group opacity, a clip mask, a mask) is the layer canvas's scene, added with its
+// opacity or set as a mask (Alpha, or Luma after convertToLuminanceMask); a pattern is its tile's scene repeated over
+// the shape, which masks it; an image is a picture clipped to its rectangle. Coordinates are the renderer's device
+// space, which is the scene's: no layer offsets (m_translation is plutovg's).
+
+struct Canvas::ScenePaint {
+    enum class Type { Color, Linear, Radial, Texture };
+    Type type = Type::Color;
+    float r = 0.f, g = 0.f, b = 0.f, a = 1.f;
+    float x1 = 0.f, y1 = 0.f, x2 = 0.f, y2 = 0.f;
+    float cx = 0.f, cy = 0.f, radius = 0.f, fx = 0.f, fy = 0.f;
+    SpreadMethod spread = SpreadMethod::Pad;
+    GradientStops stops;
+    plutovg_matrix_t matrix = { 1, 0, 0, 1, 0, 0 };
+    tvg::Paint* tile = nullptr; // the texture's scene, one reference ours
+    TextureType textureType = TextureType::Plain;
+    float opacity = 1.f;
+    int tileWidth = 0;
+    int tileHeight = 0;
+
+    ~ScenePaint() { setTile(nullptr); }
+    void setTile(tvg::Paint* paint)
+    {
+        if(paint)
+            paint->ref();
+        if(tile)
+            tile->unref();
+        tile = paint;
+    }
+};
+
+// a then b: the point mapped by b first, then by a
+static plutovg_matrix_t sceneMultiply(const plutovg_matrix_t& a, const plutovg_matrix_t& b)
+{
+    return { a.a * b.a + a.c * b.b, a.b * b.a + a.d * b.b, a.a * b.c + a.c * b.d, a.b * b.c + a.d * b.d,
+             a.a * b.e + a.c * b.f + a.e, a.b * b.e + a.d * b.f + a.f };
+}
+
+static tvg::Matrix sceneMatrix(const plutovg_matrix_t& m)
+{
+    return { m.a, m.c, m.e, m.b, m.d, m.f, 0.f, 0.f, 1.f };
+}
+
+static uint8_t sceneByte(float value)
+{
+    return static_cast<uint8_t>(std::clamp(value, 0.f, 1.f) * 255.f + 0.5f);
+}
+
+static void sceneTraverse(void* closure, plutovg_path_command_t command, const plutovg_point_t* points, int npoints)
+{
+    auto shape = static_cast<tvg::Shape*>(closure);
+    switch(command) {
+    case PLUTOVG_PATH_COMMAND_MOVE_TO:
+        shape->moveTo(points[0].x, points[0].y);
+        break;
+    case PLUTOVG_PATH_COMMAND_LINE_TO:
+        shape->lineTo(points[0].x, points[0].y);
+        break;
+    case PLUTOVG_PATH_COMMAND_CUBIC_TO:
+        shape->cubicTo(points[0].x, points[0].y, points[1].x, points[1].y, points[2].x, points[2].y);
+        break;
+    case PLUTOVG_PATH_COMMAND_CLOSE:
+        shape->close();
+        break;
+    }
+}
+
+static tvg::Shape* sceneShape(const plutovg_path_t* path, FillRule fillRule, const plutovg_matrix_t& matrix)
+{
+    auto shape = tvg::Shape::gen();
+    plutovg_path_traverse(path, sceneTraverse, shape);
+    shape->fillRule(fillRule == FillRule::EvenOdd ? tvg::FillRule::EvenOdd : tvg::FillRule::NonZero);
+    shape->transform(sceneMatrix(matrix));
+    return shape;
+}
+
+static tvg::FillSpread sceneSpread(SpreadMethod spread)
+{
+    switch(spread) {
+    case SpreadMethod::Reflect:
+        return tvg::FillSpread::Reflect;
+    case SpreadMethod::Repeat:
+        return tvg::FillSpread::Repeat;
+    default:
+        return tvg::FillSpread::Pad;
+    }
+}
+
+std::shared_ptr<Canvas> Canvas::createScene(float width, float height)
+{
+    auto canvas = std::shared_ptr<Canvas>(new Canvas(0, 0, static_cast<int>(std::ceil(width)), static_cast<int>(std::ceil(height)), true));
+    auto clipper = tvg::Shape::gen();
+    clipper->appendRect(0, 0, static_cast<float>(canvas->m_width), static_cast<float>(canvas->m_height));
+    canvas->m_scene->clip(clipper);
+    return canvas;
+}
+
+std::shared_ptr<Canvas> Canvas::createLike(const Canvas& like, float x, float y, float width, float height)
+{
+    if(like.m_scene == nullptr)
+        return create(x, y, width, height);
+    constexpr int kMaxSize = 1 << 15;
+    if(width <= 0 || height <= 0 || width >= kMaxSize || height >= kMaxSize)
+        return std::shared_ptr<Canvas>(new Canvas(0, 0, 1, 1, true));
+    auto l = static_cast<int>(std::floor(x));
+    auto t = static_cast<int>(std::floor(y));
+    auto r = static_cast<int>(std::ceil(x + width));
+    auto b = static_cast<int>(std::ceil(y + height));
+    return std::shared_ptr<Canvas>(new Canvas(l, t, r - l, b - t, true));
+}
+
+std::shared_ptr<Canvas> Canvas::createLike(const Canvas& like, const Rect& extents)
+{
+    return createLike(like, extents.x, extents.y, extents.w, extents.h);
+}
+
+tvg::Scene* Canvas::releaseScene()
+{
+    auto scene = m_scene;
+    m_scene = m_target = nullptr;
+    m_targets.clear();
+    if(scene)
+        scene->unref(false);
+    return scene;
+}
+
 void Canvas::setColor(const Color& color)
 {
     setColor(color.redF(), color.greenF(), color.blueF(), color.alphaF());
@@ -517,26 +650,185 @@ void Canvas::setColor(const Color& color)
 
 void Canvas::setColor(float r, float g, float b, float a)
 {
+    if(m_scene) {
+        m_paint->type = ScenePaint::Type::Color;
+        m_paint->r = r;
+        m_paint->g = g;
+        m_paint->b = b;
+        m_paint->a = a;
+        return;
+    }
+
     plutovg_canvas_set_rgba(m_canvas, r, g, b, a);
 }
 
 void Canvas::setLinearGradient(float x1, float y1, float x2, float y2, SpreadMethod spread, const GradientStops& stops, const Transform& transform)
 {
+    if(m_scene) {
+        m_paint->type = ScenePaint::Type::Linear;
+        m_paint->x1 = x1;
+        m_paint->y1 = y1;
+        m_paint->x2 = x2;
+        m_paint->y2 = y2;
+        m_paint->spread = spread;
+        m_paint->stops = stops;
+        m_paint->matrix = transform.matrix();
+        return;
+    }
+
     plutovg_canvas_set_linear_gradient(m_canvas, x1, y1, x2, y2, static_cast<plutovg_spread_method_t>(spread), stops.data(), stops.size(), &transform.matrix());
 }
 
 void Canvas::setRadialGradient(float cx, float cy, float r, float fx, float fy, SpreadMethod spread, const GradientStops& stops, const Transform& transform)
 {
+    if(m_scene) {
+        m_paint->type = ScenePaint::Type::Radial;
+        m_paint->cx = cx;
+        m_paint->cy = cy;
+        m_paint->radius = r;
+        m_paint->fx = fx;
+        m_paint->fy = fy;
+        m_paint->spread = spread;
+        m_paint->stops = stops;
+        m_paint->matrix = transform.matrix();
+        return;
+    }
+
     plutovg_canvas_set_radial_gradient(m_canvas, cx, cy, r, fx, fy, 0.f, static_cast<plutovg_spread_method_t>(spread), stops.data(), stops.size(), &transform.matrix());
 }
 
 void Canvas::setTexture(const Canvas& source, TextureType type, float opacity, const Transform& transform)
 {
+    if(m_scene) {
+        m_paint->type = ScenePaint::Type::Texture;
+        m_paint->setTile(source.m_scene ? source.m_scene->duplicate() : nullptr);
+        m_paint->textureType = type;
+        m_paint->opacity = opacity;
+        m_paint->matrix = transform.matrix();
+        m_paint->tileWidth = source.width();
+        m_paint->tileHeight = source.height();
+        return;
+    }
+
     plutovg_canvas_set_texture(m_canvas, source.surface(), static_cast<plutovg_texture_type_t>(type), opacity, &transform.matrix());
+}
+
+// The shape (its path and transform set) given the paint and added where drawing goes. A texture is its tile's scene
+// repeated over the path's extents (padded by strokePad for a stroke), masked by the shape painted opaque.
+void Canvas::addShape(tvg::Shape* shape, const plutovg_path_t* path, float strokePad, const Transform& transform, bool stroke)
+{
+    const auto& paint = *m_paint;
+    if(paint.type == ScenePaint::Type::Color) {
+        auto r = sceneByte(paint.r), g = sceneByte(paint.g), b = sceneByte(paint.b), a = sceneByte(paint.a);
+        stroke ? shape->strokeFill(r, g, b, a) : shape->fill(r, g, b, a);
+        m_target->add(shape);
+        return;
+    }
+
+    if(paint.type == ScenePaint::Type::Linear || paint.type == ScenePaint::Type::Radial) {
+        tvg::Fill* fill = nullptr;
+        if(paint.type == ScenePaint::Type::Linear) {
+            auto linear = tvg::LinearGradient::gen();
+            linear->linear(paint.x1, paint.y1, paint.x2, paint.y2);
+            fill = linear;
+        } else {
+            auto radial = tvg::RadialGradient::gen();
+            radial->radial(paint.cx, paint.cy, paint.radius, paint.fx, paint.fy, 0.f);
+            fill = radial;
+        }
+
+        std::vector<tvg::Fill::ColorStop> stops;
+        stops.reserve(paint.stops.size());
+        for(const auto& stop : paint.stops)
+            stops.push_back({ stop.offset, sceneByte(stop.color.r), sceneByte(stop.color.g), sceneByte(stop.color.b), sceneByte(stop.color.a) });
+        fill->colorStops(stops.data(), static_cast<uint32_t>(stops.size()));
+        fill->spread(sceneSpread(paint.spread));
+        fill->transform(sceneMatrix(paint.matrix));
+        stroke ? shape->strokeFill(fill) : shape->fill(fill);
+        m_target->add(shape);
+        return;
+    }
+
+    if(paint.tile == nullptr || paint.tileWidth <= 0 || paint.tileHeight <= 0) {
+        tvg::Paint::rel(shape);
+        return;
+    }
+
+    stroke ? shape->strokeFill(255, 255, 255, 255) : shape->fill(255, 255, 255, 255);
+    auto tileMatrix = sceneMultiply(transform.matrix(), paint.matrix);
+    int firstColumn = 0, lastColumn = 0, firstRow = 0, lastRow = 0;
+    if(paint.textureType == TextureType::Tiled) {
+        // which tiles the path covers: its extents in the tile's space
+        plutovg_rect_t extents;
+        plutovg_path_extents(path, &extents, false);
+        extents.x -= strokePad;
+        extents.y -= strokePad;
+        extents.w += strokePad * 2.f;
+        extents.h += strokePad * 2.f;
+        plutovg_matrix_t inverse;
+        if(!plutovg_matrix_invert(&tileMatrix, &inverse)) {
+            tvg::Paint::rel(shape);
+            return;
+        }
+
+        auto toTile = sceneMultiply(inverse, transform.matrix());
+        float minX = 0, minY = 0, maxX = 0, maxY = 0;
+        const plutovg_point_t corners[] = {
+            { extents.x, extents.y }, { extents.x + extents.w, extents.y },
+            { extents.x, extents.y + extents.h }, { extents.x + extents.w, extents.y + extents.h }
+        };
+
+        for(int i = 0; i < 4; i++) {
+            plutovg_point_t point;
+            plutovg_matrix_map_point(&toTile, &corners[i], &point);
+            if(i == 0 || point.x < minX) minX = point.x;
+            if(i == 0 || point.y < minY) minY = point.y;
+            if(i == 0 || point.x > maxX) maxX = point.x;
+            if(i == 0 || point.y > maxY) maxY = point.y;
+        }
+
+        firstColumn = static_cast<int>(std::floor(minX / paint.tileWidth));
+        lastColumn = static_cast<int>(std::floor(maxX / paint.tileWidth));
+        firstRow = static_cast<int>(std::floor(minY / paint.tileHeight));
+        lastRow = static_cast<int>(std::floor(maxY / paint.tileHeight));
+        constexpr long long kMaxTiles = 4096; // a tile tiny against the shape is left out, not drawn a million times
+        if(static_cast<long long>(lastColumn - firstColumn + 1) * (lastRow - firstRow + 1) > kMaxTiles) {
+            tvg::Paint::rel(shape);
+            return;
+        }
+    }
+
+    auto tiles = tvg::Scene::gen();
+    for(int row = firstRow; row <= lastRow; row++) {
+        for(int column = firstColumn; column <= lastColumn; column++) {
+            // each tile cut to its own size, as its pixels are. ThorVG doesn't move a paint's clipper by the paint's own
+            // transform, so the tile's scene stays untransformed, its clipper and content each given the tile's.
+            plutovg_matrix_t offset = { 1, 0, 0, 1, static_cast<float>(column * paint.tileWidth), static_cast<float>(row * paint.tileHeight) };
+            auto matrix = sceneMatrix(sceneMultiply(tileMatrix, offset));
+            auto clipper = tvg::Shape::gen();
+            clipper->appendRect(0, 0, static_cast<float>(paint.tileWidth), static_cast<float>(paint.tileHeight));
+            clipper->transform(matrix);
+            auto content = paint.tile->duplicate();
+            content->transform(matrix);
+            auto tile = tvg::Scene::gen();
+            tile->clip(clipper);
+            tile->add(content);
+            tiles->add(tile);
+        }
+    }
+
+    tiles->opacity(sceneByte(paint.opacity));
+    tiles->mask(shape, tvg::MaskMethod::Alpha);
+    m_target->add(tiles);
 }
 
 void Canvas::fillPath(const Path& path, FillRule fillRule, const Transform& transform)
 {
+    if(m_scene) {
+        addShape(sceneShape(path.data(), fillRule, transform.matrix()), path.data(), 0.f, transform, false);
+        return;
+    }
+
     plutovg_canvas_set_matrix(m_canvas, &m_translation);
     plutovg_canvas_transform(m_canvas, &transform.matrix());
     plutovg_canvas_set_fill_rule(m_canvas, static_cast<plutovg_fill_rule_t>(fillRule));
@@ -544,8 +836,25 @@ void Canvas::fillPath(const Path& path, FillRule fillRule, const Transform& tran
     plutovg_canvas_fill_path(m_canvas, path.data());
 }
 
+static void sceneStroke(tvg::Shape* shape, float width, float miterLimit, LineCap cap, LineJoin join, float dashOffset, const DashArray& dashes)
+{
+    shape->strokeWidth(width);
+    shape->strokeMiterlimit(miterLimit);
+    shape->strokeCap(cap == LineCap::Round ? tvg::StrokeCap::Round : cap == LineCap::Square ? tvg::StrokeCap::Square : tvg::StrokeCap::Butt);
+    shape->strokeJoin(join == LineJoin::Round ? tvg::StrokeJoin::Round : join == LineJoin::Bevel ? tvg::StrokeJoin::Bevel : tvg::StrokeJoin::Miter);
+    if(!dashes.empty())
+        shape->strokeDash(dashes.data(), static_cast<uint32_t>(dashes.size()), dashOffset);
+}
+
 void Canvas::strokePath(const Path& path, const StrokeData& strokeData, const Transform& transform)
 {
+    if(m_scene) {
+        auto shape = sceneShape(path.data(), FillRule::NonZero, transform.matrix());
+        sceneStroke(shape, strokeData.lineWidth(), strokeData.miterLimit(), strokeData.lineCap(), strokeData.lineJoin(), strokeData.dashOffset(), strokeData.dashArray());
+        addShape(shape, path.data(), strokeData.lineWidth() * std::max(strokeData.miterLimit(), 1.f), transform, true);
+        return;
+    }
+
     plutovg_canvas_set_matrix(m_canvas, &m_translation);
     plutovg_canvas_transform(m_canvas, &transform.matrix());
     plutovg_canvas_set_line_width(m_canvas, strokeData.lineWidth());
@@ -558,8 +867,32 @@ void Canvas::strokePath(const Path& path, const StrokeData& strokeData, const Tr
     plutovg_canvas_stroke_path(m_canvas, path.data());
 }
 
+// The text's glyph outlines as one path, as plutovg_canvas_add_text builds it
+static plutovg_path_t* sceneTextPath(const std::u32string_view& text, const Font& font, const Point& origin)
+{
+    auto path = plutovg_path_create();
+    if(font.face().isNull() || font.size() <= 0.f)
+        return path;
+    plutovg_text_iterator_t it;
+    plutovg_text_iterator_init(&it, text.data(), static_cast<int>(text.length()), PLUTOVG_TEXT_ENCODING_UTF32);
+    float advanceWidth = 0.f;
+    while(plutovg_text_iterator_has_next(&it)) {
+        auto codepoint = plutovg_text_iterator_next(&it);
+        advanceWidth += plutovg_font_face_get_glyph_path(font.face().get(), font.size(), origin.x + advanceWidth, origin.y, codepoint, path);
+    }
+
+    return path;
+}
+
 void Canvas::fillText(const std::u32string_view& text, const Font& font, const Point& origin, const Transform& transform)
 {
+    if(m_scene) {
+        auto path = sceneTextPath(text, font, origin);
+        addShape(sceneShape(path, FillRule::NonZero, transform.matrix()), path, 0.f, transform, false);
+        plutovg_path_destroy(path);
+        return;
+    }
+
     plutovg_canvas_set_matrix(m_canvas, &m_translation);
     plutovg_canvas_transform(m_canvas, &transform.matrix());
     plutovg_canvas_set_fill_rule(m_canvas, PLUTOVG_FILL_RULE_NON_ZERO);
@@ -570,6 +903,15 @@ void Canvas::fillText(const std::u32string_view& text, const Font& font, const P
 
 void Canvas::strokeText(const std::u32string_view& text, float strokeWidth, const Font& font, const Point& origin, const Transform& transform)
 {
+    if(m_scene) {
+        auto path = sceneTextPath(text, font, origin);
+        auto shape = sceneShape(path, FillRule::NonZero, transform.matrix());
+        sceneStroke(shape, strokeWidth, 4.f, LineCap::Butt, LineJoin::Miter, 0.f, DashArray());
+        addShape(shape, path, strokeWidth * 4.f, transform, true);
+        plutovg_path_destroy(path);
+        return;
+    }
+
     plutovg_canvas_set_matrix(m_canvas, &m_translation);
     plutovg_canvas_transform(m_canvas, &transform.matrix());
     plutovg_canvas_set_line_width(m_canvas, strokeWidth);
@@ -585,6 +927,14 @@ void Canvas::strokeText(const std::u32string_view& text, float strokeWidth, cons
 
 void Canvas::clipPath(const Path& path, FillRule clipRule, const Transform& transform)
 {
+    if(m_scene) {
+        auto clipped = tvg::Scene::gen();
+        clipped->clip(sceneShape(path.data(), clipRule, transform.matrix()));
+        m_target->add(clipped);
+        m_target = clipped;
+        return;
+    }
+
     plutovg_canvas_set_matrix(m_canvas, &m_translation);
     plutovg_canvas_transform(m_canvas, &transform.matrix());
     plutovg_canvas_set_fill_rule(m_canvas, static_cast<plutovg_fill_rule_t>(clipRule));
@@ -593,6 +943,17 @@ void Canvas::clipPath(const Path& path, FillRule clipRule, const Transform& tran
 
 void Canvas::clipRect(const Rect& rect, FillRule clipRule, const Transform& transform)
 {
+    if(m_scene) {
+        auto clipper = tvg::Shape::gen();
+        clipper->appendRect(rect.x, rect.y, rect.w, rect.h);
+        clipper->transform(sceneMatrix(transform.matrix()));
+        auto clipped = tvg::Scene::gen();
+        clipped->clip(clipper);
+        m_target->add(clipped);
+        m_target = clipped;
+        return;
+    }
+
     plutovg_canvas_set_matrix(m_canvas, &m_translation);
     plutovg_canvas_transform(m_canvas, &transform.matrix());
     plutovg_canvas_set_fill_rule(m_canvas, static_cast<plutovg_fill_rule_t>(clipRule));
@@ -604,6 +965,39 @@ void Canvas::drawImage(const Bitmap& image, const Rect& dstRect, const Rect& src
     auto xScale = dstRect.w / srcRect.w;
     auto yScale = dstRect.h / srcRect.h;
     plutovg_matrix_t matrix = { xScale, 0, 0, yScale, -srcRect.x * xScale, -srcRect.y * yScale };
+    if(m_scene) {
+        // the image's premultiplied ARGB32, copied for the picture (which frees it)
+        auto surface = image.surface();
+        int width = plutovg_surface_get_width(surface);
+        int height = plutovg_surface_get_height(surface);
+        int stride = plutovg_surface_get_stride(surface);
+        if(width <= 0 || height <= 0)
+            return;
+        auto pixels = static_cast<uint32_t*>(std::malloc(static_cast<size_t>(width) * height * 4));
+        if(pixels == nullptr)
+            return;
+        auto data = plutovg_surface_get_data(surface);
+        for(int y = 0; y < height; y++)
+            std::memcpy(pixels + static_cast<size_t>(y) * width, data + static_cast<size_t>(y) * stride, static_cast<size_t>(width) * 4);
+        auto picture = tvg::Picture::gen();
+        if(picture->load(pixels, static_cast<uint32_t>(width), static_cast<uint32_t>(width), static_cast<uint32_t>(height), tvg::ColorSpace::ARGB8888, false) != tvg::Result::Success) {
+            std::free(pixels);
+            tvg::Paint::rel(picture);
+            return;
+        }
+
+        plutovg_matrix_t place = sceneMultiply(transform.matrix(), { 1, 0, 0, 1, dstRect.x, dstRect.y });
+        picture->transform(sceneMatrix(sceneMultiply(place, matrix)));
+        auto clipper = tvg::Shape::gen();
+        clipper->appendRect(0, 0, dstRect.w, dstRect.h);
+        clipper->transform(sceneMatrix(place));
+        auto clipped = tvg::Scene::gen();
+        clipped->clip(clipper);
+        clipped->add(picture);
+        m_target->add(clipped);
+        return;
+    }
+
     plutovg_canvas_set_matrix(m_canvas, &m_translation);
     plutovg_canvas_transform(m_canvas, &transform.matrix());
     plutovg_canvas_translate(m_canvas, dstRect.x, dstRect.y);
@@ -615,6 +1009,29 @@ void Canvas::drawImage(const Bitmap& image, const Rect& dstRect, const Rect& src
 
 void Canvas::blendCanvas(const Canvas& canvas, BlendMode blendMode, float opacity)
 {
+    if(m_scene) {
+        if(canvas.m_scene == nullptr)
+            return;
+        if(blendMode == BlendMode::Dst_In || blendMode == BlendMode::Dst_Out) {
+            // what this canvas holds, masked by the other: a new root holding the old one, so a second mask (a clip
+            // mask, then a mask) masks the result of the first
+            auto method = blendMode == BlendMode::Dst_Out ? (canvas.m_luminance ? tvg::MaskMethod::InvLuma : tvg::MaskMethod::InvAlpha)
+                                                          : (canvas.m_luminance ? tvg::MaskMethod::Luma : tvg::MaskMethod::Alpha);
+            auto root = tvg::Scene::gen();
+            root->ref();
+            root->add(m_scene);
+            m_scene->unref();
+            m_scene->mask(canvas.m_scene, method);
+            m_scene = m_target = root;
+            m_targets.clear();
+            return;
+        }
+
+        canvas.m_scene->opacity(sceneByte(opacity));
+        m_target->add(canvas.m_scene);
+        return;
+    }
+
     plutovg_matrix_t matrix = { 1, 0, 0, 1, static_cast<float>(canvas.x()), static_cast<float>(canvas.y()) };
     plutovg_canvas_set_matrix(m_canvas, &m_translation);
     plutovg_canvas_set_operator(m_canvas, static_cast<plutovg_operator_t>(blendMode));
@@ -624,26 +1041,49 @@ void Canvas::blendCanvas(const Canvas& canvas, BlendMode blendMode, float opacit
 
 void Canvas::save()
 {
+    if(m_scene) {
+        m_targets.push_back(m_target);
+        return;
+    }
+
     plutovg_canvas_save(m_canvas);
 }
 
 void Canvas::restore()
 {
+    if(m_scene) {
+        if(!m_targets.empty()) {
+            m_target = m_targets.back();
+            m_targets.pop_back();
+        }
+
+        return;
+    }
+
     plutovg_canvas_restore(m_canvas);
 }
 
 int Canvas::width() const
 {
+    if(m_surface == nullptr)
+        return m_width;
     return plutovg_surface_get_width(m_surface);
 }
 
 int Canvas::height() const
 {
+    if(m_surface == nullptr)
+        return m_height;
     return plutovg_surface_get_height(m_surface);
 }
 
 void Canvas::convertToLuminanceMask()
 {
+    if(m_scene) {
+        m_luminance = true;
+        return;
+    }
+
     auto width = plutovg_surface_get_width(m_surface);
     auto height = plutovg_surface_get_height(m_surface);
     auto stride = plutovg_surface_get_stride(m_surface);
@@ -670,6 +1110,8 @@ void Canvas::convertToLuminanceMask()
 
 Canvas::~Canvas()
 {
+    if(m_scene)
+        m_scene->unref();
     plutovg_canvas_destroy(m_canvas);
     plutovg_surface_destroy(m_surface);
 }
@@ -688,6 +1130,18 @@ Canvas::Canvas(int x, int y, int width, int height)
     , m_translation({1, 0, 0, 1, -static_cast<float>(x), -static_cast<float>(y)})
     , m_x(x), m_y(y)
 {
+}
+
+Canvas::Canvas(int x, int y, int width, int height, bool)
+    : m_surface(nullptr)
+    , m_canvas(nullptr)
+    , m_translation({1, 0, 0, 1, 0, 0})
+    , m_x(x), m_y(y)
+    , m_paint(new ScenePaint)
+    , m_width(width), m_height(height)
+{
+    m_scene = m_target = tvg::Scene::gen();
+    m_scene->ref();
 }
 
 } // namespace lunasvg

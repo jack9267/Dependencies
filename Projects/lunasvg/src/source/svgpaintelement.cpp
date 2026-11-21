@@ -291,7 +291,7 @@ bool SVGPatternElement::applyPaint(SVGRenderState& state, float opacity) const
     auto xScale = currentTransform.xScale();
     auto yScale = currentTransform.yScale();
 
-    auto patternImage = Canvas::create(0, 0, patternRect.w * xScale, patternRect.h * yScale);
+    auto patternImage = Canvas::createLike(*state.canvas(), 0, 0, patternRect.w * xScale, patternRect.h * yScale); // Dependencies
     auto patternImageTransform = Transform::scaled(xScale, yScale);
 
     const auto& viewBoxRect = attributes.viewBox();

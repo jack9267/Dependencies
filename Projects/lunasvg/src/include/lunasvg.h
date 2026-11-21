@@ -130,6 +130,11 @@ LUNASVG_API bool lunasvg_add_font_face_from_data(const char* family, bool bold, 
 }
 #endif
 
+// Dependencies: Document::renderToScene
+namespace tvg {
+struct Scene;
+}
+
 namespace lunasvg {
 
 /**
@@ -765,6 +770,21 @@ public:
      * @return A Bitmap containing the raster representation of the document.
      */
     Bitmap renderToBitmap(int width = -1, int height = -1, uint32_t backgroundColor = 0x00000000) const;
+
+    /**
+     * Dependencies: the document drawn as a ThorVG scene rather than pixels - paths with their fills and strokes,
+     * gradients, clips, masks, group opacity, patterns, pictures - which a ThorVG canvas draws at any size. matrix maps
+     * the document's user space to the scene's, as render()'s maps it to a bitmap's; width and height clip the scene as
+     * a bitmap of that size would. The scene is a fresh paint: add it to a ThorVG canvas or scene, or free it with
+     * tvg::Paint::rel. A program using it links ThorVG (thorvg_static) too.
+     */
+    tvg::Scene* renderToScene(const Matrix& matrix, float width, float height) const;
+
+    /**
+     * Dependencies: as above, the document scaled to width x height as renderToBitmap scales it (-1: from the
+     * intrinsic size); null if it has no size.
+     */
+    tvg::Scene* renderToScene(float width = -1, float height = -1) const;
 
     /**
      * @brief Returns the topmost element under the specified point.

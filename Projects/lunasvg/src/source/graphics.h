@@ -11,6 +11,13 @@
 #include <array>
 #include <string>
 
+// Dependencies: a Canvas can build a ThorVG scene instead of pixels (Canvas::createScene)
+namespace tvg {
+struct Paint;
+struct Scene;
+struct Shape;
+}
+
 namespace lunasvg {
 
 enum class LineCap : uint8_t {
@@ -512,6 +519,15 @@ public:
     static std::shared_ptr<Canvas> create(float x, float y, float width, float height);
     static std::shared_ptr<Canvas> create(const Rect& extents);
 
+    // Dependencies: a canvas that builds a ThorVG scene of what is drawn (geometry, not pixels), its extents clipping
+    // it as a bitmap's size would; and a layer, mask or pattern canvas of the same kind as like (the renderer's)
+    static std::shared_ptr<Canvas> createScene(float width, float height);
+    static std::shared_ptr<Canvas> createLike(const Canvas& like, float x, float y, float width, float height);
+    static std::shared_ptr<Canvas> createLike(const Canvas& like, const Rect& extents);
+    bool isScene() const { return m_scene != nullptr; }
+    // Dependencies: the scene, handed over as a fresh paint (add it to a canvas or scene, or tvg::Paint::rel it)
+    tvg::Scene* releaseScene();
+
     void setColor(const Color& color);
     void setColor(float r, float g, float b, float a);
     void setLinearGradient(float x1, float y1, float x2, float y2, SpreadMethod spread, const GradientStops& stops, const Transform& transform);
@@ -550,11 +566,25 @@ public:
 private:
     Canvas(const Bitmap& bitmap);
     Canvas(int x, int y, int width, int height);
+    Canvas(int x, int y, int width, int height, bool scene); // Dependencies
     plutovg_surface_t* m_surface;
     plutovg_canvas_t* m_canvas;
     plutovg_matrix_t m_translation;
     const int m_x;
     const int m_y;
+
+    // Dependencies: a scene canvas's state. m_scene is the root (one reference ours); m_target where drawing goes
+    // (a clip's scene inside it); m_targets what save() kept; m_paint the paint set (setColor, the gradients,
+    // setTexture); m_luminance set by convertToLuminanceMask, for blendCanvas's mask.
+    struct ScenePaint;
+    void addShape(tvg::Shape* shape, const plutovg_path_t* path, float strokePad, const Transform& transform, bool stroke);
+    tvg::Scene* m_scene = nullptr;
+    tvg::Scene* m_target = nullptr;
+    std::vector<tvg::Scene*> m_targets;
+    std::unique_ptr<ScenePaint> m_paint;
+    bool m_luminance = false;
+    int m_width = 0;
+    int m_height = 0;
 };
 
 } // namespace lunasvg
