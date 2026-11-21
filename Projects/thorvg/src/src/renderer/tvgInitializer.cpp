@@ -138,6 +138,9 @@ uint16_t THORVG_VERSION_NUMBER()
 }
 
 
+// Dependencies: not in a static library, where they would replace the whole program's new and delete (and clash with
+// a program's own)
+#ifndef TVG_STATIC
 void* operator new(std::size_t size)
 {
     return tvg::malloc(size);
@@ -160,3 +163,4 @@ void operator delete[](void* ptr) noexcept
 {
     tvg::free(ptr);
 }
+#endif

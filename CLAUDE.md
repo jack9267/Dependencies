@@ -695,9 +695,13 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
 
 ## ThorVG (`Projects/thorvg`)
 
-- **ThorVG 1.1.4, stock** (2026-11-21), for Lottie (vector animations) and as what draws SVG (LunaSVG's scene,
+- **ThorVG 1.1.4** (2026-11-21), for Lottie (vector animations) and as what draws SVG (LunaSVG's scene,
   above), first with its CPU engine and later on Galactic's renderer through an engine of our own (its `RenderMethod`,
-  `src/renderer/tvgRender.h`). `src` is the release tarball (`thorvg-1.1.4.tar.xz`) unchanged; `thorvg_static`,
+  `src/renderer/tvgRender.h`). `src` is the release tarball (`thorvg-1.1.4.tar.xz`) but for one patch, which an
+  update must put back: **`tvgInitializer.cpp` replaces the global `operator new`/`delete`** (with `tvg::malloc`,
+  which is `std::malloc`), unconditionally - harmless in its DLL, but from a static library it took over every
+  allocation in a program, and a program with its own (GTAC's client) failed to link (LNK2005). Now under
+  `#ifndef TVG_STATIC`, which `thorvg_static` is built with. `thorvg_static`,
   built for the GUI targets. Headers in `include\thorvg\` (`<thorvg/thorvg.h>`, `<thorvg/thorvg_lottie.h>`; the
   second includes the first by name, so they sit together). Consumers define `TVG_STATIC`.
 - **`config/config.h` is ours** (meson writes it from `meson_options.txt`): the CPU engine; SVG, Lottie and TrueType
