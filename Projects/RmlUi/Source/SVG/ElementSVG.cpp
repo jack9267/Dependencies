@@ -43,7 +43,7 @@ void ElementSVG::OnRender()
 {
 	EnsureSourceLoaded();
 	if (handle)
-		handle->geometry.Render(GetAbsoluteOffset(BoxArea::Content), handle->texture);
+		handle->Render(GetAbsoluteOffset(BoxArea::Content)); // Dependencies: a draw list, not one quad
 }
 
 void ElementSVG::OnResize()

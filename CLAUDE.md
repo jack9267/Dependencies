@@ -663,12 +663,18 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   its font cache with a critical section (no C11 atomics or threads); its imports are kernel32's file, mapping,
   `FindFirstFileA` and critical-section calls, all on XP. Its stb copies (stb_image's thread-local failure reason
   included - YY-Thunks gives XP implicit TLS) are all `static`; stb_image is still compiled in, only unreached.
-- **RmlUi's SVG textures are drawn by ThorVG** (2026-11-21, a third patch, `Source/SVG/SVGCache.cpp`, marked
-  `Dependencies`): the texture callback asks LunaSVG for its scene (`renderToScene`, below) and draws it with ThorVG's
-  CPU engine into premultiplied RGBA (`ColorSpace::ABGR8888`: RmlUi 6's order, no channel swap), where it rendered
-  LunaSVG's own pixels; `SVGCache::Initialize`/`Shutdown` start and stop ThorVG (it counts its users). So
-  **`rmlui_core_static` needs `thorvg_static` linked too**. Seen in GalacticSamples' RmlTest (`-document SVG`,
-  Direct3D 9): `<svg src>`, inline, the decorator and two sizes as before.
+- **RmlUi's SVGs are triangles, drawn by the GPU** (2026-11-21, a third patch, `Source/SVG/SVGCache.cpp`/`.h`,
+  `ElementSVG.cpp`, `DecoratorSVG.cpp`, marked `Dependencies`; Lucas: animating an SVG made it rasterize again every
+  frame). Each new size asks LunaSVG for its scene (`renderToScene`, below) and draws it on ThorVG's mesh canvas
+  (`thorvg_mesh.h`, ours, below): its batches become RmlUi geometry, kept per size, with their vertex colours
+  multiplied by the element's `image-color` and opacity per colour as the quad's were, and its textures (gradients
+  other than linear, pictures) callback textures. A handle is an `SVGDrawList` (geometries and the texture each
+  samples) rendered by `SVGData::Render`, where it was one quad and one texture. **When the mesh canvas says it
+  wasn't complete** (a blend mode, a filter, a mask of varying colour), it is the texture as before: ThorVG's CPU engine
+  into premultiplied RGBA (`ColorSpace::ABGR8888`, RmlUi 6's order). `SVGCache::Initialize`/`Shutdown` start and stop
+  ThorVG (it counts its users). So **`rmlui_core_static` needs `thorvg_static` and `libtess2_static` linked too**.
+  Seen in GalacticSamples' RmlTest (`-document SVG`, Direct3D 9): `<svg src>`, inline, the decorator and two sizes as
+  before, every one as triangles (the badge's radial gradient is its one texture).
 - **LunaSVG also draws into a ThorVG scene: a second patch, which an update must put back** (2026-11-21, the user's
   call: SVG as geometry, for drawing it on the GPU later, keeping all the SVG LunaSVG reads). `Canvas` (`graphics.h`,
   `graphics.cpp`) has a scene mode beside its plutovg pixels: `Canvas::createScene` builds a `tvg::Scene` of what the
@@ -696,8 +702,8 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
 ## ThorVG (`Projects/thorvg`)
 
 - **ThorVG 1.1.4** (2026-11-21), for Lottie (vector animations) and as what draws SVG (LunaSVG's scene,
-  above), first with its CPU engine and later on Galactic's renderer through an engine of our own (its `RenderMethod`,
-  `src/renderer/tvgRender.h`). `src` is the release tarball (`thorvg-1.1.4.tar.xz`) but for one patch, which an
+  above), as triangles through an engine of our own (`mesh/`, below) or with its CPU engine where those can't show it
+  all. `src` is the release tarball (`thorvg-1.1.4.tar.xz`) but for one patch, which an
   update must put back: **`tvgInitializer.cpp` replaces the global `operator new`/`delete`** (with `tvg::malloc`,
   which is `std::malloc`), unconditionally - harmless in its DLL, but from a static library it took over every
   allocation in a program, and a program with its own (GTAC's client) failed to link (LNK2005). Now under
@@ -717,11 +723,37 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   program's XP support for that comes from YY-Thunks, as for the rest of the STL. Not yet looked at on XP.
 - No `assert` in what is built (they are all in the GL/WebGPU engines). Built Win32 and x64, Debug and Release; the
   other targets' fragments generated, not built.
+- **`mesh/` is ours: the mesh engine and `tvg::MeshCanvas`** (2026-11-21, `thorvg_mesh.h`, installed beside
+  `thorvg.h`), ThorVG's `RenderMethod` drawing into triangle lists a program draws with its own renderer: `MeshBatch`es
+  (vertices with a premultiplied colour and a texture coordinate, three indices a triangle, a texture index) and
+  `MeshImage`s (premultiplied RGBA, with a key that changes when the pixels do). Not in the tarball, so an update
+  leaves it alone, but it uses ThorVG's internals (`tvgRender.h`'s `RenderMethod`, `RenderShape`, `Canvas::Impl`):
+  check it builds against a new version. Each shape's fill and stroke is an area - libtess2's boundary contours, by its
+  fill rule; a stroke is the GL engine's stroker (`tvgMeshStroker.cpp`, its `Stroker` copied and renamed, as the GL
+  one needs OpenGL's headers) with its triangles merged - and its clips and the viewport are cut in as it is prepared
+  (an empty viewport is an empty clip: ThorVG fast-tracks a clip that way). Masks and a group's opacity come while
+  drawing, as compositors: a mask of one-colour shapes (alpha, luma of white or black, inverse, add, subtract,
+  intersect, difference) cuts the content's areas; a group's opacity fades it as one picture - exactly where every
+  shape is opaque (each less what is over it) or of one colour (non-overlapping pieces each of the colour of what is
+  over what there). A draw becomes triangles at the end, its boundary moved half a pixel in and a band added out to
+  half a pixel beyond, fading to nothing (the anti-aliasing; a feature thinner than a pixel draws faintly). A padded
+  linear gradient is vertex colours, the triangles cut along each stop (and eight times between stops whose alpha
+  differs) and coloured from the side they lie on, so it is exact at any size; radial, conic and repeating ones are a
+  texture of the area's bounds, at most 256 a side. **`complete()` is false** for what triangles can't show: a blend
+  mode, a scene effect, a mask of varying colour (a gradient mask - a linear one could be done as linear fills are),
+  translucent gradients or pictures overlapping in a faded group; the program draws that with a `SwCanvas`. Uses
+  `renderer/gpu_engine/tvgGpuCommon.cpp` (dashes, arc segments), so that is built too, and **libtess2: a program
+  linking `thorvg_static` links `libtess2_static`**. Checked against resvg's test suite (the harness above, triangles
+  filled as a GPU fills them: pixel centres, premultiplied): 843 pass against the CPU scene's 869, and of the 28 the
+  CPU passes and it doesn't, 25 report incomplete (gradient masks) and so draw as before; the rest are within a hair
+  of the line (two `ex` font sizes, a marker on a rounded rectangle). GalacticSamples' RmlTest's Lottie file is complete
+  on every frame (12 batches, about 2700 triangles, 3 ms at 400x400 in Release).
 
 ## libtess2 (`Projects/libtess2`)
 
-- **Master at `8dbd6483` (1.0.2 + nine years of fixes), stock** (2026-11-21), to draw SVG as triangles rather than
-  pixels (Galactic's RmlGUI, with LunaSVG parsing): it tessellates outlines into triangles with any fill rule
+- **Master at `8dbd6483` (1.0.2 + nine years of fixes), stock** (2026-11-21), to draw SVG and Lottie as triangles
+  rather than pixels: ThorVG's mesh engine (`Projects/thorvg/mesh`, above) is built on it, so **a program linking
+  `thorvg_static` links `libtess2_static`**. It tessellates outlines into triangles with any fill rule
   (odd, nonzero, positive, negative, abs >= 2), holes and self-intersections, and gives boundary contours too
   (`TESS_BOUNDARY_CONTOURS`, so the abs >= 2 rule intersects two shapes: a clip path). `src` is GitHub's tarball of
   that commit, unchanged (`VERSION`); master over the 1.0.2 tag for the fixes from fuzzing since (NaN guards,

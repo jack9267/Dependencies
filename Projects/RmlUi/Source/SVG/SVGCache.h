@@ -1,23 +1,31 @@
 #pragma once
 
+#include "../../Include/RmlUi/Core/Geometry.h"
 #include "../../Include/RmlUi/Core/Texture.h"
 #include "../../Include/RmlUi/Core/Types.h"
 
 namespace Rml {
 
 class Element;
-class Geometry;
 
 namespace SVG {
 
 	struct SVGKey;
 
+	// Dependencies: what an SVG is drawn with - its triangles (ThorVG's mesh canvas), each batch with the texture it
+	// samples (none for plain colour), or one quad of its picture where triangles can't show all of it
+	struct SVGDrawList {
+		Vector<Geometry> geometries;
+		Vector<Texture> textures;
+	};
+
 	struct SVGData : NonCopyMoveable {
-		SVGData(Geometry& geometry, Texture texture, Vector2f intrinsic_dimensions, const SVGKey& cache_key);
+		SVGData(const SVGDrawList& draw_list, Vector2f intrinsic_dimensions, const SVGKey& cache_key);
 		~SVGData();
 
-		Geometry& geometry;
-		Texture texture;
+		void Render(Vector2f translation) const;
+
+		const SVGDrawList& draw_list;
 		Vector2f intrinsic_dimensions;
 		const SVGKey& cache_key;
 	};
