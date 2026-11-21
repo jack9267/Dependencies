@@ -663,6 +663,12 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   its font cache with a critical section (no C11 atomics or threads); its imports are kernel32's file, mapping,
   `FindFirstFileA` and critical-section calls, all on XP. Its stb copies (stb_image's thread-local failure reason
   included - YY-Thunks gives XP implicit TLS) are all `static`; stb_image is still compiled in, only unreached.
+- **RmlUi's SVG textures are drawn by ThorVG** (2026-11-21, a third patch, `Source/SVG/SVGCache.cpp`, marked
+  `Dependencies`): the texture callback asks LunaSVG for its scene (`renderToScene`, below) and draws it with ThorVG's
+  CPU engine into premultiplied RGBA (`ColorSpace::ABGR8888`: RmlUi 6's order, no channel swap), where it rendered
+  LunaSVG's own pixels; `SVGCache::Initialize`/`Shutdown` start and stop ThorVG (it counts its users). So
+  **`rmlui_core_static` needs `thorvg_static` linked too**. Seen in GalacticSamples' RmlTest (`-document SVG`,
+  Direct3D 9): `<svg src>`, inline, the decorator and two sizes as before.
 - **LunaSVG also draws into a ThorVG scene: a second patch, which an update must put back** (2026-11-21, the user's
   call: SVG as geometry, for drawing it on the GPU later, keeping all the SVG LunaSVG reads). `Canvas` (`graphics.h`,
   `graphics.cpp`) has a scene mode beside its plutovg pixels: `Canvas::createScene` builds a `tvg::Scene` of what the

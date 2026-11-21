@@ -1259,9 +1259,11 @@ dep("lunasvg", {
 dep("rmlui_core", {
 	systems = GUI,
 	lang = "C++",
+	-- its SVG textures are LunaSVG's ThorVG scene drawn by ThorVG (SVGCache.cpp): it links thorvg_static too
 	defines = { "RMLUI_VERSION=\"6.3\"", "RMLUI_FONT_ENGINE_FREETYPE", "RMLUI_STATIC_LIB", "RMLUI_SVG_PLUGIN",
-		"LUNASVG_BUILD_STATIC" },
-	includedirs = { "Projects/RmlUi/Include", "Projects/freetype/include", "Projects/lunasvg/src/include" },
+		"LUNASVG_BUILD_STATIC", "TVG_STATIC" },
+	includedirs = { "Projects/RmlUi/Include", "Projects/freetype/include", "Projects/lunasvg/src/include",
+		"Projects/thorvg/src/inc" },
 	files = { "Projects/RmlUi/Source/Core/**.cpp", "Projects/RmlUi/Source/SVG/*.cpp" },
 })
 

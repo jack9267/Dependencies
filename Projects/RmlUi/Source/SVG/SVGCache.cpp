@@ -14,6 +14,7 @@
 #include "../Core/ControlledLifetimeResource.h"
 #include <algorithm>
 #include <lunasvg.h>
+#include <thorvg.h> // Dependencies: drawn through LunaSVG's ThorVG scene
 
 #ifdef RMLUI_SVG_DEBUG
 	#define RMLUI_SVG_DEBUG_LOG(...) Rml::Log::Message(Rml::Log::LT_DEBUG, __VA_ARGS__)
@@ -221,7 +222,9 @@ namespace SVG {
 				if (dimensions.x == 0 || dimensions.y == 0)
 					return false;
 
-				lunasvg::Bitmap bitmap;
+				// Dependencies: LunaSVG's document as a ThorVG scene (lunasvg's Document::renderToScene), drawn by ThorVG's CPU
+				// engine into premultiplied RGBA (ABGR8888: R, G, B, A bytes), RmlUi's order - not LunaSVG's own pixels
+				tvg::Scene* scene = nullptr;
 				if (crop_to_content)
 				{
 					const lunasvg::Box smallest_fit = svg_document->boundingBox();
@@ -230,29 +233,39 @@ namespace SVG {
 					matrix.scale(svg_document->width() / smallest_fit.w, svg_document->height() / smallest_fit.h);
 					matrix.translate(-smallest_fit.x, -smallest_fit.y);
 
-					bitmap = lunasvg::Bitmap(dimensions.x, dimensions.y);
-					bitmap.clear(0x00000000);
-					svg_document->render(bitmap, matrix);
+					scene = svg_document->renderToScene(matrix, float(dimensions.x), float(dimensions.y));
 				}
 				else
 				{
-					bitmap = svg_document->renderToBitmap(dimensions.x, dimensions.y);
+					scene = svg_document->renderToScene(float(dimensions.x), float(dimensions.y));
 				}
 
-				if (!bitmap.valid() || !bitmap.data())
+				Vector<uint32_t> pixels(size_t(dimensions.x) * size_t(dimensions.y), 0);
+				bool drawn = false;
+				if (scene)
+				{
+					tvg::SwCanvas* canvas = tvg::SwCanvas::gen();
+					if (canvas &&
+						canvas->target(pixels.data(), uint32_t(dimensions.x), uint32_t(dimensions.x), uint32_t(dimensions.y),
+							tvg::ColorSpace::ABGR8888) == tvg::Result::Success &&
+						canvas->add(scene) == tvg::Result::Success)
+					{
+						scene = nullptr; // the canvas owns it now
+						drawn = canvas->draw(true) == tvg::Result::Success && canvas->sync() == tvg::Result::Success;
+					}
+					delete canvas;
+					tvg::Paint::rel(scene); // not taken by a canvas (null: nothing)
+				}
+
+				if (!drawn)
 				{
 					Log::Message(Rml::Log::Type::LT_WARNING, "Could not render SVG to bitmap: %s", GetSourceOr(svg_document, "").c_str());
 					return false;
 				}
 
-				// Swap red and blue channels, assuming LunaSVG v2.3.2 or newer, to convert to RmlUi's expected RGBA-ordering.
-				const size_t bitmap_byte_size = bitmap.width() * bitmap.height() * 4;
-				uint8_t* bitmap_data = bitmap.data();
-				for (size_t i = 0; i < bitmap_byte_size; i += 4)
-					std::swap(bitmap_data[i], bitmap_data[i + 2]);
-
-				if (!texture_interface.GenerateTexture({reinterpret_cast<const Rml::byte*>(bitmap.data()), bitmap_byte_size},
-						Vector2i{bitmap.width(), bitmap.height()}))
+				const size_t bitmap_byte_size = pixels.size() * 4;
+				if (!texture_interface.GenerateTexture({reinterpret_cast<const Rml::byte*>(pixels.data()), bitmap_byte_size},
+						Vector2i{dimensions.x, dimensions.y}))
 				{
 					Log::Message(Rml::Log::Type::LT_WARNING, "Could not generate texture for SVG: %s", GetSourceOr(svg_document, "").c_str());
 					return false;
@@ -354,11 +367,13 @@ namespace SVG {
 	void SVGCache::Initialize()
 	{
 		svg_cache_data.Initialize();
+		tvg::Initializer::init(0); // Dependencies: ThorVG draws the SVGs (counted: other users init it too)
 	}
 
 	void SVGCache::Shutdown()
 	{
 		svg_cache_data.Shutdown();
+		tvg::Initializer::term(); // Dependencies
 	}
 
 	SharedPtr<SVGData> SVGCache::GetHandle(const String& source_id, const String& source, SourceType source_type, Element* element,
