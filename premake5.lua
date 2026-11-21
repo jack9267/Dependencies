@@ -841,6 +841,8 @@ headers_project {
 	{ dir = "Projects/RmlUi/Include", systems = GUI },
 	-- lunasvg.h, for the host to set the SVG image loader (lunasvg::setImageLoader); plutovg's stays private
 	{ file = "Projects/lunasvg/src/include/lunasvg.h", systems = GUI },
+	-- libtess2's header, under libtess2/ as its own Bazel build makes it available (<libtess2/tesselator.h>)
+	{ file = "Projects/libtess2/src/Include/tesselator.h", to = "libtess2", systems = GUI },
 	{ dir = "Projects/flac/src/include/FLAC", to = "FLAC" },
 	{ dir = "Projects/flac/src/include/FLAC++", to = "FLAC++" },
 	-- bsdiff + prebuilt bass/fmod headers
@@ -1205,6 +1207,15 @@ dep("plutovg", {
 	defines = { "PLUTOVG_BUILD_STATIC" },
 	includedirs = { "Projects/lunasvg/src/plutovg/include" },
 	files = { "Projects/lunasvg/src/plutovg/source/*.c" },
+})
+
+-- libtess2: tessellates paths (any fill rule, holes, self-intersections) into triangles, for drawing SVG as
+-- geometry rather than pixels. src is the master commit in VERSION, unchanged, for the fuzzing fixes after 1.0.2
+-- (NaN and range checks, crashes); only Source is built (Contrib holds a nanosvg, Example and Tests are its own).
+dep("libtess2", {
+	systems = GUI,
+	includedirs = { "Projects/libtess2/src/Include" },
+	files = { "Projects/libtess2/src/Source/*.c" },
 })
 
 dep("lunasvg", {

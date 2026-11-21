@@ -664,3 +664,24 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   `FindFirstFileA` and critical-section calls, all on XP. Its stb copies (stb_image's thread-local failure reason
   included - YY-Thunks gives XP implicit TLS) are all `static`; stb_image is still compiled in, only unreached.
 
+
+## libtess2 (`Projects/libtess2`)
+
+- **Master at `8dbd6483` (1.0.2 + nine years of fixes), stock** (2026-11-21), to draw SVG as triangles rather than
+  pixels (Galactic's RmlGUI, with LunaSVG parsing): it tessellates outlines into triangles with any fill rule
+  (odd, nonzero, positive, negative, abs >= 2), holes and self-intersections, and gives boundary contours too
+  (`TESS_BOUNDARY_CONTOURS`, so the abs >= 2 rule intersects two shapes: a clip path). `src` is GitHub's tarball of
+  that commit, unchanged (`VERSION`); master over the 1.0.2 tag for the fixes from fuzzing since (NaN guards,
+  coordinates outside +-2^23 refused, null and uninitialised reads, a float overflow, a wrong sign test), and
+  `tessGetStatus` (out of memory or invalid input). SVGs come from servers.
+- `libtess2_static`, built for the GUI targets as LunaSVG is; only `Source/*.c` (`Contrib` is a nanosvg, `Example` and
+  `Tests` its own). The header installs as `include\libtess2\tesselator.h` (`<libtess2/tesselator.h>`), the path its
+  Bazel build gives. Plain C: the C runtime and `setjmp`/`longjmp` for its errors, nothing else, so it runs on XP. An
+  allocator can be passed (`TESSalloc`); none uses `malloc`.
+- **Its `assert`s are on in Debug** (`geom.c`, `sweep.c`, `mesh.c`, `priorityq.c`): fuzzing loosened the ones bad input
+  reached, but a Debug build fed hostile geometry could still stop in one.
+- Seen working (Windows x86, Debug and Release, a scratch test linking the library through the installed header):
+  a 512 square with the iris's 20-sided hole, odd rule, 20 triangles covering exactly the square less the polygon;
+  a self-intersecting star, nonzero covering its middle pentagon and odd not (the difference exactly that
+  pentagon's area); a NaN and a coordinate of 1e30 refused with `TESS_STATUS_INVALID_INPUT`. x64 built, not run;
+  the other targets' fragments are generated, not built.
