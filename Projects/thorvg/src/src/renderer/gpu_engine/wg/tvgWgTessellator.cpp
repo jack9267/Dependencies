@@ -1,0 +1,551 @@
+/*
+ * Copyright (c) 2026 ThorVG project. All rights reserved.
+
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+#include "tvgWgCommon.h"
+#include "tvgWgTessellator.h"
+#include "tvgMath.h"
+
+
+WgStroker::WgStroker(WgMesh* buffer, float width, StrokeCap cap, StrokeJoin join, float miterLimit, float qualityScale)
+    : mBuffer(buffer), mWidth(width), mMiterLimit(miterLimit), mQualityScale(qualityScale), mCap(cap), mJoin(join)
+{
+}
+
+
+RenderRegion WgStroker::bounds() const
+{
+    return {int32_t(floor(mLeftTop.x)), int32_t(floor(mLeftTop.y)), int32_t(ceil(mRightBottom.x)), int32_t(ceil(mRightBottom.y))};
+}
+
+
+BBox WgStroker::getBBox() const
+{
+    return {mLeftTop, mRightBottom};
+}
+
+void WgStroker::run(const RenderPath& path, bool thinFill)
+{
+    mThinFill = thinFill;
+    overlapFree = !thinFill;
+    mProbe = {};
+    mDirections = 0;
+    mBuffer->vbuffer.reserve(path.pts.count * 4 + 16);
+    mBuffer->ibuffer.reserve(path.pts.count * 3);
+
+    auto validStrokeCap = false;
+    auto pts = path.pts.data;
+
+    for (auto& cmd : path.cmds) {
+        switch (cmd) {
+            case PathCommand::MoveTo: {
+                if (validStrokeCap) { // check this, so we can skip if path only contains move instruction
+                    cap();
+                    validStrokeCap = false;
+                }
+                mState = {};
+                mState.firstPt = mState.prevPt = *pts++;
+                validStrokeCap = false;
+            } break;
+            case PathCommand::LineTo: {
+                validStrokeCap = true;
+                lineTo(*pts);
+                pts++;
+            } break;
+            case PathCommand::CubicTo: {
+                validStrokeCap = true;
+                cubicTo(pts[0], pts[1], pts[2]);
+                pts += 3;
+            } break;
+            case PathCommand::Close: {
+                close();
+
+                validStrokeCap = false;
+            } break;
+            default:
+                break;
+        }
+    }
+    if (validStrokeCap) cap();
+}
+
+
+void WgStroker::cap()
+{
+    // Open contours monotone in either axis may turn both ways. Half-segment cuts
+    // keep joins independent, and their forward boundaries separate the caps.
+    auto monotone = (mDirections & 3) != 3 || (mDirections & 12) != 12;
+    overlapFree &= mState.firstLength > 0.0f && (mCap == StrokeCap::Butt || mState.firstPt != mState.prevPt) && (monotone || (mProbe.convex && mProbe.xDirChanges <= 1 && mProbe.yDirChanges <= 1 && mProbe.winding * cross(mState.firstPtDir, mState.prevPtDir) >= 0.0f));
+    if (mCap == StrokeCap::Butt) return;
+
+    if (mCap == StrokeCap::Square) {
+        if (mState.firstPt == mState.prevPt) squarePoint(mState.firstPt);
+        else {
+            square(mState.firstPt, {-mState.firstPtDir.x, -mState.firstPtDir.y});
+            square(mState.prevPt, mState.prevPtDir);
+        }
+    } else if (mCap == StrokeCap::Round) {
+        if (mState.firstPt == mState.prevPt) roundPoint(mState.firstPt);
+        else {
+            round(mState.firstPt, {-mState.firstPtDir.x, -mState.firstPtDir.y});
+            round(mState.prevPt, mState.prevPtDir);
+        }
+    }
+}
+
+
+void WgStroker::lineTo(const Point& curr)
+{
+    auto dir = (curr - mState.prevPt);
+    auto len = length(dir);
+    if (tvg::zero(len)) return;
+    dir *= 1.0f / len;
+    if (overlapFree) {
+        if (mState.firstLength == 0.0f) overlapFree &= !mProbe.contourHasEdges;
+        // Keep collecting after the convexity probe rejects a change of winding.
+        mDirections |= (dir.x > 0.0f) | ((dir.x < 0.0f) << 1) | ((dir.y > 0.0f) << 2) | ((dir.y < 0.0f) << 3);
+        mProbe.addEdge(dir);
+    }
+
+    auto normal = Point{-dir.y, dir.x};
+    auto a = mState.prevPt + normal * radius();
+    auto b = mState.prevPt - normal * radius();
+    auto c = curr + normal * radius();
+    auto d = curr - normal * radius();
+
+    auto ia = mBuffer->vbuffer.count; mBuffer->vbuffer.push(a);
+    auto ib = mBuffer->vbuffer.count; mBuffer->vbuffer.push(b);
+    auto ic = mBuffer->vbuffer.count; mBuffer->vbuffer.push(c);
+    auto id = mBuffer->vbuffer.count; mBuffer->vbuffer.push(d);
+
+    /**
+     *   a --------- c
+     *   |           |
+     *   |           |
+     *   b-----------d
+     */
+
+    mBuffer->ibuffer.push(ia);
+    mBuffer->ibuffer.push(ib);
+    mBuffer->ibuffer.push(ic);
+    mBuffer->ibuffer.push(ib);
+    mBuffer->ibuffer.push(id);
+    mBuffer->ibuffer.push(ic);
+
+    if (mState.firstLength == 0.0f) {
+        mState.firstPtDir = dir;
+        mState.firstLength = len;
+        mState.firstIndex = ia;
+    } else join(dir, len, ia);
+    mState.prevPtDir = dir;
+    mState.prevPt = curr;
+    mState.prevLength = len;
+    mState.prevIndex = ia;
+
+    if (ia == 0) {
+        mRightBottom.x = mLeftTop.x = curr.x;
+        mRightBottom.y = mLeftTop.y = curr.y;
+    }
+
+    mLeftTop.x = std::min(mLeftTop.x, std::min(std::min(a.x, b.x), std::min(c.x, d.x)));
+    mLeftTop.y = std::min(mLeftTop.y, std::min(std::min(a.y, b.y), std::min(c.y, d.y)));
+    mRightBottom.x = std::max(mRightBottom.x, std::max(std::max(a.x, b.x), std::max(c.x, d.x)));
+    mRightBottom.y = std::max(mRightBottom.y, std::max(std::max(a.y, b.y), std::max(c.y, d.y)));
+}
+
+
+void WgStroker::cubicTo(const Point& cnt1, const Point& cnt2, const Point& end)
+{
+    Bezier curve {mState.prevPt, cnt1, cnt2, end};
+    auto count = curve.segments(mQualityScale);
+    auto step = 1.f / count;
+
+    for (uint32_t i = 1; i <= count; i++) {
+        lineTo(curve.at(step * i));
+    }
+}
+
+
+void WgStroker::close()
+{
+    if (mState.firstLength == 0.0f) return;
+    if (length(mState.prevPt - mState.firstPt) > 0.015625f) {
+        lineTo(mState.firstPt);
+    }
+
+    // A skipped closing edge cannot share an inner corner.
+    auto len = (mState.prevPt.x == mState.firstPt.x && mState.prevPt.y == mState.firstPt.y) ? mState.firstLength : 0.0f;
+    if (len == 0.0f) overlapFree = false;
+    if (overlapFree) mProbe.addEdge(mState.firstPtDir);
+    join(mState.firstPtDir, len, mState.firstIndex);
+    overlapFree &= mProbe.convex;
+    mState.firstLength = 0.0f;
+    mState.prevPt = mState.firstPt;
+}
+
+void WgStroker::join(const Point& dir, float len, uint32_t index)
+{
+    auto turn = cross(mState.prevPtDir, dir);
+
+    if (tvg::zero(turn)) {
+        overlapFree &= mState.prevPtDir.x == dir.x && mState.prevPtDir.y == dir.y;
+        if (mState.prevPtDir == dir) return;      // check is same direction
+        if (mJoin != StrokeJoin::Round) return;   // opposite direction
+
+        round(mState.prevPt, dir);
+
+    } else {
+        auto normal = Point{-dir.y, dir.x};
+        auto prevNormal = Point{-mState.prevPtDir.y, mState.prevPtDir.x};
+        auto offset = turn < 0.0f ? radius() : -radius();
+        auto prevJoin = mState.prevPt + prevNormal * offset;
+        auto currJoin = mState.prevPt + normal * offset;
+        auto apex = mState.prevPt;
+        auto denom = 1.0f + dot(mState.prevPtDir, dir);
+        auto trimmed = false;
+
+        if (!mThinFill && denom > FLOAT_EPSILON) {
+            auto setback = radius() * fabsf(turn) / denom;
+            auto scale = std::max(std::max(fabsf(apex.x), fabsf(apex.y)), std::max(radius(), std::max(mState.prevLength, len)));
+            // Keep each cut within its half-segment so neighboring cuts and caps stay independent.
+            if (2.0f * setback + FLOAT_EPSILON * scale < std::min(mState.prevLength, len)) {
+                auto inner = apex - (prevNormal + normal) * (offset / denom);
+                auto side = turn < 0.0f ? 1u : 0u;
+                mBuffer->vbuffer[mState.prevIndex + 2 + side] = mBuffer->vbuffer[index + side] = inner;
+                apex = inner;
+                trimmed = true;
+            }
+        }
+        overlapFree &= trimmed;
+
+        if (mJoin == StrokeJoin::Miter) miter(prevJoin, currJoin, mState.prevPt, apex);
+        else if (mJoin == StrokeJoin::Bevel) bevel(prevJoin, currJoin, apex);
+        else round(prevJoin, currJoin, mState.prevPt, apex);
+    }
+}
+
+void WgStroker::round(const Point& prev, const Point& curr, const Point& center, const Point& apex)
+{
+    auto turn = cross(center - prev, curr - prev);
+    if (turn == 0.0f) return;
+
+    mLeftTop.x = std::min(mLeftTop.x, std::min(center.x, std::min(prev.x, curr.x)));
+    mLeftTop.y = std::min(mLeftTop.y, std::min(center.y, std::min(prev.y, curr.y)));
+    mRightBottom.x = std::max(mRightBottom.x, std::max(center.x, std::max(prev.x, curr.x)));
+    mRightBottom.y = std::max(mRightBottom.y, std::max(center.y, std::max(prev.y, curr.y)));
+
+    auto startAngle = tvg::atan(prev - center);
+    auto endAngle = tvg::atan(curr - center);
+
+    if (turn > 0.0f) {
+        if (endAngle > startAngle) endAngle -= 2 * MATH_PI;
+    } else {
+        if (endAngle < startAngle) endAngle += 2 * MATH_PI;
+    }
+
+    auto arcAngle = endAngle - startAngle;
+    auto count = std::max(2u, gpuArcSegmentsCnt(arcAngle, radius() * mQualityScale));
+
+    auto c = mBuffer->vbuffer.count;
+    mBuffer->vbuffer.push(apex);
+    auto pi = mBuffer->vbuffer.count; mBuffer->vbuffer.push(prev);
+    auto step = (endAngle - startAngle) / (count - 1);
+
+    for (uint32_t i = 1; i < count; i++) {
+        auto angle = startAngle + step * i;
+        // Keep the shared edge exact so adjacent arcs and segments do not overlap.
+        auto out = (i + 1 == count) ? curr : Point{center.x + cos(angle) * radius(), center.y + sin(angle) * radius()};
+        auto oi = mBuffer->vbuffer.count; mBuffer->vbuffer.push(out);
+
+        mBuffer->ibuffer.push(c);
+        mBuffer->ibuffer.push(pi);
+        mBuffer->ibuffer.push(oi);
+
+        pi = oi;
+
+        mLeftTop.x = std::min(mLeftTop.x, out.x);
+        mLeftTop.y = std::min(mLeftTop.y, out.y);
+        mRightBottom.x = std::max(mRightBottom.x, out.x);
+        mRightBottom.y = std::max(mRightBottom.y, out.y);
+    }
+}
+
+
+void WgStroker::roundPoint(const Point &p)
+{
+    auto count = gpuArcSegmentsCnt(2.0f * MATH_PI, radius() * mQualityScale);
+    auto c = mBuffer->vbuffer.count; mBuffer->vbuffer.push(p);
+    auto step = 2.0f * MATH_PI / (count - 1);
+
+    for (uint32_t i = 1; i <= static_cast<uint32_t>(count); i++) {
+        float angle = i * step;
+        Point dir = {cos(angle), sin(angle)};
+        Point out = p + dir * radius();
+        auto oi = mBuffer->vbuffer.count; mBuffer->vbuffer.push(out);
+
+        if (oi > 1) {
+            mBuffer->ibuffer.push(c);
+            mBuffer->ibuffer.push(oi);
+            mBuffer->ibuffer.push(oi - 1);
+        }
+    }
+
+    mLeftTop.x = std::min(mLeftTop.x, p.x - radius());
+    mLeftTop.y = std::min(mLeftTop.y, p.y - radius());
+    mRightBottom.x = std::max(mRightBottom.x, p.x + radius());
+    mRightBottom.y = std::max(mRightBottom.y, p.y + radius());
+}
+
+void WgStroker::miter(const Point& prev, const Point& curr, const Point& center, const Point& apex)
+{
+    auto pp1 = prev - center;
+    auto pp2 = curr - center;
+    auto out = pp1 + pp2;
+    auto k = 2.f * radius() * radius() / (out.x * out.x + out.y * out.y);
+    auto pe = out * k;
+
+    if (length(pe) >= mMiterLimit * radius()) {
+        bevel(prev, curr, apex);
+        return;
+    }
+
+    auto join = center + pe;
+    auto c = mBuffer->vbuffer.count;
+    mBuffer->vbuffer.push(apex);
+    auto cp1 = mBuffer->vbuffer.count; mBuffer->vbuffer.push(prev);
+    auto cp2 = mBuffer->vbuffer.count; mBuffer->vbuffer.push(curr);
+    auto e   = mBuffer->vbuffer.count; mBuffer->vbuffer.push(join);
+
+    mBuffer->ibuffer.push(c);
+    mBuffer->ibuffer.push(cp1);
+    mBuffer->ibuffer.push(e);
+
+    mBuffer->ibuffer.push(e);
+    mBuffer->ibuffer.push(cp2);
+    mBuffer->ibuffer.push(c);
+
+    mLeftTop.x = std::min(mLeftTop.x, join.x);
+    mLeftTop.y = std::min(mLeftTop.y, join.y);
+
+    mRightBottom.x = std::max(mRightBottom.x, join.x);
+    mRightBottom.y = std::max(mRightBottom.y, join.y);
+}
+
+void WgStroker::bevel(const Point& prev, const Point& curr, const Point& apex)
+{
+    auto a = mBuffer->vbuffer.count; mBuffer->vbuffer.push(prev);
+    auto b = mBuffer->vbuffer.count; mBuffer->vbuffer.push(curr);
+    auto c = mBuffer->vbuffer.count;
+    mBuffer->vbuffer.push(apex);
+
+    mBuffer->ibuffer.push(a);
+    mBuffer->ibuffer.push(b);
+    mBuffer->ibuffer.push(c);
+}
+
+
+void WgStroker::square(const Point& p, const Point& outDir)
+{
+    auto normal = Point{-outDir.y, outDir.x};
+
+    auto a = p + normal * radius();
+    auto b = p - normal * radius();
+    auto c = a + outDir * radius();
+    auto d = b + outDir * radius();
+
+    auto ai = mBuffer->vbuffer.count; mBuffer->vbuffer.push(a);
+    auto bi = mBuffer->vbuffer.count; mBuffer->vbuffer.push(b);
+    auto ci = mBuffer->vbuffer.count; mBuffer->vbuffer.push(c);
+    auto di = mBuffer->vbuffer.count; mBuffer->vbuffer.push(d);
+
+    mBuffer->ibuffer.push(ai);
+    mBuffer->ibuffer.push(bi);
+    mBuffer->ibuffer.push(ci);
+
+    mBuffer->ibuffer.push(ci);
+    mBuffer->ibuffer.push(bi);
+    mBuffer->ibuffer.push(di);
+
+    mLeftTop.x = std::min(mLeftTop.x, std::min(std::min(a.x, b.x), std::min(c.x, d.x)));
+    mLeftTop.y = std::min(mLeftTop.y, std::min(std::min(a.y, b.y), std::min(c.y, d.y)));
+    mRightBottom.x = std::max(mRightBottom.x, std::max(std::max(a.x, b.x), std::max(c.x, d.x)));
+    mRightBottom.y = std::max(mRightBottom.y, std::max(std::max(a.y, b.y), std::max(c.y, d.y)));
+}
+
+
+void WgStroker::squarePoint(const Point& p)
+{
+    auto offsetX = Point{radius(), 0.0f};
+    auto offsetY = Point{0.0f, radius()};
+
+    auto a = p + offsetX + offsetY;
+    auto b = p - offsetX + offsetY;
+    auto c = p - offsetX - offsetY;
+    auto d = p + offsetX - offsetY;
+
+    auto ai = mBuffer->vbuffer.count; mBuffer->vbuffer.push(a);
+    auto bi = mBuffer->vbuffer.count; mBuffer->vbuffer.push(b);
+    auto ci = mBuffer->vbuffer.count; mBuffer->vbuffer.push(c);
+    auto di = mBuffer->vbuffer.count; mBuffer->vbuffer.push(d);
+
+    mBuffer->ibuffer.push(ai);
+    mBuffer->ibuffer.push(bi);
+    mBuffer->ibuffer.push(ci);
+
+    mBuffer->ibuffer.push(ci);
+    mBuffer->ibuffer.push(di);
+    mBuffer->ibuffer.push(ai);
+
+    mLeftTop.x = std::min(mLeftTop.x, std::min(std::min(a.x, b.x), std::min(c.x, d.x)));
+    mLeftTop.y = std::min(mLeftTop.y, std::min(std::min(a.y, b.y), std::min(c.y, d.y)));
+    mRightBottom.x = std::max(mRightBottom.x, std::max(std::max(a.x, b.x), std::max(c.x, d.x)));
+    mRightBottom.y = std::max(mRightBottom.y, std::max(std::max(a.y, b.y), std::max(c.y, d.y)));
+}
+
+
+void WgStroker::round(const Point& p, const Point& outDir)
+{
+    auto normal = Point{-outDir.y, outDir.x};
+    auto a = p + normal * radius();
+    auto b = p - normal * radius();
+    auto c = p + outDir * radius();
+
+    round(a, c, p, p);
+    round(c, b, p, p);
+}
+
+WgBWTessellator::WgBWTessellator(WgMesh* buffer): mBuffer(buffer)
+{
+}
+
+
+void WgBWTessellator::tessellate(const RenderPath& path)
+{
+    if (path.pts.count <= 2) return;
+
+    auto cmds = path.cmds.data;
+    auto cmdCnt = path.cmds.count;
+    auto pts = path.pts.data;
+    auto ptsCnt = path.pts.count;
+
+    uint32_t firstIndex = 0;
+    uint32_t prevIndex = 0;
+    Point firstPt = {};
+    Point prevPt = {};
+    GpuConvexProbe probe;
+    bool contourClosed = false;
+
+    mBuffer->vbuffer.reserve(ptsCnt * 2);
+    mBuffer->ibuffer.reserve((ptsCnt - 2) * 3);
+
+    auto finishContour = [&]() {
+        if (prevIndex == 0 || contourClosed) return;
+        probe.addContourClose(firstPt - prevPt);
+        contourClosed = true;
+    };
+
+    for (uint32_t i = 0; i < cmdCnt; i++) {
+        switch(cmds[i]) {
+            case PathCommand::MoveTo: {
+                finishContour();
+                probe.nextContour();
+                firstIndex = pushVertex(pts->x, pts->y);
+                firstPt = prevPt = *pts;
+                prevIndex = 0;
+                contourClosed = false;
+                pts++;
+            } break;
+            case PathCommand::LineTo: {
+                auto edge = *pts - prevPt;
+                if (prevIndex == 0) {
+                    prevIndex = pushVertex(pts->x, pts->y);
+                    probe.addEdge(edge);
+                    prevPt = *pts++;
+                } else {
+                    probe.addEdge(edge);
+                    auto currIndex = pushVertex(pts->x, pts->y);
+                    pushTriangle(firstIndex, prevIndex, currIndex);
+                    prevIndex = currIndex;
+                    prevPt = *pts++;
+                }
+            } break;
+            case PathCommand::CubicTo: {
+                Bezier curve{pts[-1], pts[0], pts[1], pts[2]};
+                if (probe.convex && gpuEdgesCross(curve.start, curve.ctrl1, curve.ctrl2, curve.end)) probe.convex = false;
+
+                auto stepCount = curve.segments();
+                if (stepCount <= 1) stepCount = 2;
+                float step = 1.f / stepCount;
+                auto curvePrevPt = prevPt;
+
+                for (uint32_t s = 1; s <= static_cast<uint32_t>(stepCount); s++) {
+                    auto pt = curve.at(step * s);
+                    probe.addEdge(pt - curvePrevPt);
+                    auto currIndex = pushVertex(pt.x, pt.y);
+                    curvePrevPt = pt;
+                    if (prevIndex == 0) { prevIndex = currIndex; continue; }
+                    pushTriangle(firstIndex, prevIndex, currIndex);
+                    prevIndex = currIndex;
+                }
+                prevPt = curve.end;
+                pts += 3;
+            } break;
+            case PathCommand::Close: {
+                finishContour();
+            } break;
+            default:
+                break;
+        }
+    }
+
+    finishContour();
+    convex = probe.convex;
+}
+
+
+RenderRegion WgBWTessellator::bounds() const
+{
+    return {int32_t(floor(bbox.min.x)), int32_t(floor(bbox.min.y)), int32_t(ceil(bbox.max.x)), int32_t(ceil(bbox.max.y))};
+}
+
+
+BBox WgBWTessellator::getBBox() const
+{
+    return bbox;
+}
+
+
+uint32_t WgBWTessellator::pushVertex(float x, float y)
+{
+    auto index = mBuffer->vbuffer.count;
+    mBuffer->vbuffer.push({x, y});
+    if (index == 0) bbox.max = bbox.min = {x, y};
+    else bbox = {{std::min(bbox.min.x, x), std::min(bbox.min.y, y)}, {std::max(bbox.max.x, x), std::max(bbox.max.y, y)}};
+    return index;
+}
+
+
+void WgBWTessellator::pushTriangle(uint32_t a, uint32_t b, uint32_t c)
+{
+    mBuffer->ibuffer.push(a);
+    mBuffer->ibuffer.push(b);
+    mBuffer->ibuffer.push(c);
+}

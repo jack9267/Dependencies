@@ -1,0 +1,95 @@
+/*
+ * Copyright (c) 2026 ThorVG project. All rights reserved.
+
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+#ifndef _TVG_WG_RENDER_TASK_H_
+#define _TVG_WG_RENDER_TASK_H_
+ 
+#include "tvgWgCompositor.h"
+
+// base class for any renderable objects
+struct WgRenderTask
+{
+    virtual ~WgRenderTask() {}
+    virtual void stage(WgCompositor& compositor) = 0;
+    virtual void run(WgContext& context, WgCompositor& compositor) = 0;
+};
+
+// task for single shape rendering
+struct WgPaintTask : WgRenderTask
+{
+    // shape render properties
+    WgPaint* renderPaint{};
+    BlendMethod blendMethod{};
+
+    WgPaintTask(WgPaint* renderPaint, BlendMethod blendMethod) :
+        renderPaint(renderPaint), blendMethod(blendMethod) {}
+    // stage all resources used by this paint
+    void stage(WgCompositor& compositor) override;
+    // apply shape execution, including custom blending and clipping
+    void run(WgContext& context, WgCompositor& compositor) override;
+};
+
+struct WgBatchTask : WgRenderTask
+{
+    Array<WgShape*> shapes;
+    WgSolidBatchRange solidRange;
+    WgStencilBatchRange stencilRange;
+    bool stencilBatch{};
+
+    WgBatchTask(WgShape* first, WgShape* second, bool stencilBatch);
+    void stage(WgCompositor& compositor) override;
+    void run(WgContext& context, WgCompositor& compositor) override;
+};
+
+struct WgImageBatchTask : WgRenderTask
+{
+    Array<WgImage*> images;
+    WgImageBatchRange range;
+
+    WgImageBatchTask(WgImage* first, WgImage* second);
+    void stage(WgCompositor& compositor) override;
+    void run(WgContext& context, WgCompositor& compositor) override;
+};
+
+// task for scene rendering with blending, composition and effect
+struct WgSceneTask : WgRenderTask
+{
+    WgSceneTask* parent{};           // parent scene (nullptr for root scene)
+    Array<WgRenderTask*> children;   // children can be shapes or scenes tasks
+    WgRenderTargetState targetState;
+    WgSceneTask* maskScene{};
+    WgSceneTask* dstScene{};
+    WgMesh composeMesh;
+    WgMesh effectMesh;
+    WgCompose* compose{};  // scene blend/compose properties
+    Array<const RenderEffect*> effects;
+    bool clearBuffer = true;
+
+    WgSceneTask(WgRenderTarget* renderTarget, WgCompose* compose, WgSceneTask* parent) :
+        parent(parent), targetState{renderTarget, compose->aabb}, compose(compose) {}
+    void stage(WgCompositor& compositor) override;
+    void run(WgContext& context, WgCompositor& compositor) override;
+    void runChildren(WgContext& context, WgCompositor& compositor);
+    void runEffect(WgContext& context, WgCompositor& compositor, const RenderEffect* effect);
+};
+
+#endif  // _TVG_WG_RENDER_TASK_H_

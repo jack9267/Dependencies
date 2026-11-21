@@ -665,6 +665,27 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   included - YY-Thunks gives XP implicit TLS) are all `static`; stb_image is still compiled in, only unreached.
 
 
+## ThorVG (`Projects/thorvg`)
+
+- **ThorVG 1.1.4, stock** (2026-11-21), for Lottie (vector animations) and as what draws SVG (LunaSVG's scene,
+  above), first with its CPU engine and later on Galactic's renderer through an engine of our own (its `RenderMethod`,
+  `src/renderer/tvgRender.h`). `src` is the release tarball (`thorvg-1.1.4.tar.xz`) unchanged; `thorvg_static`,
+  built for the GUI targets. Headers in `include\thorvg\` (`<thorvg/thorvg.h>`, `<thorvg/thorvg_lottie.h>`; the
+  second includes the first by name, so they sit together). Consumers define `TVG_STATIC`.
+- **`config/config.h` is ours** (meson writes it from `meson_options.txt`): the CPU engine; SVG, Lottie and TrueType
+  loaders; partial rendering. **Off**: file IO (`THORVG_FILE_IO_SUPPORT` - nothing it loads reads a path on disk),
+  threads (its task scheduler and `std::thread`; drawing is on the main thread), SIMD (AVX2/NEON:
+  `tvgSwRasterSimd.cpp` is left out), OpenMP, Lottie expressions (JerryScript, a JavaScript engine for files from
+  servers) and logging. Its PNG/JPG decoders are not built (lodepng, a jpgd port, or libpng/TurboJPEG - our
+  `jpeg_static` has no TurboJPEG): pictures inside SVG come from the host (LunaSVG's loader), and a Lottie file's
+  images are to come from the host the same way (not done yet). The source list is its meson.build files'.
+- **On Windows it is built with `<cstdlib>` forced in**: Common.lua's `_MSVC_STL_USE_ABORT_AS_DOOM_FUNCTION` has the
+  STL call `::abort`, and `tvgLoaderMgr.cpp` includes `<atomic>` before anything declares it.
+- With threads off its locks are no-ops but for one `std::mutex` (`tvgLock.h`, under `__STDCPP_THREADS__`); a
+  program's XP support for that comes from YY-Thunks, as for the rest of the STL. Not yet looked at on XP.
+- No `assert` in what is built (they are all in the GL/WebGPU engines). Built Win32 and x64, Debug and Release; the
+  other targets' fragments generated, not built.
+
 ## libtess2 (`Projects/libtess2`)
 
 - **Master at `8dbd6483` (1.0.2 + nine years of fixes), stock** (2026-11-21), to draw SVG as triangles rather than

@@ -1,0 +1,54 @@
+"APIs":
+  - inc/**/*
+
+"binding":
+  - src/bindings/**/*
+
+"documentation":
+  - README.md
+
+"font":
+  - src/modules/sfnt/**/*
+
+"image":
+   - src/modules/jpg/**/*
+   - src/modules/png/**/*
+   - src/modules/webp/**/*
+   - src/modules/raw/**/*
+   - src/modules/gif/**/*
+
+"svg":
+   - src/modules/svg/**/*
+
+"media":
+   - src/modules/media/**/*
+
+"test":
+  - test/**/*
+
+"tools":
+  - tools/**/*
+
+"infrastructure":
+  - .github/**/*
+  - meson.build
+  - meson_option.txt
+
+"lottie":
+  - src/modules/lottie/**/*
+
+"cpu":
+  - src/renderer/cpu_engine/**/*
+
+"webgpu":
+  - src/renderer/gpu_engine/wg/**/*
+  - src/renderer/gpu_engine/*
+
+"gl":
+  - src/renderer/gpu_engine/gl/**/*
+  - src/renderer/gpu_engine/*
+
+"renderer":
+  - src/renderer/*
+  - src/common/**/*
+

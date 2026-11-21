@@ -1,0 +1,125 @@
+/*
+ * Copyright (c) 2023 - 2026 ThorVG project. All rights reserved.
+
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+#ifndef _TVG_WG_RENDERER_H_
+#define _TVG_WG_RENDERER_H_
+
+#include "tvgRender.h"
+#include "tvgWgSolidBatch.h"
+#include "tvgWgStencilBatch.h"
+#include "tvgWgTextureMgr.h"
+
+struct WgPaintPool
+{
+    Array<WgPaint*> list;    // full list of created paints
+    Array<WgShape*> shapes;  // reuse list
+    Array<WgImage*> images;  // reuse list
+
+    void recycle(WgShape* shape);
+    void recycle(WgImage* image);
+    void release(WgContext& context);
+
+    WgShape* shape();
+    WgImage* image();
+};
+
+struct WgRenderer : RenderMethod
+{
+    //main features
+    bool preUpdate() override;
+    RenderData prepare(const RenderShape& rshape, RenderData data, const Matrix& transform, const Array<RenderData>& clips, uint8_t opacity, RenderUpdateFlag flags, bool clipper) override;
+    RenderData prepare(RenderSurface* surface, RenderData data, const Matrix& transform, const Array<RenderData>& clips, uint8_t opacity, FilterMethod filter, RenderUpdateFlag flags) override;
+    bool postUpdate() override;
+    bool preRender() override;
+    bool renderShape(RenderData data) override;
+    bool renderImage(RenderData data) override;
+    bool postRender() override;
+    void dispose(RenderData data) override;
+    RenderRegion region(RenderData data) override;
+    bool bounds(RenderData data, Point* pt4, const Matrix& m) override;
+    bool blend(BlendMethod method) override;
+    ColorSpace colorSpace() override;
+    const RenderSurface* mainSurface() override;
+    bool clear() override;
+    bool sync() override;
+    bool intersectsImage(RenderData data, const RenderRegion& region) override;
+    bool intersectsShape(RenderData data, const RenderRegion& region) override;
+    Result target(const WgCanvas::Context& ctx, void* target, uint32_t w, uint32_t h, ColorSpace cs, int type = 0);
+
+    //composition
+    RenderCompositor* target(const RenderRegion& region, ColorSpace cs, CompositionFlag flags) override;
+    bool beginComposite(RenderCompositor* cmp, MaskMethod method, uint8_t opacity) override;
+    bool endComposite(RenderCompositor* cmp) override;
+
+    //post effects
+    void prepare(RenderEffect* effect, const Matrix& transform) override;
+    bool region(RenderEffect* effect) override;
+    bool render(RenderCompositor* cmp, const RenderEffect* effect, bool direct) override;
+    void dispose(RenderEffect* effect) override;
+
+    //partial rendering
+    void damage(RenderData rd, const RenderRegion& region) override;
+    bool partial(bool disable) override;
+    uint32_t dirtyRegions() const override;
+    Result dirtyRegions(Region* regions, uint32_t cnt) const override;
+
+    WgRenderer(uint32_t threads, EngineOption op);
+    static bool term();
+
+private:
+    ~WgRenderer();
+    void release();
+    void disposeObjects();
+    void releaseSurfaceTexture();
+
+    void clearTargets();
+    void surfaceConfigure(RenderSurface& rsurface, WGPUSurface wsurface, WgContext& context);
+
+    RenderSurface mSurface;  // main surface
+    WgRenderTarget mRenderTargetRoot;
+    Array<WgCompose*> mCompositorList;
+    Array<WgRenderTarget*> mRenderTargetStack;
+    Array<WgSceneTask*> mSceneTaskStack;
+    Array<WgRenderTask*> mRenderTaskList;
+    WgSolidBatch mSolidBatch;
+    WgStencilBatch mStencilBatch;
+    WgRenderTargetPool mRenderTargetPool;
+    WgPaintPool mPaintPool;
+    WgRenderEffectPool mEffectPool;
+    WgTextureMgr mTextures;
+    WgContext mContext;
+    WgCompositor mCompositor;
+    BlendMethod mBlendMethod = BlendMethod::Normal;
+
+    // disposable data list
+    Array<RenderData> mDisposedPaints;
+    Key mDisposeKey{};
+
+    // gpu handles
+    WGPUTexture targetTexture{};
+    WGPUSurfaceTexture surfaceTexture{};
+    WGPUSurface surface{};
+
+    bool mClearBuffer{};
+};
+
+#endif /* _TVG_WG_RENDERER_H_ */

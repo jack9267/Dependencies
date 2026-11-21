@@ -841,6 +841,9 @@ headers_project {
 	{ dir = "Projects/RmlUi/Include", systems = GUI },
 	-- lunasvg.h, for the host to set the SVG image loader (lunasvg::setImageLoader); plutovg's stays private
 	{ file = "Projects/lunasvg/src/include/lunasvg.h", systems = GUI },
+	-- ThorVG's public headers, together (thorvg_lottie.h includes "thorvg.h"): <thorvg/thorvg.h>, <thorvg/thorvg_lottie.h>
+	{ file = "Projects/thorvg/src/inc/thorvg.h", to = "thorvg", systems = GUI },
+	{ file = "Projects/thorvg/src/src/modules/lottie/thorvg_lottie.h", to = "thorvg", systems = GUI },
 	-- libtess2's header, under libtess2/ as its own Bazel build makes it available (<libtess2/tesselator.h>)
 	{ file = "Projects/libtess2/src/Include/tesselator.h", to = "libtess2", systems = GUI },
 	{ dir = "Projects/flac/src/include/FLAC", to = "FLAC" },
@@ -1216,6 +1219,29 @@ dep("libtess2", {
 	systems = GUI,
 	includedirs = { "Projects/libtess2/src/Include" },
 	files = { "Projects/libtess2/src/Source/*.c" },
+})
+
+-- ThorVG: SVG and Lottie (vector animations), drawn by its CPU engine for now. src is the release tarball unchanged;
+-- config/config.h is ours (meson writes it): the CPU engine, SVG, Lottie and TrueType loaders; no file IO, threads,
+-- SIMD, OpenMP, Lottie expressions (JerryScript) or PNG/JPG decoders of its own. The files are its meson.build lists.
+local THORVG = "Projects/thorvg/src/src/"
+dep("thorvg", {
+	systems = GUI,
+	lang = "C++",
+	defines = table.join({ "TVG_STATIC" }, WINDOWS_TARGET and { "NOMINMAX" } or {}),
+	-- Common.lua's _MSVC_STL_USE_ABORT_AS_DOOM_FUNCTION has the STL call ::abort, and tvgLoaderMgr.cpp includes
+	-- <atomic> before anything brings in <cstdlib>
+	forceincludes = WINDOWS_TARGET and { "cstdlib" } or nil,
+	includedirs = { "Projects/thorvg/config", "Projects/thorvg/src/inc", THORVG .. "common", THORVG .. "renderer",
+		THORVG .. "renderer/cpu_engine", THORVG .. "modules", THORVG .. "modules/raw", THORVG .. "modules/svg",
+		THORVG .. "modules/lottie", THORVG .. "modules/sfnt" },
+	files = {
+		THORVG .. "common/*.cpp", THORVG .. "renderer/*.cpp", THORVG .. "renderer/cpu_engine/*.cpp",
+		THORVG .. "modules/raw/*.cpp", THORVG .. "modules/svg/*.cpp", THORVG .. "modules/lottie/*.cpp",
+		THORVG .. "modules/sfnt/tvgSfntLoader.cpp", THORVG .. "modules/sfnt/tvgSfntReader.cpp",
+		THORVG .. "modules/sfnt/tvgTtfReader.cpp" },
+	-- the AVX2/NEON raster, built only with SIMD
+	removefiles = { THORVG .. "renderer/cpu_engine/tvgSwRasterSimd.cpp" },
 })
 
 dep("lunasvg", {
