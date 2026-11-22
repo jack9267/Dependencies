@@ -726,7 +726,9 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
 - **`mesh/` is ours: the mesh engine and `tvg::MeshCanvas`** (2026-11-21, `thorvg_mesh.h`, installed beside
   `thorvg.h`), ThorVG's `RenderMethod` drawing into triangle lists a program draws with its own renderer: `MeshBatch`es
   (vertices with a premultiplied colour and a texture coordinate, three indices a triangle, a texture index) and
-  `MeshImage`s (premultiplied RGBA, with a key that changes when the pixels do). Not in the tarball, so an update
+  `MeshImage`s (premultiplied RGBA, with a key that changes when the pixels do: a picture's is a hash of its pixels
+  (2026-11-22), so the same picture drawn again - a canvas's icon, every frame - keeps its texture on the user's side;
+  a baked gradient's is a counter). Not in the tarball, so an update
   leaves it alone, but it uses ThorVG's internals (`tvgRender.h`'s `RenderMethod`, `RenderShape`, `Canvas::Impl`):
   check it builds against a new version. Each shape's fill and stroke is an area - libtess2's boundary contours, by its
   fill rule; a stroke is the GL engine's stroker (`tvgMeshStroker.cpp`, its `Stroker` copied and renamed, as the GL
@@ -736,7 +738,10 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   intersect, difference) cuts the content's areas; a group's opacity fades it as one picture - exactly where every
   shape is opaque (each less what is over it) or of one colour (non-overlapping pieces each of the colour of what is
   over what there). A draw becomes triangles at the end, its boundary moved half a pixel in and a band added out to
-  half a pixel beyond, fading to nothing (the anti-aliasing; a feature thinner than a pixel draws faintly). A padded
+  half a pixel beyond, fading to nothing (the anti-aliasing; a feature thinner than a pixel draws faintly). So a sliver
+  (a boundary contour whose area over half its perimeter is under 0.05 px) is left out: a path out and back along
+  nearly the same line leaves one, and the band made it a pixel-wide hairline (a canvas iris wipe's arc after rect,
+  2026-11-22). A padded
   linear gradient is vertex colours, the triangles cut along each stop (and eight times between stops whose alpha
   differs) and coloured from the side they lie on, so it is exact at any size; radial, conic and repeating ones are a
   texture of the area's bounds, at most 256 a side. **`complete()` is false** for what triangles can't show: a blend

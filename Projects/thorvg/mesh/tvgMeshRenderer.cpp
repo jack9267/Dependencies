@@ -93,6 +93,11 @@ static void _boundary(TESStesselator* tess, int rule, MeshRegion& out)
         auto base = elems[i * 2];
         auto n = elems[i * 2 + 1];
         if (n < 3) continue;
+        // A sliver - its area over half its perimeter under a twentieth of a pixel - is left out: a path out and back
+        // along nearly the same line leaves one, and the anti-aliased edge (build) would draw it as a pixel-wide hairline
+        auto perimeter = 0.0f;
+        for (int k = 0; k < n; ++k) perimeter += length(verts[base + (k + 1) % n] - verts[base + k]);
+        if (perimeter > 0.0f && 2.0f * fabsf(_area(verts + base, uint32_t(n))) / perimeter < 0.05f) continue;
         out.pts.insert(out.pts.end(), verts + base, verts + base + n);
         out.counts.push_back(uint32_t(n));
     }
@@ -561,7 +566,6 @@ static std::shared_ptr<MeshTexture> _texture(const RenderSurface* surface)
     if (!surface || !surface->data || surface->w == 0 || surface->h == 0 || surface->channelSize != sizeof(uint32_t)) return nullptr;
 
     auto texture = std::make_shared<MeshTexture>();
-    texture->key = _key();
     texture->w = surface->w;
     texture->h = surface->h;
     texture->pixels.resize(size_t(surface->w) * surface->h);
@@ -569,6 +573,7 @@ static std::shared_ptr<MeshTexture> _texture(const RenderSurface* surface)
     auto noAlpha = (surface->cs == ColorSpace::XRGB8888 || surface->cs == ColorSpace::XBGR8888);
     auto straight = !surface->premultiplied && !noAlpha;
     auto opaque = true;
+    uint64_t hash = 14695981039346656037ull;   // FNV-1a over the pixels
 
     for (uint32_t y = 0; y < surface->h; ++y) {
         auto src = surface->buf32 + size_t(y) * surface->stride;
@@ -584,8 +589,12 @@ static std::shared_ptr<MeshTexture> _texture(const RenderSurface* surface)
             }
             if (a < 255) opaque = false;
             dst[x] = r | (g << 8) | (b << 16) | (a << 24);
+            hash = (hash ^ dst[x]) * 1099511628211ull;
         }
     }
+    // keyed by what it holds, so the same picture drawn again (a canvas's icon, every frame) is the same texture to the
+    // canvas's user, which keeps it; the top bit keeps it apart from _key()'s
+    texture->key = (hash ^ (uint64_t(surface->w) << 32) ^ surface->h) | (uint64_t(1) << 63);
     texture->opaque = opaque;
     return texture;
 }
