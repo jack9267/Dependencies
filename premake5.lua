@@ -849,14 +849,13 @@ headers_project {
 	{ file = "Projects/libtess2/src/Include/tesselator.h", to = "libtess2", systems = GUI },
 	{ dir = "Projects/flac/src/include/FLAC", to = "FLAC" },
 	{ dir = "Projects/flac/src/include/FLAC++", to = "FLAC++" },
-	-- bsdiff + prebuilt bass/fmod headers
+	-- bsdiff + prebuilt bass header
 	{ dir = "Projects/bsdiff/src/include", systems = WINDOWS },
 	{ file = "Projects/bass/src/c/bass.h", systems = WINDOWS },
-	{ files = "Projects/fmod/src/inc/*.h*", systems = WINDOWS },
 }
 -- --------------------------------------------------------------------------------------------
 -- The remaining Win32 / heavier libraries follow below (SDL, libressl, curl, cairo, pixman,
--- litehtml + gumbo, RmlUi, flac, bsdiff + libdivsufsort, and the prebuilt bass/fmod).
+-- litehtml + gumbo, RmlUi, flac, bsdiff + libdivsufsort, and the prebuilt bass).
 
 -- --------------------------------------------------------------------------------------------
 -- libressl: crypto + ssl (no tls lib), 4.4.0. The source lists are src/crypto/CMakeLists.txt's and
@@ -1364,9 +1363,9 @@ dep("bsdiff", {
 })
 
 -- --------------------------------------------------------------------------------------------
--- bass + fmod are prebuilt (no sources). This placeholder project exists only so common_project
+-- bass is prebuilt (no sources). This placeholder project exists only so common_project
 -- gives us the right Lib\<arch>\<toolset>_static\<config> target dir (%{cfg.targetdir}) to copy
--- the per-architecture prebuilt import libs + DLLs into, beside the built static libraries.
+-- the per-architecture prebuilt import lib + DLL into, beside the built static libraries.
 dep("prebuilt", {
 	systems = WINDOWS,
 	files = { "Projects/_prebuilt/prebuilt.c" },
@@ -1375,19 +1374,11 @@ dep("prebuilt", {
 		postbuildcommands {
 			'{COPYFILE} "%{wks.location}../Projects/bass/src/c/bass.lib" "%{cfg.targetdir}"',
 			'{COPYFILE} "%{wks.location}../Projects/bass/src/bass.dll" "%{cfg.targetdir}"',
-			'{COPYFILE} "%{wks.location}../Projects/fmod/src/lib/fmod.dll" "%{cfg.targetdir}"',
-			'{COPYFILE} "%{wks.location}../Projects/fmod/src/lib/fmod_vc.lib" "%{cfg.targetdir}"',
-			'{COPYFILE} "%{wks.location}../Projects/fmod/src/lib/fmodL.dll" "%{cfg.targetdir}"',
-			'{COPYFILE} "%{wks.location}../Projects/fmod/src/lib/fmodL_vc.lib" "%{cfg.targetdir}"',
 		}
 		filter "platforms:x64"
 		postbuildcommands {
 			'{COPYFILE} "%{wks.location}../Projects/bass/src/c/x64/bass.lib" "%{cfg.targetdir}"',
 			'{COPYFILE} "%{wks.location}../Projects/bass/src/x64/bass.dll" "%{cfg.targetdir}"',
-			'{COPYFILE} "%{wks.location}../Projects/fmod/src/lib/fmod64.dll" "%{cfg.targetdir}"',
-			'{COPYFILE} "%{wks.location}../Projects/fmod/src/lib/fmod64_vc.lib" "%{cfg.targetdir}"',
-			'{COPYFILE} "%{wks.location}../Projects/fmod/src/lib/fmodL64.dll" "%{cfg.targetdir}"',
-			'{COPYFILE} "%{wks.location}../Projects/fmod/src/lib/fmodL64_vc.lib" "%{cfg.targetdir}"',
 		}
 		filter {}
 	end,
