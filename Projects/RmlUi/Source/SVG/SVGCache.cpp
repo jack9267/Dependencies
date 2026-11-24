@@ -14,8 +14,6 @@
 #include "../Core/ControlledLifetimeResource.h"
 #include <algorithm>
 #include <lunasvg.h>
-#include <thorvg.h>      // Dependencies: drawn through LunaSVG's ThorVG scene,
-#include <thorvg_mesh.h> // as triangles (ThorVG's mesh canvas, ours) where they can show it all
 
 #ifdef RMLUI_SVG_DEBUG
 	#define RMLUI_SVG_DEBUG_LOG(...) Rml::Log::Message(Rml::Log::LT_DEBUG, __VA_ARGS__)
@@ -60,33 +58,19 @@ struct hash<::Rml::SVG::SVGKey> {
 namespace Rml {
 namespace SVG {
 
-	// Dependencies: base is what an <image href> in the SVG is relative to (the SVG's own path, or for one written in a
-	// document the document's), given to lunasvg for the host's image loader (lunasvg::setImageLoader).
 	static SharedPtr<SVGData> GetHandle(RenderManager& render_manager, String source_id, const String& source, SVGCache::SourceType source_type,
-		Vector2i dimensions, bool crop_to_content, ColourbPremultiplied colour, const String& base);
+		Vector2i dimensions, bool crop_to_content, ColourbPremultiplied colour);
 	static void ReleaseHandle(SVGData* handle);
 
 	struct SVGGeometry {
 		ColourbPremultiplied colour;
-		UniquePtr<SVGDrawList> draw_list; // Dependencies: its triangles, or its picture's quad
-	};
-
-	// Dependencies: a batch of an SVG's triangles (ThorVG's mesh canvas) at one size, uncoloured, and the image (in
-	// SVGTexture::images) it samples, -1 for none
-	struct SVGMeshPart {
-		Vector<Vertex> vertices;
-		Vector<int> indices;
-		int image;
+		UniquePtr<Geometry> geometry;
 	};
 
 	struct SVGTexture {
 		Vector2i render_dimensions;
 		bool crop_to_content;
 		CallbackTexture texture;
-		// Dependencies: drawn as triangles (parts, sampling images) rather than texture, when they show all of it
-		bool mesh = false;
-		Vector<SVGMeshPart> parts;
-		Vector<CallbackTexture> images;
 		// List of geometries using this texture, one entry for each unique color.
 		Vector<SVGGeometry> geometries;
 	};
@@ -110,92 +94,13 @@ namespace SVG {
 
 	static ControlledLifetimeResource<SVGCacheData> svg_cache_data;
 
-	SVGData::SVGData(const SVGDrawList& draw_list, Vector2f intrinsic_dimensions, const SVGKey& cache_key) :
-		draw_list(draw_list), intrinsic_dimensions(intrinsic_dimensions), cache_key(cache_key)
+	SVGData::SVGData(Geometry& geometry, Texture texture, Vector2f intrinsic_dimensions, const SVGKey& cache_key) :
+		geometry(geometry), texture(texture), intrinsic_dimensions(intrinsic_dimensions), cache_key(cache_key)
 	{}
 
 	SVGData::~SVGData()
 	{
 		ReleaseHandle(this);
-	}
-
-	void SVGData::Render(Vector2f translation) const
-	{
-		for (size_t i = 0; i < draw_list.geometries.size(); i++)
-			draw_list.geometries[i].Render(translation, draw_list.textures[i]);
-	}
-
-	// Dependencies: LunaSVG's document as a ThorVG scene (lunasvg's Document::renderToScene) of the given size, cropped
-	// to what it draws if asked
-	static tvg::Scene* MakeScene(lunasvg::Document* svg_document, Vector2i dimensions, bool crop_to_content)
-	{
-		if (crop_to_content)
-		{
-			const lunasvg::Box smallest_fit = svg_document->boundingBox();
-
-			lunasvg::Matrix matrix(dimensions.x / svg_document->width(), 0, 0, dimensions.y / svg_document->height(), 0, 0);
-			matrix.scale(svg_document->width() / smallest_fit.w, svg_document->height() / smallest_fit.h);
-			matrix.translate(-smallest_fit.x, -smallest_fit.y);
-
-			return svg_document->renderToScene(matrix, float(dimensions.x), float(dimensions.y));
-		}
-		return svg_document->renderToScene(float(dimensions.x), float(dimensions.y));
-	}
-
-	// Dependencies: the scene as triangles (ThorVG's mesh canvas): drawn by the GPU at any size it is shown, with no
-	// pixels made but small textures for gradients other than linear ones and for pictures. False when the mesh
-	// canvas can't show all of it (a blend mode, a filter, a mask of varying colour) - the texture is drawn then.
-	static bool MakeMesh(RenderManager& render_manager, lunasvg::Document* svg_document, Vector2i dimensions, bool crop_to_content,
-		SVGTexture& svg_texture)
-	{
-		tvg::Scene* scene = MakeScene(svg_document, dimensions, crop_to_content);
-		if (!scene)
-			return false;
-
-		tvg::MeshCanvas* canvas = tvg::MeshCanvas::gen();
-		bool drawn = false;
-		if (canvas && canvas->target(uint32_t(dimensions.x), uint32_t(dimensions.y)) == tvg::Result::Success &&
-			canvas->add(scene) == tvg::Result::Success)
-		{
-			scene = nullptr; // the canvas owns it now
-			drawn = canvas->draw(false) == tvg::Result::Success && canvas->sync() == tvg::Result::Success && canvas->complete();
-		}
-
-		if (drawn)
-		{
-			for (uint32_t i = 0; i < canvas->batches(); i++)
-			{
-				const tvg::MeshBatch* batch = canvas->batch(i);
-				SVGMeshPart part;
-				part.image = batch->image;
-				part.vertices.resize(batch->vertexCount);
-				for (uint32_t v = 0; v < batch->vertexCount; v++)
-				{
-					const tvg::MeshVertex& from = batch->vertices[v];
-					Vertex& to = part.vertices[v];
-					to.position = Vector2f(from.x, from.y);
-					to.tex_coord = Vector2f(from.u, from.v);
-					to.colour = ColourbPremultiplied(from.r, from.g, from.b, from.a);
-				}
-				part.indices.assign(batch->indices, batch->indices + batch->indexCount);
-				svg_texture.parts.push_back(std::move(part));
-			}
-			for (uint32_t i = 0; i < canvas->images(); i++)
-			{
-				const tvg::MeshImage* image = canvas->image(i);
-				Vector<uint32_t> pixels(image->pixels, image->pixels + size_t(image->width) * size_t(image->height));
-				const Vector2i size(int(image->width), int(image->height));
-				svg_texture.images.push_back(render_manager.MakeCallbackTexture(
-					[pixels = std::move(pixels), size](const CallbackTextureInterface& texture_interface) -> bool {
-						return texture_interface.GenerateTexture({reinterpret_cast<const byte*>(pixels.data()), pixels.size() * 4}, size);
-					}));
-			}
-			svg_texture.mesh = true;
-		}
-
-		delete canvas;
-		tvg::Paint::rel(scene); // not taken by a canvas (null: nothing)
-		return drawn;
 	}
 
 	static Vector<SVGTexture>::iterator FindSVGTexture(SVGDocument& doc, Vector2i dimensions, bool crop_to_content)
@@ -221,7 +126,7 @@ namespace SVG {
 	}
 
 	static SharedPtr<SVGData> GetHandle(RenderManager& render_manager, String move_from_id, const String& source, SVGCache::SourceType source_type,
-		const Vector2i dimensions, const bool crop_to_content, const ColourbPremultiplied colour, const String& base)
+		const Vector2i dimensions, const bool crop_to_content, const ColourbPremultiplied colour)
 	{
 		SVGKey key{std::move(move_from_id), dimensions, crop_to_content, colour};
 		const String& source_id = key.source_id;
@@ -258,14 +163,14 @@ namespace SVG {
 
 				// We use a reset-release approach here in case clients use a non-std unique_ptr (lunasvg uses std::unique_ptr). We also use
 				// loadFromData(char*, size_t) instead of loadFromData(std::string) in case clients use a non-std string.
-				doc.svg_document.reset(lunasvg::Document::loadFromData(svg_data.data(), svg_data.size(), base).release());
+				doc.svg_document.reset(lunasvg::Document::loadFromData(svg_data.data(), svg_data.size()).release());
 			}
 			else
 			{
 				RMLUI_SVG_DEBUG_LOG("Loading SVG document from element %s contents", source_id.c_str());
 				// We use a reset-release approach here in case clients use a non-std unique_ptr (lunasvg uses std::unique_ptr). We also use
 				// loadFromData(char*, size_t) instead of loadFromData(std::string) in case clients use a non-std string.
-				doc.svg_document.reset(lunasvg::Document::loadFromData(source.data(), source.size(), base).release());
+				doc.svg_document.reset(lunasvg::Document::loadFromData(source.data(), source.size()).release());
 			}
 
 			if (!doc.svg_document)
@@ -314,36 +219,38 @@ namespace SVG {
 				if (dimensions.x == 0 || dimensions.y == 0)
 					return false;
 
-				// Dependencies: LunaSVG's document as a ThorVG scene (lunasvg's Document::renderToScene), drawn by ThorVG's CPU
-				// engine into premultiplied RGBA (ABGR8888: R, G, B, A bytes), RmlUi's order - not LunaSVG's own pixels
-				tvg::Scene* scene = MakeScene(svg_document, dimensions, crop_to_content);
-
-				Vector<uint32_t> pixels(size_t(dimensions.x) * size_t(dimensions.y), 0);
-				bool drawn = false;
-				if (scene)
+				lunasvg::Bitmap bitmap;
+				if (crop_to_content)
 				{
-					tvg::SwCanvas* canvas = tvg::SwCanvas::gen();
-					if (canvas &&
-						canvas->target(pixels.data(), uint32_t(dimensions.x), uint32_t(dimensions.x), uint32_t(dimensions.y),
-							tvg::ColorSpace::ABGR8888) == tvg::Result::Success &&
-						canvas->add(scene) == tvg::Result::Success)
-					{
-						scene = nullptr; // the canvas owns it now
-						drawn = canvas->draw(true) == tvg::Result::Success && canvas->sync() == tvg::Result::Success;
-					}
-					delete canvas;
-					tvg::Paint::rel(scene); // not taken by a canvas (null: nothing)
+					const lunasvg::Box smallest_fit = svg_document->boundingBox();
+
+					lunasvg::Matrix matrix(dimensions.x / svg_document->width(), 0, 0, dimensions.y / svg_document->height(), 0, 0);
+					matrix.scale(svg_document->width() / smallest_fit.w, svg_document->height() / smallest_fit.h);
+					matrix.translate(-smallest_fit.x, -smallest_fit.y);
+
+					bitmap = lunasvg::Bitmap(dimensions.x, dimensions.y);
+					bitmap.clear(0x00000000);
+					svg_document->render(bitmap, matrix);
+				}
+				else
+				{
+					bitmap = svg_document->renderToBitmap(dimensions.x, dimensions.y);
 				}
 
-				if (!drawn)
+				if (!bitmap.valid() || !bitmap.data())
 				{
 					Log::Message(Rml::Log::Type::LT_WARNING, "Could not render SVG to bitmap: %s", GetSourceOr(svg_document, "").c_str());
 					return false;
 				}
 
-				const size_t bitmap_byte_size = pixels.size() * 4;
-				if (!texture_interface.GenerateTexture({reinterpret_cast<const Rml::byte*>(pixels.data()), bitmap_byte_size},
-						Vector2i{dimensions.x, dimensions.y}))
+				// Swap red and blue channels, assuming LunaSVG v2.3.2 or newer, to convert to RmlUi's expected RGBA-ordering.
+				const size_t bitmap_byte_size = bitmap.width() * bitmap.height() * 4;
+				uint8_t* bitmap_data = bitmap.data();
+				for (size_t i = 0; i < bitmap_byte_size; i += 4)
+					std::swap(bitmap_data[i], bitmap_data[i + 2]);
+
+				if (!texture_interface.GenerateTexture({reinterpret_cast<const Rml::byte*>(bitmap.data()), bitmap_byte_size},
+						Vector2i{bitmap.width(), bitmap.height()}))
 				{
 					Log::Message(Rml::Log::Type::LT_WARNING, "Could not generate texture for SVG: %s", GetSourceOr(svg_document, "").c_str());
 					return false;
@@ -352,10 +259,7 @@ namespace SVG {
 				return true;
 			};
 
-			// Dependencies: triangles where they show all of it, the texture otherwise
-			if (dimensions.x <= 0 || dimensions.y <= 0 ||
-				!MakeMesh(render_manager, doc.svg_document.get(), dimensions, crop_to_content, svg_texture))
-				svg_texture.texture = render_manager.MakeCallbackTexture(std::move(texture_callback));
+			svg_texture.texture = render_manager.MakeCallbackTexture(std::move(texture_callback));
 
 			doc.textures.push_back(std::move(svg_texture));
 			it_size = std::prev(doc.textures.end());
@@ -367,29 +271,9 @@ namespace SVG {
 			"We found an existing color entry in the SVG document cache, this should have been found as a cache key map entry instead.");
 		SVGGeometry colour_data;
 		colour_data.colour = colour;
-		colour_data.draw_list = MakeUnique<SVGDrawList>();
-		if (size_data.mesh)
-		{
-			// Dependencies: the triangles, their colours multiplied by the element's (image-color, opacity)
-			for (const SVGMeshPart& part : size_data.parts)
-			{
-				Mesh mesh;
-				mesh.vertices = part.vertices;
-				mesh.indices = part.indices;
-				for (Vertex& vertex : mesh.vertices)
-					for (int i = 0; i < 4; i++)
-						vertex.colour[i] = byte((int(vertex.colour[i]) * int(colour[i]) + 127) / 255);
-				colour_data.draw_list->geometries.push_back(render_manager.MakeGeometry(std::move(mesh)));
-				colour_data.draw_list->textures.push_back(part.image >= 0 ? Texture(size_data.images[part.image]) : Texture());
-			}
-		}
-		else
-		{
-			Mesh mesh;
-			MeshUtilities::GenerateQuad(mesh, Vector2f(0), Vector2f(size_data.render_dimensions), colour, Vector2f(0), Vector2f(1));
-			colour_data.draw_list->geometries.push_back(render_manager.MakeGeometry(std::move(mesh)));
-			colour_data.draw_list->textures.push_back(size_data.texture);
-		}
+		Mesh mesh;
+		MeshUtilities::GenerateQuad(mesh, Vector2f(0), Vector2f(size_data.render_dimensions), colour, Vector2f(0), Vector2f(1));
+		colour_data.geometry = MakeUnique<Geometry>(render_manager.MakeGeometry(std::move(mesh)));
 		size_data.geometries.push_back(std::move(colour_data));
 
 		// Create and insert the handle
@@ -398,7 +282,7 @@ namespace SVG {
 		const SVGKey& inserted_key = iterator_inserted.first->first;
 		WeakPtr<SVGData>& inserted_weak_data_pointer = iterator_inserted.first->second;
 
-		auto svg_handle = MakeShared<SVGData>(*size_data.geometries.back().draw_list, intrinsic_dimensions, inserted_key);
+		auto svg_handle = MakeShared<SVGData>(*size_data.geometries.back().geometry.get(), size_data.texture, intrinsic_dimensions, inserted_key);
 		inserted_weak_data_pointer = svg_handle;
 
 		return svg_handle;
@@ -468,13 +352,11 @@ namespace SVG {
 	void SVGCache::Initialize()
 	{
 		svg_cache_data.Initialize();
-		tvg::Initializer::init(0); // Dependencies: ThorVG draws the SVGs (counted: other users init it too)
 	}
 
 	void SVGCache::Shutdown()
 	{
 		svg_cache_data.Shutdown();
-		tvg::Initializer::term(); // Dependencies
 	}
 
 	SharedPtr<SVGData> SVGCache::GetHandle(const String& source_id, const String& source, SourceType source_type, Element* element,
@@ -490,19 +372,18 @@ namespace SVG {
 		if (dimensions.x == 0 || dimensions.y == 0)
 			dimensions = {0, 0};
 
-		String document_source_url;
-		if (ElementDocument* document = element->GetOwnerDocument())
-			document_source_url = StringUtilities::Replace(document->GetSourceURL(), '|', ':');
-
 		if (source_type == File)
 		{
 			String path;
-			if (!document_source_url.empty())
+			if (ElementDocument* document = element->GetOwnerDocument())
+			{
+				const String document_source_url = StringUtilities::Replace(document->GetSourceURL(), '|', ':');
 				GetSystemInterface()->JoinPath(path, document_source_url, source_id);
-			return Rml::SVG::GetHandle(*render_manager, path, path, source_type, dimensions, crop_to_content, colour, path);
+			}
+			return Rml::SVG::GetHandle(*render_manager, path, path, source_type, dimensions, crop_to_content, colour);
 		}
 
-		return Rml::SVG::GetHandle(*render_manager, source_id, source, source_type, dimensions, crop_to_content, colour, document_source_url);
+		return Rml::SVG::GetHandle(*render_manager, source_id, source, source_type, dimensions, crop_to_content, colour);
 	}
 
 } // namespace SVG

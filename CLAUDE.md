@@ -630,8 +630,8 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
 
 ## RmlUi (`Projects/RmlUi`) and LunaSVG (`Projects/lunasvg`)
 
-- **RmlUi 6.3, with one patch of ours** (2026-11-14, from 6.2, which was stock): `Include`, `Source` and `Backends`
-  are the `6.3` tag's (github.com/mikke89/RmlUi), unchanged but for the SVG image patch below. `CMakeLists.txt`
+- **RmlUi 6.3, unpatched** (2026-11-14, from 6.2): `Include`, `Source` and `Backends` are the `6.3` tag's
+  (github.com/mikke89/RmlUi) as they are - `Source/SVG` too, since 2026-11-24 (below). `CMakeLists.txt`
   beside them is the old CMake build's wrapper, not what is built. Built by premake5.lua as `rmlui_core_static` (FreeType font engine) and `rmlui_debugger_static`;
   the version string is a define there (`RMLUI_VERSION`), so change it with an update. 6.3 needs C++17 (every
   build here already is) and its custom RTTI is always on: a class of ours derived from an RmlUi one that is
@@ -640,16 +640,22 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   it, so `<svg src>` and the `svg` decorator work wherever RmlUi does - and **a program linking
   `rmlui_core_static` must link `lunasvg_static` and `plutovg_static` too** (GTAC's client and launcher,
   GalacticSamples' RmlTest). `lunasvg.h` is installed (for the image loader below); plutovg's headers are not.
-- **An SVG's pictures (`<image href>`) come from the host: a patch to each of LunaSVG and RmlUi, which an update must
-  put back** (2026-11-14, the user's call). Upstream LunaSVG decoded a `data:` URI with plutovg's stb_image (not safe
+- **RmlUi's SVGs are drawn by Galactic, not this plugin** (2026-11-24, Lucas's idea, the user's go-ahead): Galactic's
+  RmlGUI registers its own `<svg>` element (`CRmlSVGElement`, derived from `Rml::ElementSVG` so the plugin's node handler
+  for an SVG written in the document still reaches it) and `svg()` decorator over the plugin's, after `Rml::Initialise`
+  (RmlUi's factory replaces an instancer registered under the same name). So the plugin is built as upstream ships it
+  and never draws: what used to be patched into its `SVGCache` (the triangles, the base for pictures) is Galactic's.
+  It is still built, for its node handler and `Rml::ElementSVG`.
+- **An SVG's pictures (`<image href>`) come from the host: a patch to LunaSVG, which an update must
+  put back** (2026-11-14, the user's call; RmlUi's half moved to Galactic on 2026-11-24). Upstream LunaSVG decoded a `data:` URI with plutovg's stb_image (not safe
   on untrusted input, and SVGs come from servers) and handed any other href to `fopen` - a server's SVG reading any
   file on the player's disk, past the program's file system. Now:
   - LunaSVG (`lunasvg.h`, `source/lunasvg.cpp`, `source/svgelement.cpp`, each marked `Dependencies`):
     `lunasvg::setImageLoader(fn)`, a function given the href as written and the document's base, returning a
     `Bitmap`; `Document::loadFromData(data, length, base)` keeps the base (`Document::base()`); `<image>` asks the
     loader, and with none set shows nothing. plutovg's image loading is never reached.
-  - RmlUi (`Source/SVG/SVGCache.cpp`, marked `Dependencies`): passes the base - the SVG's own path for `<svg src>`
-    and the `svg()` decorator, the document's URL for an SVG written in the document - so an href is relative to it.
+  - Galactic's `CRmlSVGElement` passes the base - the SVG's own path for `<svg src>` and the `svg()` decorator, the
+    document's URL for an SVG written in the document - so an href is relative to it.
   - Galactic's RmlGUI sets the loader (`LoadSVGImage`, `RmlUi.cpp`): joins with the system interface's `JoinPath`,
     reads through Rml's file interface, decodes with the engine's `CMipLevel::LoadFromImage` (libpng, libjpeg-turbo),
     as an `<img>` is. A host that sets none gets SVGs without pictures.
@@ -663,18 +669,10 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
   its font cache with a critical section (no C11 atomics or threads); its imports are kernel32's file, mapping,
   `FindFirstFileA` and critical-section calls, all on XP. Its stb copies (stb_image's thread-local failure reason
   included - YY-Thunks gives XP implicit TLS) are all `static`; stb_image is still compiled in, only unreached.
-- **RmlUi's SVGs are triangles, drawn by the GPU** (2026-11-21, a third patch, `Source/SVG/SVGCache.cpp`/`.h`,
-  `ElementSVG.cpp`, `DecoratorSVG.cpp`, marked `Dependencies`; Lucas: animating an SVG made it rasterize again every
-  frame). Each new size asks LunaSVG for its scene (`renderToScene`, below) and draws it on ThorVG's mesh canvas
-  (`thorvg_mesh.h`, ours, below): its batches become RmlUi geometry, kept per size, with their vertex colours
-  multiplied by the element's `image-color` and opacity per colour as the quad's were, and its textures (gradients
-  other than linear, pictures) callback textures. A handle is an `SVGDrawList` (geometries and the texture each
-  samples) rendered by `SVGData::Render`, where it was one quad and one texture. **When the mesh canvas says it
-  wasn't complete** (a blend mode, a filter, a mask of varying colour), it is the texture as before: ThorVG's CPU engine
-  into premultiplied RGBA (`ColorSpace::ABGR8888`, RmlUi 6's order). `SVGCache::Initialize`/`Shutdown` start and stop
-  ThorVG (it counts its users). So **`rmlui_core_static` needs `thorvg_static` and `libtess2_static` linked too**.
-  Seen in GalacticSamples' RmlTest (`-document SVG`, Direct3D 9): `<svg src>`, inline, the decorator and two sizes as
-  before, every one as triangles (the badge's radial gradient is its one texture).
+- **RmlUi's SVGs were triangles, drawn by the GPU, through a patch here** (2026-11-21 to 2026-11-24, in
+  `Source/SVG`): that drawing is Galactic's now (above), pictures by default and the triangles (ThorVG's mesh canvas,
+  `thorvg_mesh.h`, below) behind a global switch. `rmlui_core_static` itself no longer needs ThorVG, but LunaSVG does
+  (below), so a program with RmlUi still links `thorvg_static` and `libtess2_static`.
 - **LunaSVG also draws into a ThorVG scene: a second patch, which an update must put back** (2026-11-21, the user's
   call: SVG as geometry, for drawing it on the GPU later, keeping all the SVG LunaSVG reads). `Canvas` (`graphics.h`,
   `graphics.cpp`) has a scene mode beside its plutovg pixels: `Canvas::createScene` builds a `tvg::Scene` of what the

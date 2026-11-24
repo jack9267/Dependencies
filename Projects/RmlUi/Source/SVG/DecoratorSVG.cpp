@@ -39,7 +39,7 @@ namespace SVG {
 	{
 		Data* data = reinterpret_cast<Data*>(element_data);
 		RMLUI_ASSERT(data && data->handle);
-		data->handle->Render(element->GetAbsoluteOffset(data->paint_area)); // Dependencies: a draw list, not one quad
+		data->handle->geometry.Render(element->GetAbsoluteOffset(data->paint_area), data->handle->texture);
 	}
 
 	DecoratorSVGInstancer::DecoratorSVGInstancer()
