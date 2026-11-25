@@ -630,8 +630,15 @@ Rules and findings for the Dependencies repo (the vendored third-party libraries
 
 ## RmlUi (`Projects/RmlUi`) and LunaSVG (`Projects/lunasvg`)
 
-- **RmlUi 6.3, unpatched** (2026-11-14, from 6.2): `Include`, `Source` and `Backends` are the `6.3` tag's
-  (github.com/mikke89/RmlUi) as they are - `Source/SVG` too, since 2026-11-24 (below). `CMakeLists.txt`
+- **RmlUi 6.3, with one patch** (2026-11-14, from 6.2): `Include`, `Source` and `Backends` are the `6.3` tag's
+  (github.com/mikke89/RmlUi) as they are - `Source/SVG` too, since 2026-11-24 (below) - except for **the patch,
+  `ElementText::GenerateLine`'s word breaking** (2026-11-25, the user's call; marked `Galactic:`). With
+  `word-break: break-word`/`break-all`, upstream shortened a word too long for its line one character at a time and
+  measured the whole of what was left each time (its own comment: "@performance: Can be made much faster ...
+  logarithmic search"; master still has it) - for one line, characters² steps, so a 3,900-character word pasted into
+  GTAC's chat line (a textarea with `break-word`) froze the game for minutes. It is a binary search over the word's
+  characters now: the same break wherever a longer part is never narrower than a shorter one. Carry it over on an
+  update until upstream has its own. `CMakeLists.txt`
   beside them is the old CMake build's wrapper, not what is built. Built by premake5.lua as `rmlui_core_static` (FreeType font engine) and `rmlui_debugger_static`;
   the version string is a define there (`RMLUI_VERSION`), so change it with an update. 6.3 needs C++17 (every
   build here already is) and its custom RTTI is always on: a class of ours derived from an RmlUi one that is

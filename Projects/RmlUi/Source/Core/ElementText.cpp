@@ -279,35 +279,50 @@ bool ElementText::GenerateLine(String& line, int& line_length, float& line_width
 				{
 					// Try to break up the word
 					max_token_width = RoundDownToIntegerClamped(maximum_line_width - line_width);
-					const int token_max_size = int(next_token_begin - token_begin);
-					const char* partial_string_end = token_begin + token_max_size;
+					const char* token_end = next_token_begin;
 
-					// @performance: Can be made much faster. Use string width heuristics and logarithmic search.
-					while (true)
-					{
-						partial_string_end = StringUtilities::SeekBackwardUTF8(partial_string_end - 1, token_begin);
-
-						bool force_loop_break_at_end = false;
-						if (partial_string_end == token_begin)
-						{
-							// Not even the first character of the token fits. Let it overflow onto the next line if we can.
-							if (allow_empty || !line.empty())
-								return false;
-
-							// Continue by forcing the first character to be consumed, even though it will overflow.
-							partial_string_end = StringUtilities::SeekForwardUTF8(token_begin + 1, token_begin + token_max_size);
-							force_loop_break_at_end = true;
-						}
-
+					auto BuildPartialToken = [&](const char* partial_string_end) {
 						token.clear();
 						next_token_begin = token_begin;
 						BuildToken(token, next_token_begin, partial_string_end, line.empty() && trim_whitespace_prefix, collapse_white_space,
 							break_at_endline, text_transform_property, decode_escape_characters);
 						token_width = font_engine_interface->GetStringWidth(font_face_handle, token, text_shaping_context, previous_codepoint);
+					};
 
-						if (force_loop_break_at_end || token_width <= max_token_width)
+					// Galactic: the longest part of the word that fits, found by a binary search over its characters. Upstream
+					// measured it one character shorter at a time, the whole part each time, so a word of a few thousand
+					// characters took seconds to lay out. fits_end is the longest end known to fit (token_begin: none is
+					// known), too_long_end the shortest known not to (the whole word, to begin with).
+					const char* fits_end = token_begin;
+					const char* too_long_end = token_end;
+					while (true)
+					{
+						const char* middle = fits_end + (too_long_end - fits_end) / 2;
+						while (middle != fits_end && (*middle & 0b1100'0000) == 0b1000'0000)
+							--middle;
+						if (middle == fits_end)
+							middle = StringUtilities::SeekForwardUTF8(fits_end + 1, too_long_end);
+						if (middle == too_long_end)
 							break;
+
+						BuildPartialToken(middle);
+						if (token_width <= max_token_width)
+							fits_end = middle;
+						else
+							too_long_end = middle;
 					}
+
+					if (fits_end == token_begin)
+					{
+						// Not even the first character of the token fits. Let it overflow onto the next line if we can.
+						if (allow_empty || !line.empty())
+							return false;
+
+						// Continue by forcing the first character to be consumed, even though it will overflow.
+						BuildPartialToken(StringUtilities::SeekForwardUTF8(token_begin + 1, token_end));
+					}
+					else
+						BuildPartialToken(fits_end);
 
 					break_line = true;
 				}
